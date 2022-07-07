@@ -1,5 +1,6 @@
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { componentStyle, seniorCfg } from '../common/common'
+import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 
 export function baseLineOption(chart_option, chart) {
   // 处理shape attr
@@ -15,6 +16,10 @@ export function baseLineOption(chart_option, chart) {
       const reg = new RegExp('\n', 'g')
       tooltip.formatter = tooltip.formatter.replace(reg, '<br/>')
       chart_option.tooltip = tooltip
+
+      const bgColor = tooltip.backgroundColor ? tooltip.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
+      chart_option.tooltip.backgroundColor = bgColor
+      chart_option.tooltip.borderColor = bgColor
     }
   }
   // 处理data
@@ -44,6 +49,8 @@ export function baseLineOption(chart_option, chart) {
           delete y.areaStyle
         }
       }
+      y.selectedMode = true
+      y.select = BASE_ECHARTS_SELECT
       // label
       if (customAttr.label) {
         y.label = customAttr.label
@@ -53,7 +60,6 @@ export function baseLineOption(chart_option, chart) {
       chart_option.series.push(y)
     }
   }
-  // console.log(chart_option);
   componentStyle(chart_option, chart)
   seniorCfg(chart_option, chart)
   return chart_option

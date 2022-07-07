@@ -30,27 +30,8 @@ export function baseWordCloudOptionAntV(plot, container, chart, action) {
     tooltip: tooltip,
     legend: false,
     interactions: [
-      {
-        type: 'element-active', cfg: {
-          start: [{ trigger: 'element:mouseenter', action: ['element-highlight:highlight', 'element-active:reset', 'cursor:pointer'] }],
-          end: [{ trigger: 'element:mouseleave', action: ['element-highlight:reset', 'element-active:reset', 'cursor:default'] }]
-        }
-      }
     ]
   }
-  // size
-  // let customAttr = {}
-  // if (chart.customAttr) {
-  //   customAttr = JSON.parse(chart.customAttr)
-  //   if (customAttr.size) {
-  //     const s = JSON.parse(JSON.stringify(customAttr.size))
-  //     if (s.barDefault) {
-  //       delete options.marginRatio
-  //     } else {
-  //       options.marginRatio = s.barGap
-  //     }
-  //   }
-  // }
 
   // 开始渲染
   if (plot) {

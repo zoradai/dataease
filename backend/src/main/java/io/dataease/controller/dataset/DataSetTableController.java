@@ -11,6 +11,7 @@ import io.dataease.controller.request.dataset.DataSetTableRequest;
 import io.dataease.controller.response.DataSetDetail;
 import io.dataease.dto.dataset.DataSetTableDTO;
 import io.dataease.dto.dataset.ExcelFileData;
+import io.dataease.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.base.domain.DatasetTable;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableIncrementalConfig;
@@ -49,7 +50,8 @@ public class DataSetTableController {
 
     @DePermissions(value = {
             @DePermission(type = DePermissionType.DATASET, value = "id", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE),
-            @DePermission(type = DePermissionType.DATASET, value = "sceneId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE)
+            @DePermission(type = DePermissionType.DATASET, value = "sceneId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE),
+            @DePermission(type = DePermissionType.DATASOURCE, value = "dataSourceId", level = ResourceAuthLevel.DATASOURCE_LEVEL_USE)
     }, logical = Logical.AND)
     @ApiOperation("更新")
     @PostMapping("update")
@@ -135,6 +137,10 @@ public class DataSetTableController {
 
     @ApiOperation("根据sql查询预览数据")
     @PostMapping("sqlPreview")
+    @DePermissions(value = {
+            @DePermission(type = DePermissionType.DATASET, value = "id", level = ResourceAuthLevel.DATASET_LEVEL_USE),
+            @DePermission(type = DePermissionType.DATASOURCE, value = "dataSourceId", level = ResourceAuthLevel.DATASOURCE_LEVEL_USE)
+    }, logical = Logical.AND)
     public Map<String, Object> getSQLPreview(@RequestBody DataSetTableRequest dataSetTableRequest) throws Exception {
         return dataSetTableService.getSQLPreview(dataSetTableRequest);
     }
@@ -203,4 +209,10 @@ public class DataSetTableController {
     public Map<String, Object> unionPreview(@RequestBody DataSetTableRequest dataSetTableRequest) throws Exception {
         return dataSetTableService.getUnionPreview(dataSetTableRequest);
     }
+
+    @ApiOperation("根据仪表板视图ID查询数据集变量")
+    @PostMapping("/paramsWithIds")
+    List<SqlVariableDetails> paramsWithIds(@RequestBody List<String> viewIds){
+        return dataSetTableService.paramsWithIds(viewIds);
+    };
 }

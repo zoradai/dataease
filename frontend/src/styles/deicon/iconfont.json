@@ -6,6 +6,160 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "30342179",
+      "name": "icon_Batch_outlined",
+      "font_class": "icon_Batch_outlined",
+      "unicode": "e630",
+      "unicode_decimal": 58928
+    },
+    {
+      "icon_id": "30335147",
+      "name": "icon_clear_outlined",
+      "font_class": "icon_clear_outlined",
+      "unicode": "e61d",
+      "unicode_decimal": 58909
+    },
+    {
+      "icon_id": "30335253",
+      "name": "icon_dialpad_outlined",
+      "font_class": "icon_dialpad_outlined",
+      "unicode": "e61e",
+      "unicode_decimal": 58910
+    },
+    {
+      "icon_id": "30335256",
+      "name": "icon_effects_outlined",
+      "font_class": "icon_effects_outlined",
+      "unicode": "e620",
+      "unicode_decimal": 58912
+    },
+    {
+      "icon_id": "30335257",
+      "name": "icon_magnify_outlined",
+      "font_class": "icon_magnify_outlined",
+      "unicode": "e621",
+      "unicode_decimal": 58913
+    },
+    {
+      "icon_id": "30335264",
+      "name": "icon_moments-categories_outlined",
+      "font_class": "icon_moments-categories_outlined",
+      "unicode": "e623",
+      "unicode_decimal": 58915
+    },
+    {
+      "icon_id": "30335293",
+      "name": "icon_pc_outlined",
+      "font_class": "icon_pc_outlined",
+      "unicode": "e626",
+      "unicode_decimal": 58918
+    },
+    {
+      "icon_id": "30335296",
+      "name": "icon_phone_outlined",
+      "font_class": "icon_phone_outlined",
+      "unicode": "e627",
+      "unicode_decimal": 58919
+    },
+    {
+      "icon_id": "30335326",
+      "name": "icon_redo_outlined",
+      "font_class": "icon_redo_outlined",
+      "unicode": "e629",
+      "unicode_decimal": 58921
+    },
+    {
+      "icon_id": "30335389",
+      "name": "icon_undo_outlined",
+      "font_class": "icon_undo_outlined",
+      "unicode": "e62b",
+      "unicode_decimal": 58923
+    },
+    {
+      "icon_id": "30335393",
+      "name": "icon-more",
+      "font_class": "icon-more",
+      "unicode": "e62e",
+      "unicode_decimal": 58926
+    },
+    {
+      "icon_id": "30335394",
+      "name": "icon-quicksetting",
+      "font_class": "icon-quicksetting",
+      "unicode": "e62f",
+      "unicode_decimal": 58927
+    },
+    {
+      "icon_id": "19959130",
+      "name": "square-selected",
+      "font_class": "square-selected",
+      "unicode": "e73e",
+      "unicode_decimal": 59198
+    },
+    {
+      "icon_id": "2958392",
+      "name": "italic",
+      "font_class": "italic",
+      "unicode": "e777",
+      "unicode_decimal": 59255
+    },
+    {
+      "icon_id": "1115048",
+      "name": "箭头",
+      "font_class": "jiantou",
+      "unicode": "e622",
+      "unicode_decimal": 58914
+    },
+    {
+      "icon_id": "10931817",
+      "name": "magic-line",
+      "font_class": "magic-line",
+      "unicode": "e63a",
+      "unicode_decimal": 58938
+    },
+    {
+      "icon_id": "77822",
+      "name": "更多",
+      "font_class": "gengduo",
+      "unicode": "e60c",
+      "unicode_decimal": 58892
+    },
+    {
+      "icon_id": "1817728",
+      "name": "清空",
+      "font_class": "qingkong",
+      "unicode": "e61c",
+      "unicode_decimal": 58908
+    },
+    {
+      "icon_id": "2815705",
+      "name": "查看",
+      "font_class": "chakan",
+      "unicode": "e610",
+      "unicode_decimal": 58896
+    },
+    {
+      "icon_id": "27472802",
+      "name": "outline-redo",
+      "font_class": "outline-redo",
+      "unicode": "e68c",
+      "unicode_decimal": 59020
+    },
+    {
+      "icon_id": "27472812",
+      "name": "outline-undo",
+      "font_class": "outline-undo",
+      "unicode": "e68d",
+      "unicode_decimal": 59021
+    },
+    {
+      "icon_id": "1382",
+      "name": "定位",
+      "font_class": "dingwei",
+      "unicode": "e60a",
+      "unicode_decimal": 58890
+    },
+    {
       "icon_id": "2471358",
       "name": "富文本框",
       "font_class": "fuwenbenkuang",

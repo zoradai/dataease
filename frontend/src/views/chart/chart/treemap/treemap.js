@@ -1,5 +1,6 @@
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { componentStyle } from '../common/common'
+import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 
 export function baseTreemapOption(chart_option, chart) {
   // 处理shape attr
@@ -15,6 +16,10 @@ export function baseTreemapOption(chart_option, chart) {
       const reg = new RegExp('\n', 'g')
       tooltip.formatter = tooltip.formatter.replace(reg, '<br/>')
       chart_option.tooltip = tooltip
+
+      const bgColor = tooltip.backgroundColor ? tooltip.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
+      chart_option.tooltip.backgroundColor = bgColor
+      chart_option.tooltip.borderColor = bgColor
     }
   }
   // 处理data
@@ -41,23 +46,19 @@ export function baseTreemapOption(chart_option, chart) {
       }
       const valueArr = chart.data.series[0].data
       for (let i = 0; i < valueArr.length; i++) {
-        // const y = {
-        //   name: chart.data.x[i],
-        //   value: valueArr[i]
-        // }
         const y = valueArr[i]
         y.name = chart.data.x[i]
         // color
         y.itemStyle = {
           color: hexColorToRGBA(customAttr.color.colors[i % customAttr.color.colors.length], customAttr.color.alpha)
         }
-        // y.type = 'treemap'
+        chart_option.series[0].selectedMode = true
+        chart_option.series[0].select = BASE_ECHARTS_SELECT
         chart_option.series[0].data.push(y)
       }
       chart_option.series[0].name = chart.data.series[0].name
     }
   }
-  // console.log(chart_option);
   componentStyle(chart_option, chart)
   return chart_option
 }

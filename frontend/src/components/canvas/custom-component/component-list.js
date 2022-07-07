@@ -17,23 +17,30 @@ export const BASE_MOBILE_STYLE = {
 }
 
 // 组件仪表板样式
-export const COMMON_BACKGROUND = {
-  enable: true,
-  backgroundType: 'color',
+export const COMMON_BACKGROUND_BASE = {
+  backgroundColorSelect: true,
   color: '#FFFFFF',
-  innerImage: null,
-  outerImage: null,
   alpha: 100,
   borderRadius: 5,
   innerPadding: 0
 }
 
+// 组件仪表板样式
+export const COMMON_BACKGROUND = {
+  ...COMMON_BACKGROUND_BASE,
+  enable: false,
+  backgroundType: 'innerImage',
+  innerImage: 'board/blue_1.svg',
+  outerImage: null
+}
+
 // 空组件仪表板样式
 export const COMMON_BACKGROUND_NONE = {
   enable: false,
-  backgroundType: 'color',
+  backgroundColorSelect: false,
+  backgroundType: 'innerImage',
   color: '#FFFFFF',
-  innerImage: null,
+  innerImage: 'board/blue_1.svg',
   outerImage: null,
   alpha: 100,
   borderRadius: 0,
@@ -47,6 +54,11 @@ export const commonStyle = {
   borderStyle: 'solid',
   borderWidth: 0,
   borderRadius: 0
+}
+
+export const PIC_STYLE = {
+  ...commonStyle,
+  adaptation: 'adaptation'
 }
 
 export const commonAttr = {
@@ -156,7 +168,7 @@ export const assistList = [
 export const pictureList = [
   {
     id: '20001',
-    component: 'picture-add',
+    component: 'Picture',
     type: 'picture-add',
     label: '图片',
     icon: 'iconfont icon-picture',
@@ -450,7 +462,7 @@ const list = [
   },
   {
     id: '20001',
-    component: 'picture-add',
+    component: 'Picture',
     type: 'picture-add',
     label: '图片',
     icon: 'iconfont icon-picture',
@@ -459,7 +471,8 @@ const list = [
     hyperlinks: HYPERLINKS,
     style: {
       width: 400,
-      height: 200
+      height: 200,
+      adaptation: 'adaptation'
     },
     x: 1,
     y: 1,

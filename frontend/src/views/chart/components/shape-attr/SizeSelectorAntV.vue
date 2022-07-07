@@ -258,8 +258,9 @@
           </el-tooltip>
         </el-form-item>
         <el-form-item
-          v-show="showProperty('tableColumnWidth') && sizeForm.tableColumnMode === 'custom'"
+          v-show="showProperty('tableColumnMode') && sizeForm.tableColumnMode === 'custom'"
           label=""
+          label-width="100px"
           class="form-item form-item-slider"
         >
           <el-slider
@@ -272,10 +273,16 @@
             @change="changeBarSizeCase('tableColumnWidth')"
           />
         </el-form-item>
-        <!--table-end-->
-        <!--gauge-begin-->
+      </el-form>
+      <!--table-end-->
+
+      <!--gauge-begin-->
+      <el-form ref="sizeFormGauge" :model="sizeForm" label-width="100px" size="mini">
+        <el-form-item v-show="showProperty('gaugeMin')" :label="$t('chart.min')" class="form-item form-item-slider">
+          <el-input-number v-model="sizeForm.gaugeMin" size="mini" @change="changeBarSizeCase" />
+        </el-form-item>
         <el-form-item v-show="showProperty('gaugeMax')" :label="$t('chart.max')" class="form-item form-item-slider">
-          <el-input-number v-model="sizeForm.gaugeMax" size="mini" @change="changeBarSizeCase('gaugeMax')" />
+          <el-input-number v-model="sizeForm.gaugeMax" size="mini" @change="changeBarSizeCase" />
         </el-form-item>
         <el-form-item
           v-show="showProperty('gaugeStartAngle')"
@@ -307,14 +314,15 @@
             @change="changeBarSizeCase('gaugeEndAngle')"
           />
         </el-form-item>
-        <!--gauge-end-->
-        <!--text&label-end-->
+        <el-form-item v-show="showProperty('gaugeTickCount')" :label="$t('chart.tick_count')" class="form-item form-item-slider">
+          <el-input-number v-model="sizeForm.gaugeTickCount" :min="1" :step="1" :precision="0" size="mini" @change="changeBarSizeCase('gaugeTickCount')" />
+        </el-form-item>
+      </el-form>
+      <!--gauge-end-->
+
+      <el-form ref="sizeFormPie" :model="sizeForm" label-width="100px" size="mini">
         <el-form-item v-show="showProperty('quotaFontSize')" :label="$t('chart.quota_font_size')" class="form-item">
-          <el-select
-            v-model="sizeForm.quotaFontSize"
-            :placeholder="$t('chart.quota_font_size')"
-            @change="changeBarSizeCase('quotaFontSize')"
-          >
+          <el-select v-model="sizeForm.quotaFontSize" :placeholder="$t('chart.quota_font_size')" @change="changeBarSizeCase('quotaFontSize')">
             <el-option v-for="option in fontSize" :key="option.value" :label="option.name" :value="option.value" />
           </el-select>
         </el-form-item>
@@ -520,6 +528,8 @@ export default {
 
           this.sizeForm.tableHeaderAlign = this.sizeForm.tableHeaderAlign ? this.sizeForm.tableHeaderAlign : DEFAULT_SIZE.tableHeaderAlign
           this.sizeForm.tableItemAlign = this.sizeForm.tableItemAlign ? this.sizeForm.tableItemAlign : DEFAULT_SIZE.tableItemAlign
+
+          this.sizeForm.gaugeTickCount = this.sizeForm.gaugeTickCount ? this.sizeForm.gaugeTickCount : DEFAULT_SIZE.gaugeTickCount
         }
       }
     },
@@ -535,6 +545,10 @@ export default {
     },
     changeBarSizeCase(modifyName) {
       this.sizeForm['modifyName'] = modifyName
+      if (this.sizeForm.gaugeMax <= this.sizeForm.gaugeMin) {
+        this.$message.error(this.$t('chart.max_more_than_mix'))
+        return
+      }
       this.$emit('onSizeChange', this.sizeForm)
     },
     showProperty(property) {

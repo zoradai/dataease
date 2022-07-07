@@ -20,6 +20,9 @@
           <el-form-item v-show="showProperty('textStyle')" :label="$t('chart.text_color')" class="form-item">
             <el-color-picker v-model="tooltipForm.textStyle.color" class="color-picker-style" :predefine="predefineColors" @change="changeTooltipAttr('textStyle')" />
           </el-form-item>
+          <el-form-item v-show="showProperty('textStyle')" :label="$t('chart.background')" class="form-item">
+            <el-color-picker v-model="tooltipForm.backgroundColor" class="color-picker-style" :predefine="predefineColors" @change="changeTooltipAttr('textStyle')" />
+          </el-form-item>
           <el-form-item v-show="showProperty('formatter')" class="form-item">
             <span slot="label">
               <span class="span-box">
@@ -34,10 +37,6 @@
                     <br><br>
                     折线（区域）图、柱状（条形）图、仪表盘 : {a}（系列名称），{b}（类目值），{c}（数值）
                     <br>
-                    <!--                    散点图（气泡）图 : {a}（系列名称），{b}（数据名称），{c}（数值数组）, {d}（无）-->
-                    <!--                    <br>-->
-                    <!--                    地图 : {a}（系列名称），{b}（区域名称），{c}（合并数值）, {d}（无）-->
-                    <!--                    <br>-->
                     饼图、漏斗图: {a}（系列名称），{b}（数据项名称），{c}（数值）, {d}（百分比）
                   </div>
                   <i class="el-icon-info" style="cursor: pointer;" />
@@ -105,6 +104,8 @@ export default {
         }
         if (customAttr.tooltip) {
           this.tooltipForm = customAttr.tooltip
+
+          this.tooltipForm.backgroundColor = this.tooltipForm.backgroundColor ? this.tooltipForm.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
         }
       }
     },

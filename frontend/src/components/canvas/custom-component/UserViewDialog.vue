@@ -1,6 +1,6 @@
 <template>
-  <de-container v-loading="$store.getters.loadingMap[$store.getters.currentPath]">
-    <de-aside-container v-if="showChartCanvas">
+  <de-container v-loading="$store.getters.loadingMap[$store.getters.currentPath]" :class="isAbsoluteContainer ? 'abs-container' : ''">
+    <de-main-container v-show="showChartCanvas">
       <div id="chartCanvas" class="canvas-class" :style="customStyle">
         <div class="canvas-class" :style="commonStyle">
           <plugin-com
@@ -12,14 +12,15 @@
           />
           <chart-component v-else-if="!chart.type.includes('text') && chart.type !== 'label' && !chart.type.includes('table') && renderComponent() === 'echarts'" class="chart-class" :chart="mapChart || chart" />
           <chart-component-g2 v-else-if="!chart.type.includes('text') && chart.type !== 'label' && !chart.type.includes('table') && renderComponent() === 'antv'" class="chart-class" :chart="chart" />
-          <chart-component-s2 v-else-if="chart.type === 'table-pivot' && renderComponent() === 'antv'" class="chart-class" :chart="chart" />
+          <chart-component-s2 v-else-if="chart.type.includes('table') && renderComponent() === 'antv'" class="chart-class" :chart="chart" />
           <label-normal v-else-if="chart.type.includes('text')" :chart="chart" class="table-class" />
           <label-normal-text v-else-if="chart.type === 'label'" :chart="chart" class="table-class" />
+          <table-normal v-else-if="chart.type.includes('table') && renderComponent() === 'echarts'" :chart="chart" class="table-class" />
         </div>
       </div>
-    </de-aside-container>
-    <de-main-container>
-      <table-normal :chart="chartTable" :show-summary="false" class="table-class" />
+    </de-main-container>
+    <de-main-container v-show="!showChartCanvas">
+      <table-normal :enable-scroll="false" :chart="chartTable" :show-summary="false" class="table-class" />
     </de-main-container>
   </de-container>
 </template>
@@ -32,7 +33,6 @@ import LabelNormal from '@/views/chart/components/normal/LabelNormal'
 import DeMainContainer from '@/components/dataease/DeMainContainer'
 import DeContainer from '@/components/dataease/DeContainer'
 import DeAsideContainer from '@/components/dataease/DeAsideContainer'
-// import { export_json_to_excel } from '@/plugins/Export2Excel'
 import { mapState } from 'vuex'
 import ChartComponentG2 from '@/views/chart/components/ChartComponentG2'
 import PluginCom from '@/views/system/plugin/PluginCom'
@@ -43,7 +43,7 @@ import html2canvas from 'html2canvasde'
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { deepCopy, exportImg } from '@/components/canvas/utils/utils'
 export default {
-  name: 'UserView',
+  name: 'UserViewDialog',
   components: { LabelNormalText, ChartComponentS2, ChartComponentG2, DeMainContainer, DeContainer, DeAsideContainer, ChartComponent, TableNormal, LabelNormal, PluginCom },
   props: {
     chart: {
@@ -53,6 +53,10 @@ export default {
     chartTable: {
       type: Object,
       default: null
+    },
+    openType: {
+      type: String,
+      default: 'details'
     }
   },
   data() {
@@ -63,9 +67,14 @@ export default {
     }
   },
   computed: {
-
+    isAbsoluteContainer() {
+      return this.showChartCanvas && this.chart.type === 'symbol-map'
+    },
     showChartCanvas() {
-      return this.chart.type !== 'table-normal' && this.chart.type !== 'table-info'
+      return this.openType === 'enlarge'
+    },
+    isOnlyDetails() {
+      return this.chart.type === 'table-normal' || this.chart.type === 'table-info'
     },
     customStyle() {
       let style = {
@@ -150,13 +159,17 @@ export default {
   methods: {
     exportExcel() {
       const _this = this
-      if (this.showChartCanvas) {
-        html2canvas(document.getElementById('chartCanvas')).then(canvas => {
-          const snapshot = canvas.toDataURL('image/jpeg', 1) // 是图片质量
-          _this.exportExcelDownload(snapshot, canvas.width, canvas.height)
-        })
-      } else {
+      if (this.isOnlyDetails) {
         _this.exportExcelDownload()
+      } else {
+        if (this.showChartCanvas) {
+          html2canvas(document.getElementById('chartCanvas')).then(canvas => {
+            const snapshot = canvas.toDataURL('image/jpeg', 1)
+            _this.exportExcelDownload(snapshot, canvas.width, canvas.height)
+          })
+        } else {
+          _this.exportExcelDownload()
+        }
       }
     },
     exportViewImg() {
@@ -199,15 +212,14 @@ export default {
 
 <style lang="scss" scoped>
   .ms-aside-container {
-    height: 50vh;
+    height: 70vh;
     min-width: 400px;
     max-width: 400px;
     padding: 0 0;
   }
   .ms-main-container {
-    height: 50vh;
+    height: 70vh;
     border: 1px solid #E6E6E6;
-    border-left: 0 solid;
   }
   .chart-class{
     height: 100%;
@@ -219,5 +231,10 @@ export default {
     width: 100%;
     height: 100%;
     background-size: 100% 100% !important;
+  }
+  .abs-container {
+    position: absolute;
+    width: 100%;
+    margin-left: -20px;
   }
 </style>

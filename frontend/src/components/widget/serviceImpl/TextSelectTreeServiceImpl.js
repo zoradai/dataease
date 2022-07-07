@@ -12,12 +12,14 @@ const dialogPanel = {
       multiple: false,
       placeholder: 'detextselectTree.placeholder',
       viewIds: [],
+      parameters: [],
       datas: [],
       key: 'id',
       label: 'text',
       value: 'id',
       fieldId: '',
-      dragItems: []
+      dragItems: [],
+      sort: {}
     },
     value: '',
     manualModify: false
@@ -50,6 +52,7 @@ class TextSelectTreeServiceImpl extends WidgetService {
     super(options)
     this.filterDialog = true
     this.showSwitch = true
+    this.isTree = true
   }
 
   initLeftPanel() {
@@ -95,6 +98,9 @@ class TextSelectTreeServiceImpl extends WidgetService {
       param.value = param.value.map(val => val.replaceAll('-de-', ','))
     }
     return param
+  }
+  isSortWidget() {
+    return true
   }
 
   fillValueDerfault(element) {

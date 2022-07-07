@@ -2,10 +2,12 @@
 
   <el-input
     v-if="element.options!== null && element.options.attrs!==null"
+    ref="de-input-search"
     v-model="value"
     resize="vertical"
     :placeholder="$t(element.options.attrs.placeholder)"
     :size="size"
+    class="de-range-tag"
     @input="valueChange"
     @keypress.enter.native="search"
     @dblclick="setEdit"
@@ -69,14 +71,18 @@ export default {
     }
   },
   mounted() {
-    bus.$on('reset-default-value', id => {
+    bus.$on('reset-default-value', this.resetDefaultValue)
+  },
+  beforeDestroy() {
+    bus.$off('reset-default-value', this.resetDefaultValue)
+  },
+  methods: {
+    resetDefaultValue(id) {
       if (this.inDraw && this.manualModify && this.element.id === id) {
         this.value = this.fillValueDerfault()
         this.search()
       }
-    })
-  },
-  methods: {
+    },
     search() {
       if (!this.inDraw) {
         this.element.options.value = this.value
@@ -111,6 +117,10 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
-
+<style lang="scss">
+// .de-range-tag {
+//   input::placeholder {
+//     color: var(--CustomColor, #909399) !important;
+//   }
+// }
 </style>

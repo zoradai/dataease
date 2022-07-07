@@ -30,8 +30,8 @@
     <!-- 弹出框 -->
     <el-popover ref="popover" v-model="visible" :placement="placement" :transition="transition" :popper-class="popperClass" :width="width" trigger="click">
       <!-- 是否显示搜索框 -->
-      <el-input v-if="treeParams.filterable" v-model="keywords" size="mini" class="input-with-select mb10" @change="_searchFun">
-        <el-button slot="append" icon="el-icon-search" />
+      <el-input v-if="treeParams.filterable" v-model="keywords" size="mini" class="input-with-select mb10">
+        <el-button slot="append" icon="el-icon-search" @click="_searchFun" />
       </el-input>
       <el-scrollbar tag="div" wrap-class="el-select-dropdown__wrap" view-class="el-select-dropdown__list" class="is-empty">
         <!-- 树列表 -->
@@ -48,6 +48,7 @@
           :render-content="treeRenderFun"
           @node-click="_treeNodeClickFun"
           @check="_treeCheckFun"
+          @check-change="_treeCheckChange"
         />
         <!-- 暂无数据 -->
         <div v-if="data.length === 0" class="no-data">暂无数据</div>
@@ -282,6 +283,9 @@ export default {
     off(document, 'mouseup', this._popoverHideFun)
   },
   methods: {
+    _treeCheckChange() {
+      this.$emit("treeCheckChange")
+    },
     // 根据类型判断单选，多选
     _setMultipleFun() {
       let multiple = false
@@ -470,15 +474,26 @@ export default {
     _treeCheckFun(data, node, vm) {
       this.ids = []
       const { propsValue } = this
-      node.checkedNodes.forEach(item => {
+      const checkKeys = this.$refs.tree.getCheckedKeys()
+      checkKeys.forEach((i, n) => {
+        const node = this.$refs.tree.getNode(i)
+        if (!node.visible && node.checked) {
+          this.$refs.tree.setChecked(i, false)
+        }
+      })
+
+      const checkedNodes = this.$refs.tree.getCheckedNodes()
+
+      checkedNodes.forEach(item => {
         this.ids.push(item[propsValue])
       })
       /*
-            点击复选框，对外抛出   `data, node, vm`<br>
-            `data:` 当前点击的节点数据<br>
-            `node:` 当前点击的node<br>
-            `vm:` 当前组件的vm
-            */
+        点击复选框，对外抛出   `data, node, vm`<br>
+        `data:` 当前点击的节点数据<br>
+        `node:` 当前点击的node<br>
+        `vm:` 当前组件的vm
+        */
+      node.checkedKeys = checkedNodes.map(node => node.id)
       this.$emit('check', data, node, vm)
       this._emitFun()
     },
@@ -551,6 +566,7 @@ export default {
     // 显示弹出框的时候容错，查看是否和el宽度一致
     _popoverShowFun(val) {
       this._updateH()
+      this.$emit('onFoucs')
     },
     // 判断是否隐藏弹出框
     _popoverHideFun(e) {

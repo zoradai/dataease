@@ -26,20 +26,16 @@
 </template>
 
 <script>
-// custom skin css
 import '@/custom-theme.css'
 import { mapState } from 'vuex'
 import bus from '@/utils/bus'
-// import SWF_URL from 'videojs-swf/dist/video-js.swf'
 
 export default {
   props: {
-    // eslint-disable-next-line vue/require-default-prop
     propValue: {
       type: String,
       require: true
     },
-    // eslint-disable-next-line vue/require-default-prop
     element: {
       type: Object
     },
@@ -94,15 +90,19 @@ export default {
     this.initOption()
   },
   mounted() {
-    bus.$on('videoLinksChange-' + this.element.id, () => {
+    bus.$on('videoLinksChange-' + this.element.id, this.videoLinksChange)
+  },
+  beforeDestroy() {
+    bus.$off('videoLinksChange-' + this.element.id, this.videoLinksChange)
+  },
+  methods: {
+    videoLinksChange() {
       this.showVideo = false
       this.$nextTick(() => {
         this.showVideo = true
         this.initOption()
       })
-    })
-  },
-  methods: {
+    },
     initOption() {
       this.pOption = this.element.videoLinks[this.element.videoLinks.videoType]
       this.pOption.height = this.h - (this.curGap * 2)
@@ -124,15 +124,9 @@ export default {
     },
     onPlayerCanplaythrough(player) {
     },
-
-    // or listen state event
     playerStateChanged(playerCurrentState) {
     },
-
-    // player is ready
     playerReadied(player) {
-      // seek to 10s
-      // player.currentTime(10): the player is readied', player)
     }
   }
 }
@@ -145,7 +139,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #FFFFFF;
+    background-color: rgba(255,255,255,0.3);
     font-size: 12px;
     color: #9ea6b2;
   }

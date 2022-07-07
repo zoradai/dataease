@@ -1,23 +1,22 @@
 package io.dataease.provider.query.db2;
 
 import com.google.gson.Gson;
+import io.dataease.dto.datasource.Db2Configuration;
 import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableFieldExample;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.base.mapper.DatasetTableFieldMapper;
-import io.dataease.dto.datasource.Db2Configuration;
-import io.dataease.plugins.common.constants.Db2Constants;
+import io.dataease.plugins.common.constants.datasource.Db2Constants;
 import io.dataease.plugins.common.constants.DeTypeConstants;
-import io.dataease.plugins.common.constants.EsSqlLConstants;
-import io.dataease.plugins.common.constants.SQLConstants;
+import io.dataease.plugins.common.constants.datasource.SQLConstants;
 import io.dataease.plugins.common.dto.chart.ChartCustomFilterItemDTO;
 import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
+import io.dataease.plugins.common.dto.datasource.DeSortField;
 import io.dataease.plugins.common.dto.sqlObj.SQLObj;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
 import io.dataease.plugins.datasource.query.QueryProvider;
-import io.dataease.provider.Utils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
+import io.dataease.plugins.datasource.query.Utils;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
@@ -34,7 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.dataease.plugins.common.constants.SQLConstants.TABLE_ALIAS_PREFIX;
+import static io.dataease.plugins.common.constants.datasource.SQLConstants.TABLE_ALIAS_PREFIX;
 
 @Service("db2QueryProvider")
 public class Db2QueryProvider extends QueryProvider {
@@ -79,11 +79,16 @@ public class Db2QueryProvider extends QueryProvider {
 
     @Override
     public String createSQLPreview(String sql, String orderBy) {
-        return "SELECT * FROM (" + sqlFix(sql) + ") DE_TMP " + " fetch first 1000 rows only;";
+        return "SELECT * FROM (" + sqlFix(sql) + ") DE_TMP " + " fetch first 1000 rows only";
     }
 
     @Override
     public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, null);
+    }
+
+    @Override
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(Db2Constants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -109,8 +114,10 @@ public class Db2QueryProvider extends QueryProvider {
                     if (f.getDeType() == DeTypeConstants.DE_INT || f.getDeType() == DeTypeConstants.DE_FLOAT) {
                         fieldName = String.format(Db2Constants.UNIX_TIMESTAMP, originField);
                     } else {
-                        if(f.getType().equalsIgnoreCase("TIME")){
+                        if (f.getType().equalsIgnoreCase("TIME")) {
                             fieldName = String.format(Db2Constants.FORMAT_TIME, originField, Db2Constants.DEFAULT_DATE_FORMAT);
+                        } else if(f.getType().equalsIgnoreCase("DATE")) {
+                            fieldName = String.format(Db2Constants.FORMAT_DATE, originField, Db2Constants.DEFAULT_DATE_FORMAT);
                         }else {
                             fieldName = originField;
                         }
@@ -153,7 +160,74 @@ public class Db2QueryProvider extends QueryProvider {
         if (customWheres != null) wheres.add(customWheres);
         if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
 
+        List<SQLObj> xOrders = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(sortFields)) {
+            int step = fields.size();
+            for (int i = step; i < (step + sortFields.size()); i++) {
+                DeSortField deSortField = sortFields.get(i - step);
+                SQLObj order = buildSortField(deSortField, tableObj, i);
+                xOrders.add(order);
+            }
+        }
+        if (ObjectUtils.isNotEmpty(xOrders)) {
+            st_sql.add("orders", xOrders);
+        }
+
         return st_sql.render();
+    }
+
+    private SQLObj buildSortField(DeSortField f, SQLObj tableObj, int i) {
+        String originField;
+        if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 2) {
+            // 解析origin name中有关联的字段生成sql表达式
+            originField = calcFieldRegex(f.getOriginName(), tableObj);
+        } else if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 1) {
+            originField = String.format(Db2Constants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        } else {
+            originField = String.format(Db2Constants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        }
+        String fieldAlias = String.format(SQLConstants.FIELD_ALIAS_X_PREFIX, i);
+        String fieldName = "";
+        // 处理横轴字段
+        if (f.getDeExtractType() == DeTypeConstants.DE_TIME) {
+            if (f.getDeType() == DeTypeConstants.DE_INT || f.getDeType() == DeTypeConstants.DE_FLOAT) {
+                fieldName = String.format(Db2Constants.UNIX_TIMESTAMP, originField);
+            } else {
+                if (f.getType().equalsIgnoreCase("TIME")) {
+                    fieldName = String.format(Db2Constants.FORMAT_TIME, originField, Db2Constants.DEFAULT_DATE_FORMAT);
+                } else if(f.getType().equalsIgnoreCase("DATE")) {
+                    fieldName = String.format(Db2Constants.FORMAT_DATE, originField, Db2Constants.DEFAULT_DATE_FORMAT);
+                }else {
+                    fieldName = originField;
+                }
+            }
+        } else if (f.getDeExtractType() == DeTypeConstants.DE_STRING) {
+            if (f.getDeType() == DeTypeConstants.DE_INT) {
+                fieldName = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_INT_FORMAT);
+            } else if (f.getDeType() == DeTypeConstants.DE_FLOAT) {
+                fieldName = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_FLOAT_FORMAT);
+            } else if (f.getDeType() == DeTypeConstants.DE_TIME) {
+                fieldName = String.format(Db2Constants.DATE_FORMAT, originField, Db2Constants.DEFAULT_DATE_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        } else {
+            if (f.getDeType() == DeTypeConstants.DE_TIME) {
+                String cast = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_INT_FORMAT);
+                fieldName = String.format(Db2Constants.FROM_UNIXTIME, cast, Db2Constants.DEFAULT_DATE_FORMAT);
+            } else if (f.getDeType() == DeTypeConstants.DE_INT) {
+                fieldName = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_INT_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        }
+        SQLObj result = SQLObj.builder().orderField(originField).orderAlias(originField).orderDirection(f.getOrderDirection()).build();
+        return result;
+    }
+
+    @Override
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
+        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, sortFields);
     }
 
     @Override
@@ -164,23 +238,23 @@ public class Db2QueryProvider extends QueryProvider {
     @Override
     public String createQueryTableWithPage(String table, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
         Integer size = (page - 1) * pageSize + realSize;
-        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter) + String.format(" fetch first %s rows only; ", size);
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter) + String.format(" fetch first %s rows only ", size);
     }
 
     @Override
     public String createQueryTableWithLimit(String table, List<DatasetTableField> fields, Integer limit, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
-        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter) + String.format(" fetch first %s rows only; ", limit);
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter) + String.format(" fetch first %s rows only ", limit);
     }
 
     @Override
     public String createQuerySqlWithLimit(String sql, List<DatasetTableField> fields, Integer limit, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
-        return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter) + String.format(" fetch first %s rows only; ", limit);
+        return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter) + String.format(" fetch first %s rows only ", limit);
     }
 
     @Override
     public String createQuerySQLWithPage(String sql, List<DatasetTableField> fields, Integer page, Integer pageSize, Integer realSize, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
         Integer size = (page - 1) * pageSize + realSize;
-        return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter) + String.format(" fetch first %s rows only; ", size);
+        return createQuerySQLAsTmp(sql, fields, isGroup, fieldCustomFilter) + String.format(" fetch first %s rows only ", size);
     }
 
     @Override
@@ -784,8 +858,10 @@ public class Db2QueryProvider extends QueryProvider {
                     whereName = String.format(Db2Constants.FROM_UNIXTIME, cast, Db2Constants.DEFAULT_DATE_FORMAT);
                 }
                 if (field.getDeExtractType() == DeTypeConstants.DE_TIME) {
-                    if(field.getType().equalsIgnoreCase("TIME")){
+                    if (field.getType().equalsIgnoreCase("TIME")) {
                         whereName = String.format(Db2Constants.FORMAT_TIME, originName, Db2Constants.DEFAULT_DATE_FORMAT);
+                    }else if(field.getType().equalsIgnoreCase("DATE")) {
+                        whereName = String.format(Db2Constants.FORMAT_DATE, originName, Db2Constants.DEFAULT_DATE_FORMAT);
                     }else {
                         whereName = originName;
                     }
@@ -830,7 +906,9 @@ public class Db2QueryProvider extends QueryProvider {
                     } else {
                         if (field.getDeType().equals(DeTypeConstants.DE_TIME)) {
                             whereValue = String.format(Db2Constants.DATE_FORMAT, "'" + value + "'", Db2Constants.DEFAULT_DATE_FORMAT);
-                        } else {
+                        } else if(field.getDeType().equals(DeTypeConstants.DE_FLOAT)) {
+                            whereValue = value;
+                        }else {
                             whereValue = String.format(Db2Constants.WHERE_VALUE_VALUE, value);
                         }
                     }
@@ -865,10 +943,13 @@ public class Db2QueryProvider extends QueryProvider {
             } else {
                 fieldList.add(request.getDatasetTableField());
             }
-
+            boolean isFloat = false;
             for (DatasetTableField field : fieldList) {
                 if (CollectionUtils.isEmpty(value) || ObjectUtils.isEmpty(field)) {
                     continue;
+                }
+                if(field.getDeType().equals(DeTypeConstants.DE_FLOAT)){
+                    isFloat = true;
                 }
                 String whereName = "";
 
@@ -892,8 +973,10 @@ public class Db2QueryProvider extends QueryProvider {
                         whereName = String.format(Db2Constants.FROM_UNIXTIME, cast, Db2Constants.DEFAULT_DATE_FORMAT);
                     }
                     if (field.getDeExtractType() == DeTypeConstants.DE_TIME) {
-                        if(field.getType().equalsIgnoreCase("TIME")){
+                        if (field.getType().equalsIgnoreCase("TIME")) {
                             whereName = String.format(Db2Constants.FORMAT_TIME, originName, Db2Constants.DEFAULT_DATE_FORMAT);
+                        } else if(field.getType().equalsIgnoreCase("DATE")) {
+                            whereName = String.format(Db2Constants.FORMAT_DATE, originName, Db2Constants.DEFAULT_DATE_FORMAT);
                         }else {
                             whereName = originName;
                         }
@@ -924,7 +1007,11 @@ public class Db2QueryProvider extends QueryProvider {
             String whereValue = "";
 
             if (StringUtils.containsIgnoreCase(request.getOperator(), "in")) {
-                whereValue = "('" + StringUtils.join(value, "','") + "')";
+                if(isFloat){
+                    whereValue = "(" + StringUtils.join(value, ",") + ")";
+                }else {
+                    whereValue = "('" + StringUtils.join(value, "','") + "')";
+                }
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "like")) {
                 whereValue = "'%" + value.get(0) + "%'";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "between")) {
@@ -937,7 +1024,12 @@ public class Db2QueryProvider extends QueryProvider {
                     whereValue = String.format(Db2Constants.WHERE_BETWEEN, value.get(0), value.get(1));
                 }
             } else {
-                whereValue = String.format(Db2Constants.WHERE_VALUE_VALUE, value.get(0));
+                if(isFloat){
+                    whereValue = value.get(0);
+                }else {
+                    whereValue = String.format(Db2Constants.WHERE_VALUE_VALUE, value.get(0));
+                }
+
             }
             list.add(SQLObj.builder()
                     .whereField(whereName)
@@ -995,8 +1087,10 @@ public class Db2QueryProvider extends QueryProvider {
                 fieldName = String.format(Db2Constants.UNIX_TIMESTAMP, originField) + "*1000";
             } else if (x.getDeType() == DeTypeConstants.DE_TIME) {
                 String format = transDateFormat(x.getDateStyle(), x.getDatePattern());
-                if(x.getType().equalsIgnoreCase("TIME")){
+                if (x.getType().equalsIgnoreCase("TIME")) {
                     fieldName = String.format(Db2Constants.FORMAT_TIME, originField, format);
+                } else if(x.getType().equalsIgnoreCase("DATE")){
+                    fieldName = String.format(Db2Constants.FORMAT_DATE, originField, format);
                 }else {
                     fieldName = String.format(Db2Constants.DATE_FORMAT, originField, format);
                 }
@@ -1014,7 +1108,13 @@ public class Db2QueryProvider extends QueryProvider {
                     fieldName = String.format(Db2Constants.DATE_FORMAT, from_unixtime, format);
                 }
             } else {
-                fieldName = originField;
+                if (x.getDeType() == DeTypeConstants.DE_INT) {
+                    fieldName = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_INT_FORMAT);
+                } else if (x.getDeType() == DeTypeConstants.DE_FLOAT) {
+                    fieldName = String.format(Db2Constants.CAST, originField, Db2Constants.DEFAULT_FLOAT_FORMAT);
+                } else {
+                    fieldName = originField;
+                }
             }
         }
         return SQLObj.builder()
@@ -1077,8 +1177,9 @@ public class Db2QueryProvider extends QueryProvider {
                 } else {
                     if (y.getDeType().equals(DeTypeConstants.DE_TIME)) {
                         whereValue = String.format(Db2Constants.DATE_FORMAT, "'" + f.getValue() + "'", Db2Constants.DEFAULT_DATE_FORMAT);
-                        ;
-                    } else {
+                    } else if(y.getDeType().equals(DeTypeConstants.DE_FLOAT)){
+                        whereValue = f.getValue();
+                    }else {
                         whereValue = String.format(Db2Constants.WHERE_VALUE_VALUE, f.getValue());
                     }
                 }
@@ -1120,7 +1221,7 @@ public class Db2QueryProvider extends QueryProvider {
 
     private String sqlLimit(String sql, ChartViewWithBLOBs view) {
         if (StringUtils.equalsIgnoreCase(view.getResultMode(), "custom")) {
-            return sql + String.format(" fetch first %s rows only; ", view.getResultCount());
+            return sql + String.format(" fetch first %s rows only ", view.getResultCount());
         } else {
             return sql;
         }

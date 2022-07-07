@@ -1,4 +1,16 @@
 import { sin, cos } from '@/components/canvas/utils/translate'
+import store from '@/store'
+import Vue from 'vue'
+export const LIGHT_THEME_COLOR_MAIN = '#000000'
+export const LIGHT_THEME_COLOR_SLAVE1 = '#CCCCCC'
+export const LIGHT_THEME_PANEL_BACKGROUND = '#F1F3F5'
+export const LIGHT_THEME_COMPONENT_BACKGROUND = '#FFFFFF'
+
+export const DARK_THEME_COLOR_MAIN = '#FFFFFF'
+export const DARK_THEME_COLOR_SLAVE1 = '#CCCCCC'
+export const DARK_THEME_PANEL_BACKGROUND = '#030B2E'
+export const DARK_THEME_COMPONENT_BACKGROUND = '#131E42'
+export const DARK_THEME_COMPONENT_BACKGROUND_BACK = '#5a5c62'
 
 export function getStyle(style, filter = []) {
   const needUnit = [
@@ -103,8 +115,6 @@ export const customAttrTrans = {
     'quotaFontSize',
     'spaceSplit', // 间隔
     'scatterSymbolSize', // 气泡大小，散点图
-    'treemapWidth', // 矩形树图
-    'treemapHeight',
     'radarSize'// 雷达占比
   ],
   'label': [
@@ -148,6 +158,108 @@ export const customStyleTrans = {
   }
 }
 
+export const THEME_STYLE_TRANS_MAIN_BACK = {
+  'legend': {
+    'textStyle': ['color']
+  },
+  'xAxis': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color'],
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'yAxis': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color'],
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'yAxisExt': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color'],
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'split': {
+    'name': ['color'],
+    'axisLine': {
+      'lineStyle': ['color']
+    },
+    'axisTick': {
+      'lineStyle': ['color']
+    },
+    'axisLabel': ['color'],
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  }
+}
+
+export const THEME_STYLE_TRANS_MAIN = {
+  'legend': {
+    'textStyle': ['color']
+  },
+  'xAxis': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color']
+  },
+  'yAxis': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color']
+  },
+  'yAxisExt': {
+    'nameTextStyle': ['color'],
+    'axisLabel': ['color']
+  },
+  'split': {
+    'name': ['color'],
+    'axisTick': {
+      'lineStyle': ['color']
+    },
+    'axisLabel': ['color']
+  }
+}
+
+export const THEME_STYLE_TRANS_SLAVE1 = {
+  'xAxis': {
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'yAxis': {
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'yAxisExt': {
+    'splitLine': {
+      'lineStyle': ['color']
+    }
+  },
+  'split': {
+    'splitLine': {
+      'lineStyle': ['color']
+    },
+    'axisLine': {
+      'lineStyle': ['color']
+    }
+  }
+}
+
+export const THEME_ATTR_TRANS_MAIN = {
+  'label': ['color'],
+  'tooltip': {
+    'textStyle': ['color']
+  }
+}
+
+export const THEME_ATTR_TRANS_SLAVE1_BACKGROUND = {
+  'tooltip': ['backgroundColor']
+}
+
 // 移动端特殊属性
 export const mobileSpecialProps = {
   'lineWidth': 3, // 线宽固定值
@@ -167,7 +279,6 @@ export function recursionTransObj(template, infoObj, scale, terminal) {
         if (infoObj[templateKey] && infoObj[templateKey][templateProp]) {
           // 移动端特殊属性值设置
           if (terminal === 'mobile' && mobileSpecialProps[templateProp] !== undefined) {
-            // console.log('mobile:' + templateProp + mobileSpecialProps[templateProp])
             infoObj[templateKey][templateProp] = mobileSpecialProps[templateProp]
           } else {
             infoObj[templateKey][templateProp] = getScaleValue(infoObj[templateKey][templateProp], scale)
@@ -183,6 +294,24 @@ export function recursionTransObj(template, infoObj, scale, terminal) {
   }
 }
 
+export function recursionThemTransObj(template, infoObj, color) {
+  for (const templateKey in template) {
+    // 如果是数组 进行赋值计算
+    if (template[templateKey] instanceof Array) {
+      template[templateKey].forEach(templateProp => {
+        if (infoObj[templateKey]) {
+          Vue.set(infoObj[templateKey], templateProp, color)
+        }
+      })
+    } else {
+      // 如果是对象 继续进行递归
+      if (infoObj[templateKey]) {
+        recursionThemTransObj(template[templateKey], infoObj[templateKey], color)
+      }
+    }
+  }
+}
+
 export function componentScalePublic(chartInfo, heightScale, widthScale) {
   const scale = Math.min(heightScale, widthScale)
   // attr 缩放转换
@@ -190,5 +319,69 @@ export function componentScalePublic(chartInfo, heightScale, widthScale) {
   // style 缩放转换
   recursionTransObj(this.customStyleTrans, chartInfo.customStyle, scale)
   return chartInfo
+}
+
+export function adaptCurTheme(customStyle, customAttr) {
+  const canvasStyle = store.state.canvasStyleData
+  const themeColor = canvasStyle.panel.themeColor
+  if (themeColor === 'light') {
+    recursionThemTransObj(THEME_STYLE_TRANS_MAIN, customStyle, LIGHT_THEME_COLOR_MAIN)
+    recursionThemTransObj(THEME_STYLE_TRANS_SLAVE1, customStyle, LIGHT_THEME_COLOR_SLAVE1)
+    recursionThemTransObj(THEME_ATTR_TRANS_MAIN, customAttr, LIGHT_THEME_COLOR_MAIN)
+    recursionThemTransObj(THEME_ATTR_TRANS_SLAVE1_BACKGROUND, customAttr, LIGHT_THEME_COMPONENT_BACKGROUND)
+  } else {
+    recursionThemTransObj(THEME_STYLE_TRANS_MAIN, customStyle, DARK_THEME_COLOR_MAIN)
+    recursionThemTransObj(THEME_STYLE_TRANS_SLAVE1, customStyle, DARK_THEME_COLOR_SLAVE1)
+    recursionThemTransObj(THEME_ATTR_TRANS_MAIN, customAttr, DARK_THEME_COLOR_MAIN)
+    recursionThemTransObj(THEME_ATTR_TRANS_SLAVE1_BACKGROUND, customAttr, DARK_THEME_COMPONENT_BACKGROUND_BACK)
+  }
+  customAttr['color'] = { ...canvasStyle.chartInfo.chartColor }
+  customStyle['text'] = { ...canvasStyle.chartInfo.chartTitle, title: customStyle['text']['title'] }
+  if (customStyle.background) {
+    delete customStyle.background
+  }
+}
+
+export function adaptCurThemeCommonStyle(component) {
+  const commonStyle = store.state.canvasStyleData.chartInfo.chartCommonStyle
+  for (const key in commonStyle) {
+    component.commonBackground[key] = commonStyle[key]
+  }
+  if (isFilterComponent(component.component)) {
+    const filterStyle = store.state.canvasStyleData.chartInfo.filterStyle
+    for (const styleKey in filterStyle) {
+      Vue.set(component.style, styleKey, filterStyle[styleKey])
+    }
+  } else {
+    if (component.style.color) {
+      if (store.state.canvasStyleData.panel.themeColor === 'light') {
+        component.style.color = LIGHT_THEME_COLOR_MAIN
+      } else {
+        component.style.color = DARK_THEME_COLOR_MAIN
+      }
+    }
+  }
+  return component
+}
+
+export function adaptCurThemeCommonStyleAll() {
+  const componentData = store.state.componentData
+  componentData.forEach((item) => {
+    adaptCurThemeCommonStyle(item)
+  })
+}
+
+export function adaptCurThemeFilterStyleAll(styleKey) {
+  const componentData = store.state.componentData
+  const filterStyle = store.state.canvasStyleData.chartInfo.filterStyle
+  componentData.forEach((item) => {
+    if (isFilterComponent(item.component)) {
+      Vue.set(item.style, styleKey, filterStyle[styleKey])
+    }
+  })
+}
+
+export function isFilterComponent(component) {
+  return ['de-select', 'de-select-grid', 'de-date', 'de-input-search', 'de-number-range', 'de-select-tree'].includes(component)
 }
 

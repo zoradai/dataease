@@ -21,6 +21,7 @@ import event from '@/components/canvas/store/event'
 import layer from '@/components/canvas/store/layer'
 import snapshot from '@/components/canvas/store/snapshot'
 import lock from '@/components/canvas/store/lock'
+import task from './modules/task'
 import { valueValid, formatCondition } from '@/utils/conditionUtil'
 import { Condition } from '@/components/widget/bean/Condition'
 
@@ -44,6 +45,7 @@ const data = {
     ...layer.state,
     ...snapshot.state,
     ...lock.state,
+    ...task.state,
     // 编辑器模式 edit preview
     editMode: 'edit',
     // 当前页面全局数据 包括扩展公共样式 公共的仪表板样式，用来实时响应样式的变化
@@ -129,7 +131,8 @@ const data = {
       customStyle: {},
       customAttr: {}
     },
-    allViewRender: []
+    allViewRender: [],
+    isInEditor: false // 是否在编辑器中，用于判断复制、粘贴组件时是否生效，如果在编辑器外，则无视这些操作
   },
   mutations: {
     ...animation.mutations,
@@ -271,7 +274,6 @@ const data = {
         if (!element.type || element.type !== 'view') continue
         const currentFilters = element.filters || []
         const vidMatch = viewIdMatch(condition.viewIds, element.propValue.viewId)
-
         let j = currentFilters.length
         while (j--) {
           const filter = currentFilters[j]
@@ -473,7 +475,6 @@ const data = {
           item.linkageFilters.splice(0, item.linkageFilters.length)
         }
       })
-      // state.styleChangeTimes++
     },
     setDragComponentInfo(state, dragComponentInfo) {
       dragComponentInfo['shadowStyle'] = {
@@ -670,6 +671,7 @@ const data = {
         customStyle: {},
         customAttr: {}
       }
+      state.isInEditor = true
     },
     initViewRender(state, pluginViews) {
       pluginViews.forEach(plugin => {
@@ -679,6 +681,9 @@ const data = {
     },
     initCurMultiplexingComponents(state) {
       state.curMultiplexingComponents = {}
+    },
+    setInEditorStatus(state, status) {
+      state.isInEditor = status
     }
   },
   modules: {
@@ -693,7 +698,8 @@ const data = {
     application,
     lic,
     msg,
-    map
+    map,
+    task
   },
   getters
 }

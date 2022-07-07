@@ -17,7 +17,7 @@
           </span>
           <span class="item-span-style" :title="item.name">{{ item.name }}</span>
           <field-error-tips v-if="tagType === 'danger'" />
-          <span v-if="chart.type !== 'table-info' && item.summary" class="summary-span">
+          <span v-if="chart.type !== 'table-info' && item.summary && !item.chartId" class="summary-span">
             {{ $t('chart.' + item.summary) }}<span v-if="false && item.compareCalc && item.compareCalc.type && item.compareCalc.type !== '' && item.compareCalc.type !== 'none'">-{{ $t('chart.' + item.compareCalc.type) }}</span>
           </span>
           <i class="el-icon-arrow-down el-icon--right" style="position: absolute;top: 6px;right: 10px;" />
@@ -39,7 +39,7 @@
               </el-dropdown-menu>
             </el-dropdown>
           </el-dropdown-item>
-          <el-dropdown-item v-show="chart.type !== 'table-info'" :divided="chart.type === 'chart-mix'">
+          <el-dropdown-item v-show="!item.chartId && chart.type !== 'table-info'" :divided="chart.type === 'chart-mix'">
             <el-dropdown placement="right-start" size="mini" style="width: 100%" @command="summary">
               <span class="el-dropdown-link inner-dropdown-menu">
                 <span>
@@ -63,7 +63,7 @@
           </el-dropdown-item>
 
           <!--同比/环比-->
-          <el-dropdown-item v-show="chart.type !== 'table-info'">
+          <el-dropdown-item v-show="!item.chartId && chart.type !== 'table-info'">
             <el-dropdown placement="right-start" size="mini" style="width: 100%" @command="quickCalc">
               <span class="el-dropdown-link inner-dropdown-menu">
                 <span>
@@ -80,7 +80,7 @@
             </el-dropdown>
           </el-dropdown-item>
 
-          <el-dropdown-item :divided="chart.type !== 'table-info'">
+          <el-dropdown-item :divided="!item.chartId && chart.type !== 'table-info'">
             <el-dropdown placement="right-start" size="mini" style="width: 100%" @command="sort">
               <span class="el-dropdown-link inner-dropdown-menu">
                 <span>
@@ -100,7 +100,7 @@
           <el-dropdown-item icon="el-icon-files" :command="beforeClickItem('filter')">
             <span>{{ $t('chart.filter') }}...</span>
           </el-dropdown-item>
-          <el-dropdown-item v-if="chart.render === 'antv' && chart.type.includes('table')" icon="el-icon-notebook-2" divided :command="beforeClickItem('formatter')">
+          <el-dropdown-item v-if="chart.render === 'antv' && (chart.type.includes('table') || chart.type === 'text')" icon="el-icon-notebook-2" divided :command="beforeClickItem('formatter')">
             <span>{{ $t('chart.value_formatter') }}...</span>
           </el-dropdown-item>
           <el-dropdown-item icon="el-icon-edit-outline" divided :command="beforeClickItem('rename')">
@@ -173,7 +173,10 @@ export default {
   mounted() {
     this.init()
     this.isEnableCompare()
-    bus.$on('reset-change-table', () => this.getItemTagType())
+    bus.$on('reset-change-table', this.getItemTagType)
+  },
+  beforeDestroy() {
+    bus.$off('reset-change-table', this.getItemTagType)
   },
   methods: {
     init() {

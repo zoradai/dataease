@@ -131,12 +131,15 @@ export default {
     default_login: '普通登錄'
   },
   commons: {
+    default_value: '默認值',
+    params_value: '参数值',
     publish: '發布',
     unpublished: '取消發布',
     default_pwd: '初始密碼',
     stop: '停止',
     first_login_tips: '您使用的是初始密碼，記得修改密碼哦',
     roger_that: '知道了',
+    donot_noti: '不再提示',
     apply: '應用',
     search: '搜索',
     folder: '目錄',
@@ -471,7 +474,8 @@ export default {
     display: '顯示設置',
     ldap: 'LDAP設置',
     oidc: 'OIDC設置',
-    theme: '主題設置'
+    theme: '主題設置',
+    cas: 'CAS設置'
   },
   license: {
     i18n_no_license_record: '沒有 License 記錄',
@@ -645,7 +649,7 @@ export default {
     login_type: '默認登錄方式',
     empty_front: '為空則默認取值10秒',
     empty_msg: '為空則默認取值30天',
-    front_error: '請填寫0-300正整數', //修改了提示信息
+    front_error: '請填寫0-300正整數', // 修改了提示信息
     msg_error: '請填寫1-365正整數',
     SMTP_port: 'SMTP端口',
     SMTP_account: 'SMTP賬戶',
@@ -659,9 +663,14 @@ export default {
     test_recipients: '測試收件人',
     tip: '提示：僅用來作爲測試郵件收件人',
     engine_mode_setting: '引擎設置',
-    kettle_setting: 'Kettle 設置'
+    kettle_setting: 'Kettle 設置',
+    cas_selected_warn: '選擇CAS方式保存後會註銷當前回話，重新登錄',
+    cas_reset: 'CAS切換回默認登錄方式訪問API：'
   },
   chart: {
+    view_reset: '視圖重置',
+    view_reset_tips: '放棄對視圖的修改？',
+    export_img: '導出圖片',
     title_repeat: '當前標題已存在',
     save_snapshot: '保存縮略圖',
     datalist: '視圖',
@@ -1101,9 +1110,32 @@ export default {
     tick_count: '刻度間隔數',
     custom_sort: '自定義',
     custom_sort_tip: '自定義排序優先級最高，且僅支持單個字段自定義',
-    clean_custom_sort: '清除自定義排序'
+    clean_custom_sort: '清除自定義排序',
+    ds_field_edit: '數據集字段管理',
+    chart_field_edit: '視圖字段管理',
+    copy_field: '復製字段',
+    calc_field: '計算字段',
+    form_type: '類別',
+    scroll_cfg: '滾動設置',
+    scroll: '滾動',
+    open: '開啟',
+    row: '行數',
+    interval: '間隔',
+    max_more_than_mix: '最大值必須大於最小值'
   },
   dataset: {
+    params_work: '僅在編輯 sql 時生效',
+    sql_variable_limit_1: '1、SQL變數只能在WHERE條件中使用',
+    sql_variable_limit_2: '2、示例：select * from table_name where column_name1=${parm_name1} and column_name2 in ${parm_name2}',
+    selesql_variable_limit_2ct_year: '選擇年',
+    select_month: '選擇月',
+    select_date: '選擇日期',
+    select_time: '選擇時間',
+    time_year: '日期-年',
+    time_year_month: '日期-年月',
+    time_year_month_day: '日期-年月日',
+    time_all: '日期-年月日時分秒',
+    dataset_sync: ' ( 資料同步中... )',
     sheet_warn: '有多個 Sheet 頁，默認抽取第一個',
     datalist: '數據集',
     name: '數據集名稱',
@@ -1250,7 +1282,7 @@ export default {
       exec: '執行一次',
       confirm_exec: '手動觸發執行？',
       change_success: '狀態切換成功',
-      excel_replace_msg: '可能會影響計算欄位、自定義數据集、關聯數据集、儀錶板等，確認替換？',
+      excel_replace_msg: '可能會影響計算欄位、自定義數據集、關聯數據集、儀錶板等，確認替換？',
       effect_ext_field: '會影響計算欄位'
     },
     field_group_type: '分類',
@@ -1384,6 +1416,8 @@ export default {
     schema: '數據庫 Schema',
     please_choose_schema: '請選擇數據庫 Schema',
     charset: '字符集',
+    targetCharset: '目標字符集',
+    please_choose_targetCharset: '請選擇目標字符集',
     please_choose_charset: '請選擇數據庫字符集',
     edit_datasource_msg: '修改數據源信息，可能會導致改數據源下的數據集不可用，確認修改？',
     repeat_datasource_msg: '已經存在相同配置的數據源信息，',
@@ -1402,6 +1436,7 @@ export default {
     please_input_replication_num: '請輸入副本數量',
     acquire_increment: '增長數',
     connect_timeout: '連接超時(秒)',
+    query_timeout: '査詢超時（秒）',
     please_input_initial_pool_size: '請輸入初始連接數',
     please_input_min_pool_size: '請輸入最小連接數',
     please_input_max_pool_size: '請輸入最大連接數',
@@ -1453,6 +1488,32 @@ export default {
     sure_bt: '確定'
   },
   panel: {
+    pic_adaptation: '适应组件',
+    pic_equiratio: '等比适应',
+    pic_original: '原始尺寸',
+    pic_size: '图片尺寸',
+    web_addr: '网页地址',
+    stream_media_info: '流媒体信息',
+    video_info: '视频信息',
+    title_position: '标题位置',
+    tab_inner_style: 'tab内部样式',
+    data_format: '日期格式',
+    border_color: '边框颜色',
+    theme_change_warn: '主題更換',
+    theme_change_tips: '更換主題將會覆蓋視圖相關主題屬性建議提前備份,是否繼續更換？',
+    theme_color_change_warn: '主題色更換',
+    theme_color_change_tips: '主題色變更將會覆蓋原有視圖屬性',
+    theme_color: '主題色',
+    theme_color_dark: '深色',
+    theme_color_light: '淺色',
+    refresh_frequency: '刷新頻率',
+    card_color_matching: '卡片配色',
+    table_color_matching: '表格配色',
+    background_color: '背景顏色',
+    more: '更多',
+    level: '層級',
+    enlarge: '放大',
+    panel_style: '儀表板樣式',
     multiplexing: '復用',
     panel_off: '儀表板已下架',
     batch_opt: '批量操作',
@@ -1569,7 +1630,7 @@ export default {
     select_by_table: '按錶選擇',
     data_list: '數據列錶',
     component_list: '組件列錶',
-    custom_scope: '自定義控製範圍',
+    custom_scope: '控製範圍',
     multiple_choice: '多選',
     single_choice: '單選',
     field: '字段',
@@ -1647,7 +1708,7 @@ export default {
     no_drill_field: '缺少關聯字段',
     matrix: '矩陣',
     suspension: '懸浮',
-    new_element_distribution: '當前元素移入分佈方式',
+    new_element_distribution: '元素移入分佈方式',
     aided_grid: '輔助設計網格',
     aided_grid_open: '打開',
     aided_grid_close: '關閉',
@@ -1689,20 +1750,23 @@ export default {
     web_url: '網頁地址',
     video_add_tips: '請點擊添加配置視頻信息...',
     web_add_tips: '請點擊添加網頁信息...',
-    panel_view_result_show: '視圖結果展示',
+    panel_view_result_show: '視圖結果',
     panel_view_result_tips: '選擇儀錶闆會覆蓋視圖的結果展示數量，取值範圍1~10000',
     timeout_refresh: '請求超時，稍後刷新...',
     mobile_layout: '移動端佈局',
     component_hidden: '隱藏的組件',
     public_link_tips: '當前是公共鏈接模式，目標儀錶闆未設置公共鏈接，無法跳轉',
     input_title: '請輸入標題',
-    show_title: '顯示標題',
+    show_title: '標題',
     default_settings: '默認值設置',
     choose_background: '選擇組件背景',
     choose_background_tips: '組件自有的背景設置會覆蓋當前設置',
     setting_background: '設置背景',
     setting_jump: '跳轉設置',
-    select_view: '請選擇視圖...'
+    select_view: '請選擇視圖...',
+    visual: '虛擬化',
+    prohibit_multiple: '禁止同數據集多字段',
+    be_empty_dir: '是空目錄'
   },
   plugin: {
     local_install: '本地安裝',
@@ -1902,7 +1966,7 @@ export default {
     placeholder: '請選擇'
   },
   detextselectTree: {
-    label: '下拉树',
+    label: '下拉樹',
     placeholder: '請選擇'
   },
   detextgridselect: {
@@ -1990,7 +2054,8 @@ export default {
     once_a_week: '每周一次',
     once_a_month: '每月一次',
     complex_repeat: '複雜重複',
-    pixel_tip: '可直接輸入分辨率(例如:2560 * 1600)或者選擇'
+    pixel_tip: '可直接輸入分辨率(例如:2560 * 1600)或者選擇',
+    task_type: '任務類型'
 
   },
   dynamic_time: {

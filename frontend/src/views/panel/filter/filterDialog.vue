@@ -33,7 +33,7 @@
                   v-if="showDomType === 'tree'"
                   :default-expanded-keys="expandedArray"
                   node-key="id"
-                  :data="datas"
+                  :data="tempTreeDatas || datas"
                   :props="defaultProps"
 
                   @node-click="handleNodeClick"
@@ -64,7 +64,7 @@
                     animation="300"
                     :move="onMove"
                     class="drag-list"
-                    @end="end"
+                    @end="endDs"
                   >
                     <transition-group>
                       <div
@@ -150,7 +150,7 @@
                     animation="300"
                     :move="onMove"
                     class="drag-list"
-                    @end="end"
+                    @end="endVw"
                   >
                     <transition-group>
                       <div
@@ -181,7 +181,7 @@
 
     <de-main-container class="ms-main-container">
       <div v-if="currentElement.options && currentElement.options.attrs">
-        <filter-head :element="currentElement" />
+        <filter-head :element="currentElement" :all-fields="allFields" :widget="widget" />
 
         <filter-control :element="currentElement" :widget="widget" :control-attrs="myAttrs" :child-views="childViews" />
 
@@ -210,6 +210,7 @@ import {
   fieldListWithPermission
 } from '@/api/dataset/dataset'
 import {
+  paramsWithIds,
   viewsWithIds
 } from '@/api/panel/view'
 import {
@@ -292,13 +293,19 @@ export default {
       myAttrs: null,
 
       childViews: {
-        viewInfos: []
+        viewInfos: [],
+        datasetParams: []
       },
-      currentElement: null
+      currentElement: null,
+      allFields: [],
+      tempTreeDatas: null,
+      showTips: false
     }
   },
   computed: {
-
+    isTree() {
+      return this.widget && this.widget.isTree
+    },
     ...mapState([
       'componentData'
     ])
@@ -318,6 +325,7 @@ export default {
       }
       this.enableSureButton()
     },
+
     keyWord(val) {
       this.expandedArray = []
       if (this.showDomType === 'field') {
@@ -357,13 +365,14 @@ export default {
     }
     this.initWithField()
     this.loadViews()
+    this.ProhibitMultiple()
   },
   mounted() {
-    bus.$on('valid-values-change', valid => {
-      this.validateFilterValue(valid)
-    })
+    bus.$on('valid-values-change', this.validateFilterValue)
   },
-
+  beforeDestroy() {
+    bus.$off('valid-values-change', this.validateFilterValue)
+  },
   methods: {
 
     treeNode(cache) {
@@ -424,7 +433,6 @@ export default {
       }, {})
       const roots = []
       arrs.forEach(el => {
-        // 判断根节点 ###
         el.type = el.modelInnerType
         el.isLeaf = el.leaf
         if (el[this.defaultProps.parentId] === null || el[this.defaultProps.parentId] === 0 || el[this
@@ -432,22 +440,29 @@ export default {
           roots.push(el)
           return
         }
-        // 用映射表找到父元素
         const parentEl = arrs[idMapping[el[this.defaultProps.parentId]]]
-        // 把当前元素添加到父元素的`children`数组中
         parentEl.children = [...(parentEl.children || []), el]
 
-        // 设置展开节点 如果没有子节点则不进行展开
         if (parentEl.children.length > 0) {
           this.expandedArray.push(parentEl[this.defaultProps.id])
         }
       })
       return roots
     },
+    getNode(id, roots) {
+      for (let index = 0; index < roots.length; index++) {
+        const node = roots[index]
+        if (node.id === id) return node
+
+        if (node && node.children && node.children.length) {
+          const temp = this.getNode(id, node.children)
+          if (temp) return temp
+        }
+      }
+      return null
+    },
+
     loadViews() {
-      /* const viewIds = this.componentData
-        .filter(item => item.type === 'view' && item.propValue && item.propValue.viewId)
-        .map(item => item.propValue.viewId) */
       let viewIds = []; let tabViewIds = []
       for (let index = 0; index < this.componentData.length; index++) {
         const element = this.componentData[index]
@@ -462,18 +477,27 @@ export default {
       }
       viewIds && viewIds.length > 0 && viewsWithIds(viewIds).then(res => {
         const datas = res.data
-        /* datas.forEach(item => {
-          if (tabViewIds.includes(item.id)) {
-            item.name = 'tabs(' + item.name + ')'
-          }
-        }) */
+
         this.viewInfos = datas
         this.childViews.viewInfos = datas
       })
+      viewIds && viewIds.length > 0 && paramsWithIds(viewIds).then(res => {
+        const datas = res.data
+
+        this.childViews.datasetParams = datas
+      })
     },
     handleNodeClick(data) {
-      if (data.type !== 'group') {
+      if (data.modelInnerType !== 'group') {
         this.showFieldDatas(data)
+      } else {
+        if (!data.children || !data.children.length) {
+          const name = data.name
+          const msg = `[${name}]` + this.$t('panel.be_empty_dir')
+          this.$warning(msg)
+          return
+        }
+        this.showNextGroup(data)
       }
     },
 
@@ -487,7 +511,7 @@ export default {
 
     setTailLink(node) {
       const tail = this.dataSetBreads[this.dataSetBreads.length - 1]
-      tail.type = node.type
+      tail.type = node.modelInnerType
       tail.link = true
     },
     comSetTailLink(node) {
@@ -499,9 +523,57 @@ export default {
       const tail = {
         link: false,
         label: node.label || node.name,
-        type: node.type
+        type: node.modelInnerType,
+        id: node.id
       }
       this.dataSetBreads.push(tail)
+    },
+    addQueue(node) {
+      this.dataSetBreads = this.dataSetBreads.slice(0, 1)
+      const root = {
+        id: null,
+        children: JSON.parse(JSON.stringify(this.datas))
+      }
+      this.getPathById(node.id, root, res => {
+        if (res.length > 1) {
+          for (let index = 1; index < res.length; index++) {
+            const node = res[index]
+            const temp = {
+              link: true,
+              label: node.label || node.name,
+              type: node.modelInnerType,
+              id: node.id
+            }
+            this.dataSetBreads.push(temp)
+            this.dataSetBreads[0].link = true
+          }
+
+          this.dataSetBreads[this.dataSetBreads.length - 1].link = false
+        }
+      })
+    },
+    getPathById(id, catalog, callback) {
+      var temppath = []
+      try {
+        const getNodePath = function(node) {
+          temppath.push(node)
+          if (node.id === id) {
+            // eslint-disable-next-line no-throw-literal
+            throw ('GOT IT!')
+          }
+          if (node.children && node.children.length > 0) {
+            for (var i = 0; i < node.children.length; i++) {
+              getNodePath(node.children[i])
+            }
+            temppath.pop()
+          } else {
+            temppath.pop()
+          }
+        }
+        getNodePath(catalog)
+      } catch (e) {
+        callback(temppath)
+      }
     },
     comAddTail(node) {
       const tail = {
@@ -513,9 +585,14 @@ export default {
     },
 
     removeTail(bread) {
+      if (!bread.id) {
+        this.dataSetBreads = this.dataSetBreads.slice(0, 1)
+        this.dataSetBreads[this.dataSetBreads.length - 1]['link'] = false
+        return
+      }
       for (let index = 0; index < this.dataSetBreads.length; index++) {
         const element = this.dataSetBreads[index]
-        if (element.type === bread.type) {
+        if (element.type === bread.type && element.id === bread.id) {
           this.dataSetBreads = this.dataSetBreads.slice(0, index + 1)
           this.dataSetBreads[this.dataSetBreads.length - 1]['link'] = false
           return
@@ -534,6 +611,15 @@ export default {
         this.expandedArray = []
         this.keyWord = ''
         this.isTreeSearch = false
+        if (bread.id) {
+          const node = this.getNode(bread.id, this.datas)
+          if (node) {
+            this.tempTreeDatas = node.children
+          }
+        } else {
+          this.tempTreeDatas = null
+        }
+
         this.datas = JSON.parse(JSON.stringify(this.defaultDatas))
       })
     },
@@ -546,6 +632,7 @@ export default {
     loadField(tableId) {
       fieldListWithPermission(tableId).then(res => {
         let datas = res.data
+        this.allFields = JSON.parse(JSON.stringify(datas))
         if (this.widget && this.widget.filterFieldMethod) {
           datas = this.widget.filterFieldMethod(datas)
         }
@@ -556,6 +643,7 @@ export default {
     comLoadField(tableId) {
       fieldListWithPermission(tableId).then(res => {
         let datas = res.data
+        this.allFields = JSON.parse(JSON.stringify(datas))
         if (this.widget && this.widget.filterFieldMethod) {
           datas = this.widget.filterFieldMethod(datas)
         }
@@ -566,10 +654,15 @@ export default {
     showFieldDatas(row) {
       this.keyWord = ''
       this.showDomType = 'field'
-      this.setTailLink(row)
-      this.addTail(row)
+      this.addQueue(row)
       this.fieldsParent = row
       this.loadField(row.id)
+    },
+    showNextGroup(row) {
+      this.tempTreeDatas = JSON.parse(JSON.stringify(row.children))
+      this.keyWord = ''
+      this.showDomType = 'tree'
+      this.addQueue(row)
     },
     comShowFieldDatas(row) {
       this.viewKeyWord = ''
@@ -580,23 +673,34 @@ export default {
       this.comLoadField(row.tableId)
     },
     onMove(e, originalEvent) {
+      this.showTips = false
       this.moveId = e.draggedContext.element.id
-      return true
+      if (this.isTree) return true
+      const tabelId = e.draggedContext.element.tableId
+      const prohibit = this.currentElement.options.attrs.dragItems.some(item => item.tableId === tabelId)
+      if (prohibit) {
+        this.showTips = true
+      }
+      return !prohibit
     },
 
-    end(e) {
-      this.refuseMove(e)
+    endDs(e) {
+      this.refuseMove(e, this.fieldDatas)
+      this.removeCheckedKey(e)
+    },
+    endVw(e) {
+      this.refuseMove(e, this.comFieldDatas)
       this.removeCheckedKey(e)
     },
 
-    refuseMove(e) {
+    refuseMove(e, datas) {
       const that = this
-      const xItems = this.fieldDatas.filter(function(m) {
+      const xItems = datas.filter(function(m) {
         return m.id === that.moveId
       })
 
       if (xItems && xItems.length > 1) {
-        this.fieldDatas.splice(e.newDraggableIndex, 1)
+        this.datas.splice(e.newDraggableIndex, 1)
       }
     },
     removeCheckedKey(e) {
@@ -609,11 +713,26 @@ export default {
       if (xItems && xItems.length > 1) {
         this.currentElement.options.attrs.dragItems.splice(e.newDraggableIndex, 1)
       }
+      this.ProhibitMultiple()
+    },
+
+    ProhibitMultiple() {
+      if (this.isTree) return
+      const sourceLen = this.currentElement.options.attrs.dragItems.length
+      if (!sourceLen) return
+      const res = new Map()
+
+      const result = this.currentElement.options.attrs.dragItems.filter(item => !res.has(item.tableId) && res.set(item.tableId), 1)
+      this.currentElement.options.attrs.dragItems = result
+      const newLen = result.length
+      if (sourceLen > newLen || this.showTips) this.$warning(this.$t('panel.prohibit_multiple'))
     },
 
     enableSureButton() {
       let valid = true
-      const enable = this.currentElement.options.attrs.dragItems && this.currentElement.options.attrs.dragItems
+
+      const enable =
+      this.currentElement.options.attrs.dragItems && this.currentElement.options.attrs.dragItems
         .length > 0
       if (this.widget.validDynamicValue) {
         valid = this.widget.validDynamicValue(this.currentElement)

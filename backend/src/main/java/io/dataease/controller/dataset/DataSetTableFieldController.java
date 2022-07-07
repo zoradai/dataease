@@ -159,21 +159,13 @@ public class DataSetTableFieldController {
     public List<Object> multFieldValues(@RequestBody MultFieldValuesRequest multFieldValuesRequest) throws Exception {
         List<Object> results = new ArrayList<>();
         for (String fieldId : multFieldValuesRequest.getFieldIds()) {
-            List<Object> fieldValues = dataSetFieldService.fieldValues(fieldId, multFieldValuesRequest.getUserId(), true, false);
+            List<Object> fieldValues = dataSetFieldService.fieldValues(fieldId, multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, false);
             if (CollectionUtil.isNotEmpty(fieldValues)) {
                 results.addAll(fieldValues);
             }
 
         }
-        ArrayList<Object> list = results.stream().collect(
-                Collectors.collectingAndThen(
-                        Collectors.toCollection(
-                                () -> new TreeSet<>(Comparator.comparing(t -> {
-                                    if (ObjectUtils.isEmpty(t))
-                                        return "";
-                                    return t.toString();
-                                }))),
-                        ArrayList::new));
+        List<Object> list = results.stream().distinct().collect(Collectors.toList());
         return list;
     }
 
@@ -185,13 +177,13 @@ public class DataSetTableFieldController {
         DecodedJWT jwt = JWT.decode(linkToken);
         Long userId = jwt.getClaim("userId").asLong();
         multFieldValuesRequest.setUserId(userId);
-        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getUserId(), true, true,false);
+        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true,false);
     }
 
     @ApiIgnore
     @PostMapping("mappingFieldValues")
     public List<Object> mappingFieldValues(@RequestBody MultFieldValuesRequest multFieldValuesRequest) throws Exception {
-        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getUserId(), true, true, false);
+        return dataSetFieldService.fieldValues(multFieldValuesRequest.getFieldIds(), multFieldValuesRequest.getSort(), multFieldValuesRequest.getUserId(), true, true, false);
     }
 
     @ApiIgnore

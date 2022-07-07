@@ -1,5 +1,7 @@
 package io.dataease.service.datasource;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -30,6 +32,7 @@ import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.DatasetTableMapper;
 import io.dataease.plugins.common.base.mapper.DatasourceMapper;
+import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceCalculationMode;
 import io.dataease.plugins.common.constants.DatasourceTypes;
 import io.dataease.plugins.common.dto.datasource.DataSourceType;
@@ -88,6 +91,10 @@ public class DatasourceService {
         if (!types().stream().map(DataSourceType::getType).collect(Collectors.toList()).contains(datasource.getType())) {
             throw new Exception("Datasource type not supported.");
         }
+
+        Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
+        datasourceProvider.checkConfiguration(datasource);
+
         checkName(datasource.getName(), datasource.getType(), datasource.getId());
         long currentTimeMillis = System.currentTimeMillis();
         datasource.setId(UUID.randomUUID().toString());
@@ -139,10 +146,16 @@ public class DatasourceService {
                 if (StringUtils.isNotEmpty(configuration.getCustomDriver()) && !configuration.getCustomDriver().equalsIgnoreCase("default")) {
                     datasourceDTO.setCalculationMode(DatasourceCalculationMode.DIRECT);
                 }
+                JSONObject jsonObject = JSONObject.parseObject(datasourceDTO.getConfiguration());
+                if(jsonObject.getString("queryTimeout") == null){
+                    jsonObject.put("queryTimeout", 30);
+                    datasourceDTO.setConfiguration(jsonObject.toString());
+                }
             }
 
             if(datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.mysql.toString())){
-                datasourceDTO.setConfiguration(datasourceDTO.getConfiguration());
+                MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasourceDTO.getConfiguration(), MysqlConfiguration.class);
+                datasourceDTO.setConfiguration(new Gson().toJson(mysqlConfiguration));
             }
             if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasourceDTO.getConfiguration(), new TypeToken<ArrayList<ApiDefinition>>() {}.getType());
@@ -325,7 +338,7 @@ public class DatasourceService {
         Provider datasourceProvider = ProviderFactory.getProvider(ds.getType());
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         datasourceRequest.setDatasource(ds);
-        if (!ds.getType().equalsIgnoreCase("api")) {
+        if (!ds.getType().equalsIgnoreCase(DatasetType.API.name())) {
             datasourceProvider.checkStatus(datasourceRequest);
         }
 
@@ -333,8 +346,8 @@ public class DatasourceService {
 
         // 获取当前数据源下的db、api类型数据集
         DatasetTableExample datasetTableExample = new DatasetTableExample();
-        datasetTableExample.createCriteria().andTypeIn(Arrays.asList("db", "api")).andDataSourceIdEqualTo(ds.getId());
-        List<DatasetTable> datasetTables = datasetTableMapper.selectByExampleWithBLOBs(datasetTableExample);
+        datasetTableExample.createCriteria().andTypeIn(Arrays.asList(DatasetType.DB.name(), DatasetType.API.name())).andDataSourceIdEqualTo(ds.getId());
+        List<DatasetTable> datasetTables = datasetTableMapper.selectByExample(datasetTableExample);
         List<DBTableDTO> list = new ArrayList<>();
         for (TableDesc tableDesc : tables) {
             DBTableDTO dbTableDTO = new DBTableDTO();

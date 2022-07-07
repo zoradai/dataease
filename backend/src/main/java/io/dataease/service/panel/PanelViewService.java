@@ -125,13 +125,27 @@ public class PanelViewService {
                 extPanelViewMapper.savePanelView(panelViewInsertDTOList);
                 //将视图从cache表中更新到正式表中
                 viewIds = panelViewInsertDTOList.stream().map(panelView -> panelView.getChartViewId()).collect(Collectors.toList());
-//                extChartViewMapper.copyCacheToView(viewIds);
             }
             extChartViewMapper.deleteCacheWithPanel(viewIds, panelId);
             extChartViewMapper.deleteNoUseView(viewIds, panelId);
         }
         panelGroup.setMobileLayout(mobileLayout);
         return viewIds;
+    }
+
+    public Boolean havaMobileLayout(String panelData){
+        Boolean mobileLayout = false;
+        if (StringUtils.isNotEmpty(panelData)) {
+            JsonArray dataArray = JsonParser.parseString(panelData).getAsJsonArray();
+            for (int i = 0; i < dataArray.size(); i++) {
+                JsonObject jsonObject = dataArray.get(i).getAsJsonObject();
+                if (jsonObject.get("mobileSelected") != null && jsonObject.get("mobileSelected").getAsBoolean()) {
+                    mobileLayout = true;
+                }
+            }
+        }
+
+        return mobileLayout;
     }
 
     public List<PanelViewTableDTO> detailList(String panelId) {

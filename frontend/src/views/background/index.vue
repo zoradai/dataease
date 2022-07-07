@@ -12,7 +12,7 @@
           <span class="params-title">{{ $t('panel.inner_padding') }}</span>
         </el-col>
         <el-col :span="15">
-          <el-slider v-model="curComponent.commonBackground.innerPadding" show-input :show-input-controls="false" input-size="mini" :max="15" />
+          <el-slider v-model="curComponent.commonBackground.innerPadding" show-input :show-input-controls="false" input-size="mini" :max="50" />
         </el-col>
       </el-row>
       <el-row style="height: 50px;overflow: hidden">
@@ -21,6 +21,21 @@
         </el-col>
         <el-col :span="15">
           <el-slider v-model="curComponent.commonBackground.borderRadius" show-input :show-input-controls="false" input-size="mini" />
+        </el-col>
+      </el-row>
+
+      <el-row style="height: 40px;overflow: hidden;">
+        <el-col :span="3" style="padding-left: 10px;padding-top: 5px">
+          <el-checkbox v-model="curComponent.commonBackground.backgroundColorSelect">颜色</el-checkbox>
+        </el-col>
+        <el-col :span="1" style="padding-top: 5px">
+          <el-color-picker v-model="curComponent.commonBackground.color" :disabled="!curComponent.commonBackground.backgroundColorSelect" size="mini" class="color-picker-style" :predefine="predefineColors" />
+        </el-col>
+        <el-col :span="3">
+          <span class="params-title-small">不透明度：</span>
+        </el-col>
+        <el-col :span="11">
+          <el-slider v-model="curComponent.commonBackground.alpha" :disabled="!curComponent.commonBackground.backgroundColorSelect" show-input :show-input-controls="false" input-size="mini" />
         </el-col>
       </el-row>
 
@@ -34,21 +49,7 @@
           </span>
         </el-col>
       </el-row>
-      <el-row v-if="curComponent.commonBackground.enable">
-        <el-row style="height: 40px;overflow: hidden">
-          <el-col :span="3" style="padding-left: 10px;padding-top: 5px">
-            <el-radio v-model="curComponent.commonBackground.backgroundType" label="color" @change="onChangeType">颜色</el-radio>
-          </el-col>
-          <el-col :span="1" style="padding-top: 5px">
-            <el-color-picker v-model="curComponent.commonBackground.color" size="mini" class="color-picker-style" :predefine="predefineColors" />
-          </el-col>
-          <el-col :span="3">
-            <span class="params-title-small">不透明度：</span>
-          </el-col>
-          <el-col :span="11">
-            <el-slider v-model="curComponent.commonBackground.alpha" show-input :show-input-controls="false" input-size="mini" />
-          </el-col>
-        </el-row>
+      <el-row v-if="curComponent.commonBackground.enable" style="padding-left: 20px">
         <el-row style="height: 80px;margin-top:10px;margin-bottom:20px;overflow: hidden">
           <el-col :span="3" style="padding-left: 10px">
             <el-radio v-model="curComponent.commonBackground.backgroundType" label="outerImage" @change="onChangeType">{{ $t('panel.photo') }}</el-radio>
@@ -91,6 +92,29 @@
             </el-row>
           </el-col>
         </el-row>
+      </el-row>
+      <el-row v-if="isFilterComponent" style="height: 40px;overflow: hidden;">
+        <el-col :span="5" style="padding-left: 10px;padding-top: 8px">
+          输入框样式(颜色):
+        </el-col>
+        <el-col :span="2" style="padding-left: 10px;padding-top: 8px">
+          边框
+        </el-col>
+        <el-col :span="3" style="padding-top: 5px">
+          <el-color-picker v-model="curComponent.style.brColor" size="mini" class="color-picker-style" :predefine="predefineColors" />
+        </el-col>
+        <el-col :span="2" style="padding-left: 10px;padding-top: 8px">
+          文字
+        </el-col>
+        <el-col :span="3" style="padding-top: 5px">
+          <el-color-picker v-model="curComponent.style.wordColor" size="mini" class="color-picker-style" :predefine="predefineColors" />
+        </el-col>
+        <el-col :span="2" style="padding-left: 10px;padding-top: 8px">
+          背景
+        </el-col>
+        <el-col :span="3" style="padding-top: 5px">
+          <el-color-picker v-model="curComponent.style.innerBgColor" size="mini" class="color-picker-style" :predefine="predefineColors" />
+        </el-col>
       </el-row>
 
     </el-row>
@@ -138,7 +162,10 @@ export default {
     ...mapState([
       'curComponent',
       'componentData'
-    ])
+    ]),
+    isFilterComponent() {
+      return ['de-select', 'de-select-grid', 'de-date',  "de-input-search", "de-number-range", "de-select-tree"].includes(this.curComponent.component)
+    }
   },
   methods: {
     init() {
@@ -169,10 +196,7 @@ export default {
       this.$emit('backgroundSetClose')
     },
     commitStyle() {
-      const canvasStyleData = deepCopy(this.canvasStyleData)
-      canvasStyleData.panel = this.panel
-      this.$store.commit('setCanvasStyle', canvasStyleData)
-      this.$store.commit('recordSnapshot', 'commitStyle')
+      this.$store.commit('recordSnapshot')
     },
     onChangeType() {
       this.commitStyle()

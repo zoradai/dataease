@@ -74,6 +74,7 @@ public class ShiroServiceImpl implements ShiroService {
 
 
         filterChainDefinitionMap.put("/api/auth/login", ANON);
+        filterChainDefinitionMap.put("/api/auth/logout", ANON);
         filterChainDefinitionMap.put("/api/auth/isPluginLoaded", ANON);
         filterChainDefinitionMap.put("/system/requestTimeOut", ANON);
         filterChainDefinitionMap.put("/api/auth/validateName", ANON);
@@ -84,6 +85,8 @@ public class ShiroServiceImpl implements ShiroService {
         filterChainDefinitionMap.put("/api/pluginCommon/staticInfo/**", ANON);
         filterChainDefinitionMap.put("/plugin/oidc/authInfo", ANON);
         filterChainDefinitionMap.put("/sso/callBack*", ANON);
+        filterChainDefinitionMap.put("/cas/callBack*", ANON);
+        filterChainDefinitionMap.put("/cas/reset/**", ANON);
 
         filterChainDefinitionMap.put("/unauth", ANON);
         filterChainDefinitionMap.put("/display/**", ANON);
@@ -91,7 +94,6 @@ public class ShiroServiceImpl implements ShiroService {
         filterChainDefinitionMap.put("/downline", ANON);
         filterChainDefinitionMap.put("/common-files/**", ANON);
         filterChainDefinitionMap.put("/linkage/getPanelAllLinkageInfo/**", ANON);
-        filterChainDefinitionMap.put("/api/auth/logout", "logout");
 
         filterChainDefinitionMap.put("/api/link/resourceDetail/**", "link");
         filterChainDefinitionMap.put("/api/link/viewDetail/**", "link");

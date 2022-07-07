@@ -5,15 +5,16 @@ import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableFieldExample;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.base.mapper.DatasetTableFieldMapper;
-import io.dataease.plugins.common.constants.DorisConstants;
-import io.dataease.plugins.common.constants.SQLConstants;
+import io.dataease.plugins.common.constants.DeTypeConstants;
+import io.dataease.plugins.common.constants.datasource.DorisConstants;
+import io.dataease.plugins.common.constants.datasource.SQLConstants;
 import io.dataease.plugins.common.dto.chart.ChartCustomFilterItemDTO;
 import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
+import io.dataease.plugins.common.dto.datasource.DeSortField;
 import io.dataease.plugins.common.dto.sqlObj.SQLObj;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
 import io.dataease.plugins.datasource.query.QueryProvider;
-import io.dataease.provider.Utils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
+import io.dataease.plugins.datasource.query.Utils;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
@@ -30,7 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.dataease.plugins.common.constants.SQLConstants.TABLE_ALIAS_PREFIX;
+import static io.dataease.plugins.common.constants.datasource.SQLConstants.TABLE_ALIAS_PREFIX;
 
 /**
  * @Author gin
@@ -83,6 +85,11 @@ public class DorisQueryProvider extends QueryProvider {
 
     @Override
     public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, null);
+    }
+
+    @Override
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(DorisConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -149,7 +156,69 @@ public class DorisQueryProvider extends QueryProvider {
         if (customWheres != null) wheres.add(customWheres);
         if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
 
+        if (CollectionUtils.isNotEmpty(sortFields)) {
+            int step = fields.size();
+            for (int i = step; i < (step + sortFields.size()); i++) {
+                DeSortField deSortField = sortFields.get(i - step);
+                SQLObj order = buildSortField(deSortField, tableObj, i);
+                xOrders.add(order);
+            }
+        }
+        if (ObjectUtils.isNotEmpty(xOrders)) {
+            st_sql.add("orders", xOrders);
+        }
+
         return st_sql.render();
+    }
+
+    private SQLObj buildSortField(DeSortField f, SQLObj tableObj, int i) {
+        String originField;
+        if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 2) {
+            // 解析origin name中有关联的字段生成sql表达式
+            originField = calcFieldRegex(f.getOriginName(), tableObj);
+        } else if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 1) {
+            originField = String.format(DorisConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getDataeaseName());
+        } else {
+            originField = String.format(DorisConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getDataeaseName());
+        }
+        String fieldAlias = String.format(SQLConstants.FIELD_ALIAS_X_PREFIX, i);
+        String fieldName = "";
+        // 处理横轴字段
+        if (f.getDeExtractType() == 1) {
+            if (f.getDeType() == 2 || f.getDeType() == 3) {
+                fieldName = String.format(DorisConstants.UNIX_TIMESTAMP, originField) + "*1000";
+            } else {
+                fieldName = originField;
+            }
+        } else if (f.getDeExtractType() == 0) {
+            if (f.getDeType() == 2) {
+                fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_INT_FORMAT);
+            } else if (f.getDeType() == 3) {
+                fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_FLOAT_FORMAT);
+            } else if (f.getDeType() == 1) {
+                fieldName = String.format(DorisConstants.STR_TO_DATE, originField, DorisConstants.DEFAULT_DATE_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        } else {
+            if (f.getDeType() == 1) {
+                String cast = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_INT_FORMAT) + "/1000";
+                fieldName = String.format(DorisConstants.FROM_UNIXTIME, cast, DorisConstants.DEFAULT_DATE_FORMAT);
+            } else if (f.getDeType() == 2) {
+                fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_INT_FORMAT);
+            } else if (f.getDeType() == 3) {
+                fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_FLOAT_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        }
+        SQLObj result = SQLObj.builder().orderField(originField).orderAlias(originField).orderDirection(f.getOrderDirection()).build();
+        return result;
+    }
+
+    @Override
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
+        return createQuerySQL("(" + sql + ")", fields, isGroup, null, fieldCustomFilter, sortFields);
     }
 
     @Override
@@ -992,7 +1061,13 @@ public class DorisQueryProvider extends QueryProvider {
             } else if (x.getDeType() == 0) {
                 fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.VARCHAR);
             } else {
-                fieldName = originField;
+                if (x.getDeType() == DeTypeConstants.DE_INT) {
+                    fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_INT_FORMAT);
+                } else if (x.getDeType() == DeTypeConstants.DE_FLOAT) {
+                    fieldName = String.format(DorisConstants.CAST, originField, DorisConstants.DEFAULT_FLOAT_FORMAT);
+                } else {
+                    fieldName = originField;
+                }
             }
         }
         return SQLObj.builder()

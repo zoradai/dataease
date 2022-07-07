@@ -131,12 +131,15 @@ export default {
     default_login: '普通登录'
   },
   commons: {
+    default_value: '默认值',
+    params_value: '参数值',
     publish: '发布',
     unpublished: '取消发布',
     default_pwd: '初始密码',
     stop: '停止',
     first_login_tips: '您使用的是初始密码，记得修改密码哦',
     roger_that: '知道了',
+    donot_noti: '不再提示',
     apply: '应用',
     search: '搜索',
     folder: '目录',
@@ -472,7 +475,8 @@ export default {
     display: '显示设置',
     ldap: 'LDAP设置',
     oidc: 'OIDC设置',
-    theme: '主题设置'
+    theme: '主题设置',
+    cas: 'CAS设置'
   },
   license: {
     i18n_no_license_record: '没有 License 记录',
@@ -646,7 +650,7 @@ export default {
     login_type: '默认登录方式',
     empty_front: '为空则默认取10秒',
     empty_msg: '为空则默认取30天',
-    front_error: '请填写0-300正整数', //修改了提示信息
+    front_error: '请填写0-300正整数', // 修改了提示信息
     msg_error: '请填写1-365正整数',
     SMTP_port: 'SMTP端口',
     SMTP_account: 'SMTP账户',
@@ -660,9 +664,14 @@ export default {
     test_recipients: '测试收件人',
     tip: '提示：仅用来作为测试邮件收件人',
     engine_mode_setting: '引擎设置',
-    kettle_setting: 'Kettle 设置'
+    kettle_setting: 'Kettle 设置',
+    cas_selected_warn: '选择CAS方式保存后会注销当前回话，重新登录',
+    cas_reset: 'CAS切换回默认登录方式访问API：'
   },
   chart: {
+    view_reset: '视图重置',
+    view_reset_tips: '放弃对视图的修改？',
+    export_img: '导出图片',
     title_repeat: '当前标题已存在',
     save_snapshot: '保存缩略图',
     datalist: '视图',
@@ -1103,9 +1112,32 @@ export default {
     tick_count: '刻度间隔数',
     custom_sort: '自定义',
     custom_sort_tip: '自定义排序优先级最高，且仅支持单个字段自定义',
-    clean_custom_sort: '清除自定义排序'
+    clean_custom_sort: '清除自定义排序',
+    ds_field_edit: '数据集字段管理',
+    chart_field_edit: '视图字段管理',
+    copy_field: '复制字段',
+    calc_field: '计算字段',
+    form_type: '类别',
+    scroll_cfg: '滚动设置',
+    scroll: '滚动',
+    open: '开启',
+    row: '行数',
+    interval: '间隔',
+    max_more_than_mix: '最大值必须大于最小值'
   },
   dataset: {
+    params_work: '仅在编辑sql时生效',
+    select_year: '选择年',
+    sql_variable_limit_1: '1、SQL 变量只能在 WHERE 条件中使用',
+    sql_variable_limit_2: '2、示例：select * from table_name where column_name1=${parm_name1} and column_name2 in ${parm_name2} ',
+    select_month: '选择月',
+    select_date: '选择日期',
+    select_time: '选择时间',
+    time_year: '日期-年',
+    time_year_month: '日期-年月',
+    time_year_month_day: '日期-年月日',
+    time_all: '日期-年月日时分秒',
+    dataset_sync: ' ( 数据同步中... )',
     sheet_warn: '有多个 Sheet 页，默认抽取第一个',
     datalist: '数据集',
     name: '数据集名称',
@@ -1389,8 +1421,10 @@ export default {
     get_schema: '获取 Schema',
     schema: '数据库 Schema',
     charset: '字符集',
+    targetCharset: '目标字符集',
     please_choose_schema: '请选择数据库 Schema',
     please_choose_charset: '请选择数据库字符集',
+    please_choose_targetCharset: '请选择目标字符集',
     edit_datasource_msg: '修改数据源信息，可能会导致该数据源下的数据集不可用，确认修改？',
     repeat_datasource_msg: '已经存在相同配置的数据源信息, ',
     confirm_save: '确认保存?',
@@ -1405,11 +1439,13 @@ export default {
     max_idle_time: '最大空闲(秒)',
     acquire_increment: '增长数',
     connect_timeout: '连接超时(秒)',
+    query_timeout: '查询超时(秒)',
     please_input_initial_pool_size: '请输入初始连接数',
     please_input_min_pool_size: '请输入最小连接数',
     please_input_max_pool_size: '请输入最大连接数',
     please_input_max_idle_time: '请输入最大空闲(秒)',
     please_input_acquire_increment: '请输入增长数',
+    please_input_query_timeout: '请输入查询超时',
     please_input_connect_timeout: '请输入连接超时(秒)',
     no_less_then_0: '高级设置中的参数不能小于零',
     port_no_less_then_0: '端口不能小于零',
@@ -1460,6 +1496,32 @@ export default {
     sure_bt: '确定'
   },
   panel: {
+    pic_adaptation: '适应组件',
+    pic_equiratio: '等比适应',
+    pic_original: '原始尺寸',
+    pic_size: '图片尺寸',
+    web_addr: '网页地址',
+    stream_media_info: '流媒体信息',
+    video_info: '视频信息',
+    title_position: '标题位置',
+    tab_inner_style: 'tab内部样式',
+    data_format: '日期格式',
+    border_color: '边框颜色',
+    theme_change_warn: '主题更换',
+    theme_change_tips: '更换主题将会覆盖视图相关主题属性建议提前备份,是否继续更换？',
+    theme_color_change_warn: '主题色更换',
+    theme_color_change_tips: '主题色变更将会覆盖原有视图属性',
+    theme_color: '主题色',
+    theme_color_dark: '深色',
+    theme_color_light: '浅色',
+    refresh_frequency: '刷新频率',
+    card_color_matching: '卡片配色',
+    table_color_matching: '表格配色',
+    background_color: '背景颜色',
+    more: '更多',
+    level: '层级',
+    enlarge: '放大',
+    panel_style: '仪表板样式',
     multiplexing: '复用',
     panel_off: '仪表板已下架',
     batch_opt: '批量操作',
@@ -1576,7 +1638,8 @@ export default {
     select_by_table: '按表选择',
     data_list: '数据列表',
     component_list: '组件列表',
-    custom_scope: '自定义控制范围',
+    custom_scope: '控制范围',
+    binding_parameters: '参数',
     multiple_choice: '多选',
     single_choice: '单选',
     field: '字段',
@@ -1656,7 +1719,7 @@ export default {
     no_drill_field: '缺少关联字段',
     matrix: '矩阵',
     suspension: '悬浮',
-    new_element_distribution: '当前元素移入分布方式',
+    new_element_distribution: '元素移入分布方式',
     aided_grid: '辅助设计网格',
     aided_grid_open: '打开',
     aided_grid_close: '关闭',
@@ -1697,20 +1760,23 @@ export default {
     web_url: '网页地址',
     video_add_tips: '请点击添加配置视频信息...',
     web_add_tips: '请点击添加网页信息...',
-    panel_view_result_show: '视图结果展示',
+    panel_view_result_show: '视图结果',
     panel_view_result_tips: '选择仪表板会覆盖视图的结果展示数量，取值范围1~10000',
     timeout_refresh: '请求超时，稍后刷新...',
     mobile_layout: '移动端布局',
     component_hidden: '隐藏的组件',
     public_link_tips: '当前是公共链接模式，目标仪表板未设置公共链接，无法跳转',
     input_title: '请输入标题',
-    show_title: '显示标题',
+    show_title: '标题',
     default_settings: '默认值设置',
     choose_background: '选择组件背景',
     choose_background_tips: '组件自有的背景设置会覆盖当前设置',
     setting_background: '设置背景',
     setting_jump: '跳转设置',
-    select_view: '请选择视图...'
+    select_view: '请选择视图...',
+    visual: '虚拟化',
+    prohibit_multiple: '禁止同数据集多字段',
+    be_empty_dir: '是空目录！'
   },
   plugin: {
     local_install: '本地安装',
@@ -1998,7 +2064,8 @@ export default {
     once_a_week: '每周一次',
     once_a_month: '每月一次',
     complex_repeat: '复杂重复',
-    pixel_tip: '可直接输入自定义分辨率(例如:2560 * 1600)或选择'
+    pixel_tip: '可直接输入自定义分辨率(例如:2560 * 1600)或选择',
+    task_type: '任务类型'
 
   },
   dynamic_time: {
@@ -2080,5 +2147,8 @@ export default {
   },
   plugin_style: {
     border: '边框'
+  },
+  sql_variable: {
+    variable_mgm: '参数设置'
   }
 }

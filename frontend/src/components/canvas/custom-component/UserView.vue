@@ -12,6 +12,8 @@
       v-if="editBarViewShowFlag"
       :element="element"
       :show-position="showPosition"
+      :panel-id="panelInfo.id"
+      :chart-title="chart.title || chart.name"
       :is-edit="isEdit"
       :view-id="element.propValue.viewId"
       @showViewDetails="openChartDetailsDialog"
@@ -33,6 +35,7 @@
       :search-count="searchCount"
       :terminal-type="scaleCoefficientType"
       :scale="scale"
+      :theme-style="element.commonBackground"
       class="chart-class"
       @onChartClick="chartClick"
       @onJumpClick="jumpClick"
@@ -47,6 +50,7 @@
       :search-count="searchCount"
       :terminal-type="scaleCoefficientType"
       :scale="scale"
+      :theme-style="element.commonBackground"
       @onChartClick="chartClick"
       @onJumpClick="jumpClick"
     />
@@ -119,7 +123,7 @@ import DrillPath from '@/views/chart/view/DrillPath'
 import { areaMapping } from '@/api/map/map'
 import ChartComponentG2 from '@/views/chart/components/ChartComponentG2'
 import EditBarView from '@/components/canvas/components/Editor/EditBarView'
-import { customAttrTrans, customStyleTrans, recursionTransObj } from '@/components/canvas/utils/style'
+import { adaptCurTheme, customAttrTrans, customStyleTrans, recursionTransObj } from '@/components/canvas/utils/style'
 import ChartComponentS2 from '@/views/chart/components/ChartComponentS2'
 import PluginCom from '@/views/system/plugin/PluginCom'
 import LabelNormalText from '@/views/chart/components/normal/LabelNormalText'
@@ -149,7 +153,6 @@ export default {
       required: false,
       default: false
     },
-    // eslint-disable-next-line vue/require-default-prop
     componentIndex: {
       type: Number,
       required: false
@@ -205,7 +208,6 @@ export default {
       changeIndex: 0,
       changeScaleIndex: 0,
       pre: null,
-      preCanvasPanel: null,
       // string
       sourceCustomAttrStr: null,
       // obj
@@ -234,7 +236,7 @@ export default {
       }
     },
     editBarViewShowFlag() {
-      return (this.active && this.inTab && !this.mobileLayoutStatus) || this.showPosition.includes('multiplexing')
+      return (this.active && this.inTab && !this.mobileLayoutStatus) || this.showPosition.includes('multiplexing') || this.showPosition.includes('email-task')
     },
     charViewShowFlag() {
       return this.httpRequest.status && this.chart.type && !this.chart.type.includes('table') && !this.chart.type.includes('text') && this.chart.type !== 'label' && this.renderComponent() === 'echarts'
@@ -314,6 +316,9 @@ export default {
     resultCount() {
       return this.canvasStyleData.panel && this.canvasStyleData.panel.resultCount || null
     },
+    gap() {
+      return this.canvasStyleData.panel && this.canvasStyleData.panel.gap || null
+    },
     innerPadding() {
       return this.element.commonBackground && this.element.commonBackground.innerPadding || 0
     },
@@ -352,21 +357,14 @@ export default {
       },
       deep: true
     },
-    // deep监听panel 如果改变 提交到 store
-    canvasStyleData: {
-      handler(newVal, oldVla) {
-        this.mergeStyle()
-        // 如果视图结果模式模式 或者 视图结果获取数量改变 刷新视图
-        if (!this.preCanvasPanel || this.preCanvasPanel.resultCount !== newVal.panel.resultCount || this.preCanvasPanel.resultMode !== newVal.panel.resultMode) {
-          this.getData(this.element.propValue.viewId, false)
-        }
-        // 如果gap有变化刷新
-        if (this.preCanvasPanel && this.preCanvasPanel.gap !== newVal.panel.gap) {
-          this.resizeChart()
-        }
-        this.preCanvasPanel = deepCopy(newVal.panel)
-      },
-      deep: true
+    resultCount: function() {
+      this.getData(this.element.propValue.viewId, false)
+    },
+    resultMode: function() {
+      this.getData(this.element.propValue.viewId, false)
+    },
+    gap: function() {
+      this.resizeChart()
     },
     // 监听外部的样式变化 （非实时性要求）
     'hw': {
@@ -390,7 +388,6 @@ export default {
       }
     },
     'chartType': function(newVal, oldVal) {
-      // this.isPlugin = this.plugins.some(plugin => plugin.value === this.chart.type)
       if ((newVal === 'map' || newVal === 'buddle-map') && newVal !== oldVal) {
         this.initAreas()
       }
@@ -409,6 +406,17 @@ export default {
     this.bindPluginEvent()
   },
 
+  beforeDestroy() {
+    bus.$off('plugin-chart-click', this.pluginChartClick)
+    bus.$off('plugin-jump-click', this.pluginJumpClick)
+    bus.$off('plugin-add-view-track-filter', this.pluginAddViewTrackFilter)
+    bus.$off('view-in-cache', this.viewInCache)
+    bus.$off('batch-opt-change', this.batchOptChange)
+    bus.$off('onSubjectChange', this.optFromBatchThemeChange)
+    bus.$off('onThemeColorChange', this.optFromBatchThemeChange)
+    bus.$off('onThemeAttrChange', this.optFromBatchSingleProp)
+    bus.$off('clear_panel_linkage', this.clearPanelLinkage)
+  },
   created() {
     this.refId = uuid.v1
     if (this.element && this.element.propValue && this.element.propValue.viewId) {
@@ -423,30 +431,43 @@ export default {
     },
     batchOptChange(param) {
       if (this.curBatchOptComponents.includes(this.element.propValue.viewId)) {
-        this.$store.state.styleChangeTimes++
-        // stylePriority change to 'view'
-        const updateParams = { 'id': this.chart.id, 'stylePriority': 'view' }
-        if (param.custom === 'customAttr') {
-          const sourceCustomAttr = JSON.parse(this.sourceCustomAttrStr)
-          sourceCustomAttr[param.property][param.value.modifyName] = param.value[param.value.modifyName]
-          this.sourceCustomAttrStr = JSON.stringify(sourceCustomAttr)
-          this.chart.customAttr = this.sourceCustomAttrStr
-          updateParams['customAttr'] = this.sourceCustomAttrStr
-        } else if (param.custom === 'customStyle') {
-          const sourceCustomStyle = JSON.parse(this.sourceCustomStyleStr)
-          // view's title use history
-          // if (param.property === 'text') {
-          //   param.value.title = sourceCustomStyle.text.title
-          // }
-          sourceCustomStyle[param.property][param.value.modifyName] = param.value[param.value.modifyName]
-          this.sourceCustomStyleStr = JSON.stringify(sourceCustomStyle)
-          this.chart.customStyle = this.sourceCustomStyleStr
-          updateParams['customStyle'] = this.sourceCustomStyleStr
-        }
-        viewPropsSave(this.panelInfo.id, updateParams)
-        this.$store.commit('recordViewEdit', { viewId: this.chart.id, hasEdit: true })
-        this.mergeScale()
+        this.optFromBatchSingleProp(param)
       }
+    },
+    optFromBatchSingleProp(param) {
+      this.$store.state.styleChangeTimes++
+      const updateParams = { 'id': this.chart.id }
+      if (param.custom === 'customAttr') {
+        const sourceCustomAttr = JSON.parse(this.sourceCustomAttrStr)
+        sourceCustomAttr[param.property][param.value.modifyName] = param.value[param.value.modifyName]
+        this.sourceCustomAttrStr = JSON.stringify(sourceCustomAttr)
+        this.chart.customAttr = this.sourceCustomAttrStr
+        updateParams['customAttr'] = this.sourceCustomAttrStr
+      } else if (param.custom === 'customStyle') {
+        const sourceCustomStyle = JSON.parse(this.sourceCustomStyleStr)
+        sourceCustomStyle[param.property][param.value.modifyName] = param.value[param.value.modifyName]
+        this.sourceCustomStyleStr = JSON.stringify(sourceCustomStyle)
+        this.chart.customStyle = this.sourceCustomStyleStr
+        updateParams['customStyle'] = this.sourceCustomStyleStr
+      }
+      viewPropsSave(this.panelInfo.id, updateParams)
+      this.$store.commit('recordViewEdit', { viewId: this.chart.id, hasEdit: true })
+      this.mergeScale()
+    },
+    optFromBatchThemeChange() {
+      const updateParams = { 'id': this.chart.id }
+      const sourceCustomAttr = JSON.parse(this.sourceCustomAttrStr)
+      const sourceCustomStyle = JSON.parse(this.sourceCustomStyleStr)
+      adaptCurTheme(sourceCustomStyle, sourceCustomAttr)
+      this.sourceCustomAttrStr = JSON.stringify(sourceCustomAttr)
+      this.chart.customAttr = this.sourceCustomAttrStr
+      updateParams['customAttr'] = this.sourceCustomAttrStr
+      this.sourceCustomStyleStr = JSON.stringify(sourceCustomStyle)
+      this.chart.customStyle = this.sourceCustomStyleStr
+      updateParams['customStyle'] = this.sourceCustomStyleStr
+      viewPropsSave(this.panelInfo.id, updateParams)
+      this.$store.commit('recordViewEdit', { viewId: this.chart.id, hasEdit: true })
+      this.mergeScale()
     },
     resizeChart() {
       if (this.chart.type === 'map') {
@@ -459,24 +480,34 @@ export default {
           : this.$refs[this.element.propValue.id].chartResize()
       }
     },
-    bindPluginEvent() {
-      bus.$on('plugin-chart-click', param => {
-        param.viewId && param.viewId === this.element.propValue.viewId && this.chartClick(param)
-      })
-      bus.$on('plugin-jump-click', param => {
-        param.viewId && param.viewId === this.element.propValue.viewId && this.jumpClick(param)
-      })
-      bus.$on('plugin-add-view-track-filter', param => {
-        param.viewId && param.viewId === this.element.propValue.viewId && this.addViewTrackFilter(param)
-      })
-      bus.$on('view-in-cache', param => {
-        param.viewId && param.viewId === this.element.propValue.viewId && this.getDataEdit(param)
-      })
-      bus.$on('batch-opt-change', param => {
-        this.batchOptChange(param)
-      })
+    pluginChartClick(param) {
+      param.viewId && param.viewId === this.element.propValue.viewId && this.chartClick(param)
     },
-
+    pluginJumpClick(param) {
+      param.viewId && param.viewId === this.element.propValue.viewId && this.jumpClick(param)
+    },
+    pluginAddViewTrackFilter(param) {
+      param.viewId && param.viewId === this.element.propValue.viewId && this.addViewTrackFilter(param)
+    },
+    viewInCache(param) {
+      param.viewId && param.viewId === this.element.propValue.viewId && this.getDataEdit(param)
+    },
+    clearPanelLinkage(param) {
+      if (param.viewId === 'all' || param.viewId === this.element.propValue.viewId) {
+        this.$refs[this.element.propValue.id].reDrawView()
+      }
+    },
+    bindPluginEvent() {
+      bus.$on('plugin-chart-click', this.pluginChartClick)
+      bus.$on('plugin-jump-click', this.pluginJumpClick)
+      bus.$on('plugin-add-view-track-filter', this.pluginAddViewTrackFilter)
+      bus.$on('view-in-cache', this.viewInCache)
+      bus.$on('batch-opt-change', this.batchOptChange)
+      bus.$on('onSubjectChange', this.optFromBatchThemeChange)
+      bus.$on('onThemeColorChange', this.optFromBatchThemeChange)
+      bus.$on('onThemeAttrChange', this.optFromBatchSingleProp)
+      bus.$on('clear_panel_linkage', this.clearPanelLinkage)
+    },
     addViewTrackFilter(linkageParam) {
       this.$store.commit('addViewTrackFilter', linkageParam)
     },
@@ -487,7 +518,6 @@ export default {
       const customStyleChart = JSON.parse(this.sourceCustomStyleStr)
       recursionTransObj(customAttrTrans, customAttrChart, this.scale, this.scaleCoefficientType)
       recursionTransObj(customStyleTrans, customStyleChart, this.scale, this.scaleCoefficientType)
-
       // 移动端地图标签不显示
       if (this.chart.type === 'map' && this.scaleCoefficientType === 'mobile') {
         customAttrChart.label.show = false
@@ -497,34 +527,8 @@ export default {
         customAttr: JSON.stringify(customAttrChart),
         customStyle: JSON.stringify(customStyleChart)
       }
-      this.mergeStyle()
     },
-    mergeStyle() {
-      if ((this.requestStatus === 'success' || this.requestStatus === 'merging') && this.chart.stylePriority === 'panel' && this.canvasStyleData.chart) {
-        const customAttrChart = JSON.parse(this.chart.customAttr)
-        const customStyleChart = JSON.parse(this.chart.customStyle)
-        const customAttrPanel = JSON.parse(this.canvasStyleData.chart.customAttr)
-        const customStylePanel = JSON.parse(this.canvasStyleData.chart.customStyle)
-        if (customStyleChart.background) {
-          // 组件样式-背景设置
-          customStyleChart.background = customStylePanel.background
-        }
-        // 图形属性-颜色设置
-        if (this.chart.type.includes('table')) {
-          customAttrChart.color = customAttrPanel.tableColor
-        } else {
-          customAttrChart.color['value'] = customAttrPanel.color['value']
-          customAttrChart.color['colors'] = customAttrPanel.color['colors']
-          customAttrChart.color['alpha'] = customAttrPanel.color['alpha']
-        }
-        this.chart = {
-          ...this.chart,
-          customAttr: JSON.stringify(customAttrChart),
-          customStyle: JSON.stringify(customStyleChart)
-        }
-      }
-    },
-    getData(id, cache = true) {
+    getData(id, cache = true, dataBroadcast = false) {
       if (id) {
         this.requestStatus = 'waiting'
         this.message = null
@@ -549,7 +553,7 @@ export default {
           // 将视图传入echart组件
           if (response.success) {
             this.chart = response.data
-            this.getDataOnly(response.data)
+            this.getDataOnly(response.data, dataBroadcast)
             this.chart['position'] = this.inTab ? 'tab' : 'panel'
             // 记录当前数据
             this.panelViewDetailsInfo[id] = JSON.stringify(this.chart)
@@ -593,7 +597,7 @@ export default {
     viewIdMatch(viewIds, viewId) {
       return !viewIds || viewIds.length === 0 || viewIds.includes(viewId)
     },
-    openChartDetailsDialog() {
+    openChartDetailsDialog(params) {
       const tableChart = deepCopy(this.chart)
       tableChart.customAttr = JSON.parse(this.chart.customAttr)
       tableChart.customStyle = JSON.parse(this.chart.customStyle)
@@ -604,7 +608,7 @@ export default {
       tableChart.customStyle.text.show = false
       tableChart.customAttr = JSON.stringify(tableChart.customAttr)
       tableChart.customStyle = JSON.stringify(tableChart.customStyle)
-      eventBus.$emit('openChartDetailsDialog', { chart: this.chart, tableChart: tableChart })
+      eventBus.$emit('openChartDetailsDialog', { chart: this.chart, tableChart: tableChart, openType: params.openType })
     },
     chartClick(param) {
       if (this.drillClickDimensionList.length < this.chart.drillFields.length - 1) {
@@ -845,7 +849,7 @@ export default {
     getDataEdit(param) {
       this.$store.state.styleChangeTimes++
       if (param.type === 'propChange') {
-        this.getData(param.viewId, false)
+        this.getData(param.viewId, false, true)
       } else if (param.type === 'styleChange') {
         this.chart.customAttr = param.viewInfo.customAttr
         this.chart.customStyle = param.viewInfo.customStyle
@@ -856,11 +860,14 @@ export default {
         this.sourceCustomStyleStr = this.chart.customStyle
         if (this.componentViewsData[this.chart.id]) {
           this.componentViewsData[this.chart.id]['title'] = this.chart.title
+          if (param.refreshProp) {
+            this.componentViewsData[this.chart.id][param.refreshProp] = this.chart[param.refreshProp]
+          }
         }
         this.mergeScale()
       }
     },
-    getDataOnly(sourceResponseData) {
+    getDataOnly(sourceResponseData, dataBroadcast) {
       if (this.isEdit) {
         if ((this.filter.filter && this.filter.filter.length) || (this.filter.linkageFilters && this.filter.linkageFilters.length)) {
           viewData(this.chart.id, this.panelInfo.id, {
@@ -869,9 +876,15 @@ export default {
             queryFrom: 'panel'
           }).then(response => {
             this.componentViewsData[this.chart.id] = response.data
+            if (dataBroadcast) {
+              bus.$emit('prop-change-data')
+            }
           })
         } else {
           this.componentViewsData[this.chart.id] = sourceResponseData
+          if (dataBroadcast) {
+            bus.$emit('prop-change-data')
+          }
         }
       }
     }
@@ -921,32 +934,4 @@ export default {
     z-index: 2;
     display: block !important;
   }
-
-  /*.rect-shape > i {*/
-  /*  right: 5px;*/
-  /*  color: gray;*/
-  /*  position: absolute;*/
-  /*}*/
-
-  /*.rect-shape > > > i:hover {*/
-  /*  color: red;*/
-  /*}*/
-
-  /*.rect-shape:hover > > > .icon-fangda {*/
-  /*  z-index: 2;*/
-  /*  display: block;*/
-  /*}*/
-
-  /*.rect-shape > > > .icon-fangda {*/
-  /*  display: none*/
-  /*}*/
-
-  /*.rect-shape:hover > > > .icon-shezhi {*/
-  /*  z-index: 2;*/
-  /*  display: block;*/
-  /*}*/
-
-  /*.rect-shape > > > .icon-shezhi {*/
-  /*  display: none*/
-  /*}*/
 </style>

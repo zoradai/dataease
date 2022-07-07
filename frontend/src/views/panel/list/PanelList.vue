@@ -228,7 +228,7 @@ import LinkGenerate from '@/views/link/generate'
 import { uuid } from 'vue-uuid'
 import bus from '@/utils/bus'
 import EditPanel from './EditPanel'
-import {addGroup, delGroup, groupTree, defaultTree, panelSave, initPanelData, panelUpdate} from '@/api/panel/panel'
+import { addGroup, delGroup, groupTree, defaultTree, initPanelData, panelUpdate } from '@/api/panel/panel'
 import { mapState } from 'vuex'
 import {
   DEFAULT_COMMON_CANVAS_STYLE_STRING
@@ -621,6 +621,11 @@ export default {
         if (!userCache) {
           this.tData = res.data
         }
+        if (this.filterText) {
+          this.$nextTick(() => {
+            this.$refs.panel_list_tree.filter(this.filterText)
+          })
+        }
       })
     },
     defaultTree(cache = false) {
@@ -638,6 +643,11 @@ export default {
         if (!userCache) {
           this.defaultData = res.data
         }
+        if (this.filterText) {
+          this.$nextTick(() => {
+            this.$refs.default_panel_tree.filter(this.filterText)
+          })
+        }
       })
     },
 
@@ -650,6 +660,7 @@ export default {
         this.$store.commit('setComponentDataCache', null)
         initPanelData(data.id, function(response) {
           bus.$emit('set-panel-show-type', 0)
+          data.mobileLayout = response.data.mobileLayout
         })
       }
     },
@@ -686,8 +697,6 @@ export default {
     edit(data, node) {
       this.lastActiveNodeData = data
       this.lastActiveNode = node
-      // 清空当前缓存,快照
-      this.$store.commit('refreshSnapshot')
       this.$store.commit('setComponentData', [])
       this.$store.commit('setCanvasStyle', DEFAULT_COMMON_CANVAS_STYLE_STRING)
       this.$store.dispatch('panel/setPanelInfo', {

@@ -46,9 +46,20 @@
                 <el-input v-model="axisForm.axisValue.min" @blur="changeXAxisStyle('axisValue')" />
               </el-form-item>
               <el-form-item :label="$t('chart.axis_value_max')" class="form-item">
-                <el-input @blur="changeXAxisStyle('axisValue')" />
+                <el-input v-model="axisForm.axisValue.max" @blur="changeXAxisStyle('axisValue')" />
               </el-form-item>
               <el-form-item :label="$t('chart.axis_value_split_count')" class="form-item">
+                <span slot="label">
+                  <span class="span-box">
+                    <span>{{ $t('chart.axis_value_split_count') }}</span>
+                    <el-tooltip class="item" effect="dark" placement="bottom">
+                      <div slot="content">
+                        期望的坐标轴刻度数量，非最终结果。
+                      </div>
+                      <i class="el-icon-info" style="cursor: pointer;" />
+                    </el-tooltip>
+                  </span>
+                </span>
                 <el-input v-model="axisForm.axisValue.splitCount" @blur="changeXAxisStyle('axisValue')" />
               </el-form-item>
             </span>
@@ -81,6 +92,32 @@
                 <el-option v-for="option in fontSize" :key="option.value" :label="option.name" :value="option.value" />
               </el-select>
             </el-form-item>
+
+            <span v-show="chart.type && chart.type.includes('horizontal')">
+              <el-form-item :label="$t('chart.value_formatter_type')" class="form-item">
+                <el-select v-model="axisForm.axisLabelFormatter.type" @change="changeXAxisStyle('axisLabelFormatter')">
+                  <el-option v-for="type in typeList" :key="type.value" :label="$t('chart.' + type.name)" :value="type.value" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item v-show="axisForm.axisLabelFormatter.type !== 'auto'" :label="$t('chart.value_formatter_decimal_count')" class="form-item">
+                <el-input-number v-model="axisForm.axisLabelFormatter.decimalCount" :precision="0" :min="0" :max="10" size="mini" @change="changeXAxisStyle('axisLabelFormatter')" />
+              </el-form-item>
+
+              <el-form-item v-show="axisForm.axisLabelFormatter.type !== 'percent'" :label="$t('chart.value_formatter_unit')" class="form-item">
+                <el-select v-model="axisForm.axisLabelFormatter.unit" :placeholder="$t('chart.pls_select_field')" size="mini" @change="changeXAxisStyle('axisLabelFormatter')">
+                  <el-option v-for="item in unitList" :key="item.value" :label="$t('chart.' + item.name)" :value="item.value" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item :label="$t('chart.value_formatter_suffix')" class="form-item">
+                <el-input v-model="axisForm.axisLabelFormatter.suffix" size="mini" clearable :placeholder="$t('commons.input_content')" @change="changeXAxisStyle('axisLabelFormatter')" />
+              </el-form-item>
+
+              <el-form-item :label="$t('chart.value_formatter_thousand_separator')" class="form-item">
+                <el-checkbox v-model="axisForm.axisLabelFormatter.thousandSeparator" @change="changeXAxisStyle('axisLabelFormatter')" />
+              </el-form-item>
+            </span>
           </span>
         </div>
       </el-form>
@@ -90,6 +127,7 @@
 
 <script>
 import { COLOR_PANEL, DEFAULT_XAXIS_STYLE } from '../../chart/chart'
+import { formatterType, unitList } from '@/views/chart/chart/formatter'
 
 export default {
   name: 'XAxisSelectorAntV',
@@ -115,7 +153,9 @@ export default {
       axisForm: JSON.parse(JSON.stringify(DEFAULT_XAXIS_STYLE)),
       isSetting: false,
       fontSize: [],
-      predefineColors: COLOR_PANEL
+      predefineColors: COLOR_PANEL,
+      typeList: formatterType,
+      unitList: unitList
     }
   },
   watch: {
@@ -149,6 +189,9 @@ export default {
           }
           if (!this.axisForm.axisValue) {
             this.axisForm.axisValue = JSON.parse(JSON.stringify(DEFAULT_XAXIS_STYLE.axisValue))
+          }
+          if (!this.axisForm.axisLabelFormatter) {
+            this.axisForm.axisLabelFormatter = JSON.parse(JSON.stringify(DEFAULT_XAXIS_STYLE.axisLabelFormatter))
           }
         }
       }

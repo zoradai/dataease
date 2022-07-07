@@ -50,6 +50,9 @@ export default {
     bus.$on('panle_start_list_refresh', this.refreshStarts)
     this.initData()
   },
+  beforeDestroy() {
+    bus.$off('panle_start_list_refresh', this.refreshStarts)
+  },
   methods: {
     showPanel(row) {
       initPanelData(row.panelGroupId, function() {
@@ -67,6 +70,8 @@ export default {
     },
     remove(row) {
       deleteEnshrine(row.panelGroupId).then(res => {
+        const msg = this.$t('commons.cancel') + this.$t('panel.store') + this.$t('commons.success')
+        this.$success(msg)
         this.initData()
         this.panelInfo && this.panelInfo.id && row.panelGroupId === this.panelInfo.id && this.setMainNull()
       })

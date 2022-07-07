@@ -1,7 +1,8 @@
 // import { hexColorToRGBA } from '@/views/chart/chart/util'
-import { componentStyle } from '../common/common'
+import { componentStyle, reverseColor } from '../common/common'
+import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 
-export function baseMapOption(chart_option, chart) {
+export function baseMapOption(chart_option, chart, themeStyle) {
   // 处理shape attr
   let customAttr = {}
   if (chart.customAttr) {
@@ -21,6 +22,10 @@ export function baseMapOption(chart_option, chart) {
         return text.replace(new RegExp('{a}', 'g'), a).replace(new RegExp('{b}', 'g'), b).replace(new RegExp('{c}', 'g'), c)
       }
       chart_option.tooltip = tooltip
+
+      const bgColor = tooltip.backgroundColor ? tooltip.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
+      chart_option.tooltip.backgroundColor = bgColor
+      chart_option.tooltip.borderColor = bgColor
     }
   }
   // 处理data
@@ -28,6 +33,8 @@ export function baseMapOption(chart_option, chart) {
     chart_option.title.text = chart.title
     if (chart.data.series && chart.data.series.length > 0) {
       chart_option.series[0].name = chart.data.series[0].name
+      chart_option.series[0].selectedMode = true
+      chart_option.series[0].select = BASE_ECHARTS_SELECT
       // label
       if (customAttr.label) {
         const text = customAttr.label.formatter
@@ -64,23 +71,18 @@ export function baseMapOption(chart_option, chart) {
         chart_option.visualMap.inRange.color = customAttr.color.colors
         chart_option.visualMap.inRange.colorAlpha = customAttr.color.alpha / 100
       }
+      if (themeStyle && themeStyle.backgroundColorSelect) {
+        const panelColor = themeStyle.color
+        const reverseValue = reverseColor(panelColor)
+        chart_option.visualMap.textStyle = { color: reverseValue }
+      }
       for (let i = 0; i < valueArr.length; i++) {
-        // const y = {
-        //   name: chart.data.x[i],
-        //   value: valueArr[i]
-        // }
         const y = valueArr[i]
         y.name = chart.data.x[i]
-        // color
-        // y.itemStyle = {
-        //   color: hexColorToRGBA(customAttr.color.colors[i % customAttr.color.colors.length], customAttr.color.alpha),
-        //   borderRadius: 0
-        // }
         chart_option.series[0].data.push(y)
       }
     }
   }
-  // console.log(chart_option);
   componentStyle(chart_option, chart)
   return chart_option
 }

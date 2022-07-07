@@ -1,5 +1,6 @@
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { componentStyle } from '../common/common'
+import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 
 export function baseRadarOption(chart_option, chart) {
   // 处理shape attr
@@ -20,6 +21,10 @@ export function baseRadarOption(chart_option, chart) {
       const reg = new RegExp('\n', 'g')
       tooltip.formatter = tooltip.formatter.replace(reg, '<br/>')
       chart_option.tooltip = tooltip
+
+      const bgColor = tooltip.backgroundColor ? tooltip.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
+      chart_option.tooltip.backgroundColor = bgColor
+      chart_option.tooltip.borderColor = bgColor
     }
   }
   // 处理data
@@ -50,7 +55,9 @@ export function baseRadarOption(chart_option, chart) {
             name: y.name,
             label: y.label
           }
-        ]
+        ],
+        selectedMode: true,
+        select: BASE_ECHARTS_SELECT
       }
       y.value = JSON.parse(JSON.stringify(y.data))
       chart_option.series.push(d)
@@ -62,7 +69,6 @@ export function baseRadarOption(chart_option, chart) {
       chart_option.radar.indicator.push({ name: ele, max: max })
     })
   }
-  // console.log(chart_option);
   componentStyle(chart_option, chart)
   return chart_option
 }

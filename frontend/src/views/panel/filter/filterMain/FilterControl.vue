@@ -6,11 +6,12 @@
           v-if="widget.showSwitch"
           v-model="attrs.multiple"
           :active-text="$t('panel.multiple_choice')"
-          :inactive-text="$t('panel.single_choice')"
           @change="multipleChange"
         />
+
       </div>
     </el-col>
+
     <el-col :span="16">
       <div class="filter-options-right">
         <span style="padding-right: 10px;">
@@ -60,6 +61,37 @@
             />
           </el-popover>
         </span>
+        <span v-if="element.component === 'de-select'" style="padding-left: 10px;">
+          <el-checkbox v-model="attrs.enableParameters" @change="enableParametersChange"><span>
+            {{ $t('panel.binding_parameters') }} </span> </el-checkbox>
+
+          <el-popover placement="bottom-end" :disabled="!attrs.enableParameters" width="200">
+            <div class="view-container-class">
+              <el-checkbox-group v-model="attrs.parameters">
+                <el-checkbox
+                  v-for="(item ) in childViews.datasetParams"
+                  :key="item.variableName"
+                  :label="item.variableName"
+                  class="de-checkbox"
+                >
+                  <div class="span-div">
+                    <span v-if="item.variableName && item.variableName.length <= 7" style="margin-left: 6px">{{ item.variableName }}</span>
+                    <el-tooltip v-else class="item" effect="dark" :content="item.variableName" placement="left">
+                      <span style="margin-left: 6px">{{ item.variableName }}</span>
+                    </el-tooltip>
+                  </div>
+
+                </el-checkbox>
+              </el-checkbox-group>
+            </div>
+
+            <i
+              slot="reference"
+              :class="{'i-filter-active': attrs.enableParameters, 'i-filter-inactive': !attrs.enableParameters}"
+              class="el-icon-setting i-filter"
+            />
+          </el-popover>
+        </span>
       </div>
 
     </el-col>
@@ -67,7 +99,6 @@
 </template>
 
 <script>
-import {mapState} from "vuex";
 
 export default {
   name: 'FilterControl',
@@ -94,9 +125,13 @@ export default {
     return {
       attrs: null,
       titlePopovervisible: false,
-      popovervisible: false
+      popovervisible: false,
+      parametersVisible: false
 
     }
+  },
+  computed: {
+
   },
 
   created() {
@@ -115,11 +150,20 @@ export default {
       }
       this.fillAttrs2Filter()
     },
+    enableParametersChange(value) {
+      if (!value) {
+        this.attrs.parameters = []
+      }
+      this.fillAttrs2Filter()
+    },
     showTitleChange(value) {
       if (!value) {
         this.attrs.title = ''
         this.element.style.backgroundColor = ''
       }
+      this.fillAttrs2Filter()
+    },
+    showVisualChange(value) {
       this.fillAttrs2Filter()
     },
 

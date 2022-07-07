@@ -228,6 +228,14 @@
             </el-select>
           </el-form-item>
 
+          <el-form-item v-if="form.type=='oracle'" :label="$t('datasource.targetCharset')">
+            <el-select v-model="form.configuration.targetCharset" filterable
+                       :placeholder="$t('datasource.please_choose_targetCharset')"
+                       class="select-width">
+              <el-option v-for="item in datasourceType.targetCharset" :key="item" :label="item" :value="item"/>
+            </el-select>
+          </el-form-item>
+
           <el-collapse v-if="form.type !=='es' && form.type !== 'api' && form.type !== 'mongo'">
             <el-collapse-item :title="$t('datasource.priority')" name="1">
               <el-form-item :label="$t('datasource.initial_pool_size')" prop="configuration.initialPoolSize">
@@ -239,6 +247,9 @@
               </el-form-item>
               <el-form-item :label="$t('datasource.max_pool_size')" prop="configuration.maxPoolSize">
                 <el-input v-model="form.configuration.maxPoolSize" autocomplete="off" type="number" min="0"/>
+              </el-form-item>
+              <el-form-item v-if="datasourceType.isJdbc" :label="$t('datasource.query_timeout')" prop="configuration.queryTimeout">
+                <el-input v-model="form.configuration.queryTimeout" autocomplete="off" type="number" min="0"/>
               </el-form-item>
             </el-collapse-item>
           </el-collapse>
@@ -290,7 +301,8 @@ export default {
             maxIdleTime: 30,
             acquireIncrement: 5,
             idleConnectionTestPeriod: 5,
-            connectTimeout: 5
+            connectTimeout: 5,
+            queryTimeout: 30
           },
           apiConfiguration: []
         }
@@ -350,6 +362,11 @@ export default {
         'configuration.acquireIncrement': [{
           required: true,
           message: i18n.t('datasource.please_input_acquire_increment'),
+          trigger: 'blur'
+        }],
+        'configuration.queryTimeout': [{
+          required: true,
+          message: i18n.t('datasource.please_input_query_timeout'),
           trigger: 'blur'
         }],
         'configuration.connectTimeout': [{

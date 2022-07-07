@@ -15,6 +15,8 @@
     @removeTag="changeNodeIds"
     @check="changeCheckNode"
     @select-clear="selectClear"
+    @onFoucs="onFoucs"
+    @treeCheckChange="handleElTagStyle"
   />
 
 </template>
@@ -22,10 +24,15 @@
 <script>
 import { mappingFieldValues, linkMappingFieldValues } from '@/api/dataset/dataset'
 import bus from '@/utils/bus'
+import { isSameVueObj } from '@/utils'
 import { getLinkToken, getToken } from '@/utils/auth'
 import ElTreeSelect from '@/components/ElTreeSelect'
+import customInput from '@/components/widget/DeWidget/customInput'
+import { textSelectWidget } from '@/components/widget/DeWidget/serviceNameFn.js'
+
 export default {
   components: { ElTreeSelect },
+  mixins: [customInput],
   props: {
     element: {
       type: Object,
@@ -118,7 +125,7 @@ export default {
       if (!token && linkToken) {
         method = linkMappingFieldValues
       }
-      const param = { fieldIds: this.element.options.attrs.fieldId.split(',') }
+      const param = { fieldIds: this.element.options.attrs.fieldId.split(','), sort: this.element.options.attrs.sort }
       if (this.panelInfo.proxy) {
         param.userId = this.panelInfo.proxy
       }
@@ -162,25 +169,63 @@ export default {
           this.$refs.deSelectTree && this.$refs.deSelectTree.treeDataUpdateFun(this.datas)
         })
       })
+    },
+    'element.options.attrs.sort': function(value, old) {
+      if (value === null || typeof value === 'undefined' || value === old || isSameVueObj(value, old)) return
+      this.datas = []
+
+      let method = mappingFieldValues
+      const token = this.$store.getters.token || getToken()
+      const linkToken = this.$store.getters.linkToken || getLinkToken()
+      if (!token && linkToken) {
+        method = linkMappingFieldValues
+      }
+      const param = { fieldIds: this.element.options.attrs.fieldId.split(','), sort: this.element.options.attrs.sort }
+      if (this.panelInfo.proxy) {
+        param.userId = this.panelInfo.proxy
+      }
+      this.element.options.attrs.fieldId &&
+      this.element.options.attrs.fieldId.length > 0 &&
+      method(param).then(res => {
+        this.datas = this.optionDatas(res.data)
+        this.$nextTick(() => {
+          this.$refs.deSelectTree && this.$refs.deSelectTree.treeDataUpdateFun(this.datas)
+        })
+      })
+      this.element.options.value = ''
     }
 
   },
   created() {
+    if (!this.element.options.attrs.sort) {
+      this.element.options.attrs.sort = {}
+    }
     this.initLoad()
   },
   mounted() {
-    bus.$on('onScroll', () => {
+    bus.$on('reset-default-value', this.resetDefaultValue)
+  },
+  beforeDestroy() {
+    bus.$off('reset-default-value', this.resetDefaultValue)
+  },
 
-    })
-    bus.$on('reset-default-value', id => {
+  methods: {
+    resetDefaultValue(id) {
       if (this.inDraw && this.manualModify && this.element.id === id) {
         this.value = this.fillValueDerfault()
         this.changeValue(this.value)
       }
-    })
-  },
-
-  methods: {
+    },
+    onFoucs() {
+      this.$nextTick(() => {
+        this.handleCoustomStyle()
+      })
+    },
+    handleElTagStyle() {
+      setTimeout(() => {
+        textSelectWidget(this.$refs.deSelectTree.$refs.select.$el, this.element.style)
+      }, 50)
+    },
     selectClear() {
       this.changeValue(this.value)
     },
@@ -206,7 +251,7 @@ export default {
         if (!token && linkToken) {
           method = linkMappingFieldValues
         }
-        method({ fieldIds: this.element.options.attrs.fieldId.split(',') }).then(res => {
+        method({ fieldIds: this.element.options.attrs.fieldId.split(','), sort: this.element.options.attrs.sort }).then(res => {
           this.datas = this.optionDatas(res.data)
           this.$nextTick(() => {
             this.$refs.deSelectTree && this.$refs.deSelectTree.treeDataUpdateFun(this.datas)
@@ -302,11 +347,9 @@ export default {
     },
     // 树点击
     _nodeClickFun(data, node, vm) {
-      console.log('this _nodeClickFun', this.value, data, node)
     },
     // 树过滤
     _searchFun(value) {
-      console.log(value, '<--_searchFun')
       // 自行判断 是走后台查询，还是前端过滤
       this.$refs.deSelectTree.filterFun(value)
       // 后台查询
@@ -327,6 +370,47 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
+.test-class-wrap {
+  background: var(--BgSelectTreeColor, #FFFFFF) !important;
+  border-color: var(--BrSelectTreeColor, #E4E7ED) !important;
 
+  .popper__arrow,
+  .popper__arrow::after {
+    display: none !important;
+  }
+
+  .el-tree {
+    background: var(--BgSelectTreeColor, #FFFFFF) !important;
+    color: var(--SelectTreeColor, #606266) !important;
+
+    .el-tree-node.is-current {
+      background-color: rgb(245, 247, 250, .5) !important;
+    }
+    .el-tree-node:focus>.el-tree-node__content {
+      background-color: rgb(245, 247, 250, .5) !important;
+    }
+
+    .el-tree-node__content:hover {
+      background-color: rgb(245, 247, 250, .5) !important;
+    }
+  }
+
+  
+
+  .el-input-group--append {
+    .el-input__inner {
+      background: var(--BgSelectTreeColor, #FFFFFF) !important;
+      color: var(--SelectTreeColor, #606266) !important;
+      border: 1px solid var(--BrSelectTreeColor, #606266) !important;
+    }
+
+    .el-input-group__append {
+      background: var(--BgSelectTreeColor, #FFFFFF) !important;
+      color: var(--SelectTreeColor, #606266) !important;
+      border: 1px solid var(--BrSelectTreeColor, #606266) !important;
+      border-left: none;
+    }
+  }
+}
 </style>

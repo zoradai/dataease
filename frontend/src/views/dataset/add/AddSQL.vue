@@ -16,36 +16,45 @@
       </el-row>
       <el-divider/>
       <el-row>
-        <el-form :inline="true">
-          <el-form-item class="form-item">
-            <el-select v-model="dataSource" filterable :placeholder="$t('dataset.pls_slc_data_source')" size="mini"
-                       @change="changeDatasource()">
-              <el-option
-                v-for="item in options"
-                :key="item.id"
-                :label="item.name"
-                :value="item.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item class="form-item">
-            <el-input v-model="name" size="mini" :placeholder="$t('commons.name')"/>
-          </el-form-item>
-          <el-form-item v-if="!param.tableId" class="form-item">
-            <el-select v-model="mode" filterable :placeholder="$t('dataset.connect_mode')" size="mini">
-              <el-option :label="$t('dataset.direct_connect')" value="0"/>
-              <el-option :label="$t('dataset.sync_data')" value="1"
-                         :disabled="disabledSync"/>
-            </el-select>
-          </el-form-item>
+        <el-col :span="16">
+          <el-form :inline="true">
+            <el-form-item class="form-item">
+              <el-select v-model="dataSource" filterable :placeholder="$t('dataset.pls_slc_data_source')" size="mini"
+                         @change="changeDatasource()">
+                <el-option
+                  v-for="item in options"
+                  :key="item.id"
+                  :label="item.name"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item class="form-item">
+              <el-input v-model="name" size="mini" :placeholder="$t('commons.name')"/>
+            </el-form-item>
+            <el-form-item v-if="!param.tableId" class="form-item">
+              <el-select v-model="mode" filterable :placeholder="$t('dataset.connect_mode')" size="mini">
+                <el-option :label="$t('dataset.direct_connect')" value="0"/>
+                <el-option :label="$t('dataset.sync_data')" value="1"
+                           :disabled="disabledSync"/>
+              </el-select>
+            </el-form-item>
 
-          <el-form-item v-if="mode === '1'" class="form-item">
-            <el-select v-model="syncType" filterable :placeholder="$t('dataset.connect_mode')" size="mini">
-              <el-option :label="$t('dataset.sync_now')" value="sync_now" :disabled="engineMode === 'simple'"/>
-              <el-option :label="$t('dataset.sync_latter')" value="sync_latter"/>
-            </el-select>
-          </el-form-item>
-        </el-form>
+            <el-form-item v-if="mode === '1'" class="form-item">
+              <el-select v-model="syncType" filterable :placeholder="$t('dataset.connect_mode')" size="mini">
+                <el-option :label="$t('dataset.sync_now')" value="sync_now" :disabled="engineMode === 'simple'"/>
+                <el-option :label="$t('dataset.sync_latter')" value="sync_latter"/>
+              </el-select>
+            </el-form-item>
+          </el-form>
+        </el-col>
+        <el-col :span="8">
+          <el-row style="float: right">
+            <el-button  v-if="mode === '0'"  type="text" size="mini" @click="variableMgm">
+              {{ $t('sql_variable.variable_mgm') }}
+            </el-button>
+          </el-row>
+        </el-col>
       </el-row>
       <el-row>
         <el-col style="min-width: 200px;">
@@ -94,6 +103,76 @@
           </span>
         </el-card>
       </el-row>
+
+      <el-dialog :title="dialogTitle" :visible="showVariableMgm" :before-close="closeVariableMgm" width="60%"
+                 class="dialog-css" append-to-body>
+
+              <div slot="title" class="header-title">
+                <span>{{dialogTitle}}</span>
+                <span>
+                  <el-tooltip class="item" effect="dark" content="Right Bottom 提示文字" placement="bottom">
+                    <div slot="content">
+                      {{ $t('dataset.sql_variable_limit_1') }}<br>
+                      {{ $t('dataset.sql_variable_limit_2') }}<br>
+                    </div>
+                    <i class="el-icon-info" style="cursor: pointer;" />
+                  </el-tooltip>
+                </span>
+              </div>
+              <el-table :data="variablesTmp" style="width: 80%">
+                <el-table-column prop="variableName" :label="$t('commons.name')" width="180">
+                </el-table-column>
+                <el-table-column :label="$t('table.type')" width="180">
+                    <template  slot-scope="scope">
+                      <el-cascader v-model="scope.row.type" size="mini" style="display: inline-block;width: 120px;" :options="fieldOptions" @change="variableTypeChange(scope.row)">
+                      </el-cascader>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="defaultValue" :label="$t('commons.params_value')" :render-header="renderPrice">
+                  <template slot-scope="scope">
+                    <el-input size="mini" v-if="scope.row.type[0] === 'TEXT'" type="text" v-model="scope.row.defaultValue" />
+                    <el-input  size="mini" v-if="scope.row.type[0] === 'LONG' || scope.row.type[0] === 'DOUBLE'" type="number" v-model="scope.row.defaultValue" />
+
+                    <el-date-picker v-if="scope.row.type[0] === 'DATETIME-YEAR'"
+                      v-model="scope.row.defaultValue"
+                      type="year"
+                      value-format="yyyy"
+                      :placeholder="$t('dataset.select_year')">
+                    </el-date-picker>
+
+                    <el-date-picker v-if="scope.row.type[0] === 'DATETIME-YEAR-MONTH'"
+                                    v-model="scope.row.defaultValue"
+                                    type="month"
+                                    :format="scope.row.type[1]"
+                                    :value-format="scope.row.type[1]"
+                                    :placeholder="$t('dataset.select_month')">
+                    </el-date-picker>
+
+                    <el-date-picker v-if="scope.row.type[0] === 'DATETIME-YEAR-MONTH-DAY'"
+                                    v-model="scope.row.defaultValue"
+                                    type="date"
+                                    :format="scope.row.type[1]"
+                                    :value-format="scope.row.type[1]"
+                                    :placeholder="$t('dataset.select_date')">
+                    </el-date-picker>
+
+                    <el-date-picker v-if="scope.row.type[0] === 'DATETIME'"
+                                    v-model="scope.row.defaultValue"
+                                    type="datetime"
+                                    :format="scope.row.type[1]"
+                                    :value-format="scope.row.type[1]"
+                                    :placeholder="$t('dataset.select_time')">
+                    </el-date-picker>
+
+                  </template>
+                </el-table-column>
+              </el-table>
+                <div slot="footer" class="dialog-footer">
+                  <el-button size="mini" @click="closeVariableMgm">{{ $t('dataset.cancel') }}</el-button>
+                  <el-button type="primary" size="mini" @click="saveVariable()">{{ $t('dataset.confirm') }}</el-button>
+                </div>
+      </el-dialog>
+
     </el-row>
   </el-col>
 </template>
@@ -161,6 +240,44 @@ export default {
       selectedDatasource: {},
       engineMode: 'local',
       disabledSync: true,
+      showVariableMgm: false,
+      dialogTitle: '',
+      variables: [],
+      variablesTmp: [],
+      fieldOptions: [
+        { label: this.$t('dataset.text'), value: 'TEXT' },
+        { label: this.$t('dataset.value'), value: 'LONG' },
+        { label: this.$t('dataset.value') + '(' + this.$t('dataset.float') + ')', value: 'DOUBLE' },
+        // { label: this.$t('dataset.time_year'), value: 'DATETIME-YEAR' },
+        // { label: this.$t('dataset.time_year_month'), value: 'DATETIME-YEAR-MONTH',
+        //   children: [{
+        //     value: 'yyyy-MM',
+        //     label: 'YYYY-MM'
+        //   }, {
+        //     value: 'yyyy/MM',
+        //     label: 'YYYY/MM'
+        //   }]
+        // },
+        // { label: this.$t('dataset.time_year_month_day'), value: 'DATETIME-YEAR-MONTH-DAY',
+        //   children: [{
+        //     value: 'yyyy-MM-dd',
+        //     label: 'YYYY-MM-DD'
+        //   }, {
+        //     value: 'yyyy/MM/dd',
+        //     label: 'YYYY/MM/DD'
+        //   }]
+        // },
+        // { label: this.$t('dataset.time_all'), value: 'DATETIME',
+        //   children: [{
+        //     value: 'yyyy-MM-dd HH:mm:ss',
+        //     label: 'YYYY-MM-DD HH:MI:SS'
+        //   }, {
+        //     value: 'yyyy/MM/dd HH:mm:ss',
+        //     label: 'YYYY/MM/DD HH:MI:SS'
+        //   }
+        //   ]
+        // }
+      ],
     }
   },
   computed: {
@@ -205,7 +322,7 @@ export default {
         if (this.options[i].id === this.dataSource) {
           this.selectedDatasource = this.options[i]
           this.mode = '0'
-          if (this.engineMode === 'simple' || (!this.kettleRunning || this.selectedDatasource.calculationMode === 'DIRECT' )) {
+          if (this.engineMode === 'simple' || (!this.kettleRunning || this.selectedDatasource.calculationMode === 'DIRECT')) {
             this.disabledSync = true
           } else {
             this.disabledSync = false
@@ -234,6 +351,7 @@ export default {
           this.dataSource = table.dataSourceId
           this.mode = table.mode + ''
           this.sql = JSON.parse(table.info.replace(/\n/g, '\\n').replace(/\r/g, '\\r')).sql
+          this.variables= JSON.parse(table.sqlVariableDetails)
 
           this.getSQLPreview()
         })
@@ -249,10 +367,11 @@ export default {
         })
         return
       }
+      this.parseVariable()
       post('/dataset/table/sqlPreview', {
         dataSourceId: this.dataSource,
         type: 'sql',
-        // info: '{"sql":"' + this.sql + '"}',
+        sqlVariableDetails: JSON.stringify(this.variables),
         info: JSON.stringify({sql: this.sql.trim()})
       }).then(response => {
         this.fields = response.data.fields
@@ -287,6 +406,7 @@ export default {
         })
         return
       }
+      this.parseVariable()
       const table = {
         id: this.param.tableId,
         name: this.name,
@@ -295,18 +415,16 @@ export default {
         type: 'sql',
         syncType: this.syncType,
         mode: parseInt(this.mode),
-        // info: '{"sql":"' + this.sql + '"}',
+        sqlVariableDetails: JSON.stringify(this.variables),
         info: JSON.stringify({sql: this.sql.trim()})
       }
       post('/dataset/table/update', table).then(response => {
-        // this.$store.dispatch('dataset/setSceneData', new Date().getTime())
         this.$emit('saveSuccess', table)
         this.cancel()
       })
     },
 
     cancel() {
-      // this.dataReset()
       if (this.param.tableId) {
         this.$emit('switchComponent', {name: 'ViewTable', param: this.param.table})
       } else {
@@ -335,7 +453,64 @@ export default {
       this.fields = []
       this.mode = '0'
       this.syncType = 'sync_now'
-    }
+    },
+
+    variableMgm() {
+      this.parseVariable()
+      this.dialogTitle = this.$t('sql_variable.variable_mgm') + ' '
+      this.showVariableMgm = true
+    },
+    parseVariable(){
+      this.variablesTmp = []
+      var reg = new RegExp("\\${(.*?)}", "gim");
+      var match = this.sql.match(reg);
+      const names = []
+      if (match !== null) {
+        for (let index = 0; index < match.length; index++) {
+          var name = match[index].substring(2, match[index].length - 1)
+          if(names.indexOf(name) < 0){
+            names.push(name)
+            var obj = undefined
+            for (let i = 0; i  < this.variables.length; i ++) {
+              if(this.variables[i].variableName === name){
+                obj = this.variables[i]
+              }
+            }
+            if(obj === undefined){
+              obj = {variableName: name, alias: '', type: [], required: false, defaultValue: '', details: ''}
+              obj.type.push('TEXT')
+            }
+            this.variablesTmp.push(obj)
+          }
+        }
+      }
+      this.variables = JSON.parse(JSON.stringify(this.variablesTmp)).concat()
+    },
+    closeVariableMgm() {
+      this.showVariableMgm = false
+    },
+    saveVariable(){
+      this.variables = JSON.parse(JSON.stringify(this.variablesTmp)).concat()
+      this.showVariableMgm = false
+    },
+    variableTypeChange(row){
+      row.defaultValue = ''
+    },
+    renderPrice(h, { column, $index }) {
+      return [
+        column.label,
+        h(
+          'el-tooltip',
+          {
+            props: {
+              content: this.$t('dataset.params_work'),
+              placement: 'top'
+            }
+          },
+          [h('span', { class: { 'el-icon-info': true }})]
+        )
+      ]
+    },
   }
 }
 </script>

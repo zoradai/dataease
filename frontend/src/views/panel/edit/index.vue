@@ -1,16 +1,8 @@
 <template>
   <el-row>
     <el-header class="de-header">
-      <el-col
-        :span="8"
-        style="text-overflow:ellipsis;overflow: hidden;white-space: nowrap;color: #606266;font-size: 16px"
-      >
-        <span style="line-height: 35px;">
-          {{ $t('commons.name') }} ：{{ panelInfo.name || '测试仪表板' }}
-        </span>
-      </el-col>
       <!--横向工具栏-->
-      <el-col :span="16">
+      <el-col :span="24">
         <Toolbar
           ref="toolbar"
           :style-button-active="show&&showIndex===2"
@@ -134,7 +126,6 @@
           </div>
         </div>
       </de-aside-container>
-
       <!--画布区域-->
       <de-main-container id="canvasInfo-main">
         <!--左侧抽屉-->
@@ -149,12 +140,12 @@
           :close-on-press-escape="false"
           :modal-append-to-body="true"
         >
-          <!--          <view-select v-show=" show && showIndex===0" @newChart="newChart" />-->
-          <filter-group v-show=" show &&showIndex===1" />
-          <subject-setting v-show=" show &&showIndex===2" />
-          <assist-component v-show=" show &&showIndex===3" />
+          <div style="width: 295px">
+            <filter-group v-show=" show &&showIndex===1" />
+            <subject-setting v-show=" show &&showIndex===2" />
+            <assist-component v-show=" show &&showIndex===3" />
+          </div>
         </el-drawer>
-
         <!--PC端画布区域-->
         <div
           v-if="!previewVisible&&!mobileLayoutStatus"
@@ -226,13 +217,13 @@
       </de-main-container>
 
       <div v-show="!mobileLayoutStatus&&rightDrawOpen" class="tools-window-main">
-        <div v-show="showViewToolsAside">
+        <div v-if="showViewToolsAside">
           <chart-edit ref="chartEditRef" :edit-statue="showViewToolsAside&&!mobileLayoutStatus&&rightDrawOpen" :edit-from="'panel'" :param="chartEditParam" />
         </div>
-        <div v-show="showBatchViewToolsAside">
+        <div v-if="showBatchViewToolsAside">
           <chart-style-batch-set />
         </div>
-        <div v-show="!showViewToolsAside&&!showBatchViewToolsAside">
+        <div v-if="!showViewToolsAside&&!showBatchViewToolsAside">
           <el-row style="height: 40px">
             <el-tooltip :content="$t('chart.draw_back')">
               <el-button class="el-icon-d-arrow-right" style="position:absolute;left: 4px;top: 5px;" size="mini" circle @click="changeRightDrawOpen(false)" />
@@ -278,6 +269,7 @@
         :show-type="canvasStyleData.selfAdaption?'full':'width'"
         :canvas-style-data="canvasStyleData"
         :component-data="componentData"
+        show-position="edit"
       />
     </fullscreen>
     <input
@@ -342,7 +334,6 @@ import DeContainer from '@/components/dataease/DeContainer'
 import DeAsideContainer from '@/components/dataease/DeAsideContainer'
 import { addClass, removeClass } from '@/utils'
 import FilterGroup from '../filter'
-import ViewSelect from '../ViewSelect'
 import SubjectSetting from '../SubjectSetting'
 import bus from '@/utils/bus'
 import Editor from '@/components/canvas/components/Editor/index'
@@ -350,7 +341,7 @@ import { deepCopy, matrixBaseChange } from '@/components/canvas/utils/utils'
 import componentList, {
   BASE_MOBILE_STYLE,
   COMMON_BACKGROUND,
-  HYPERLINKS
+  HYPERLINKS, PIC_STYLE
 } from '@/components/canvas/custom-component/component-list' // 左侧列表数据
 import { mapState } from 'vuex'
 import { uuid } from 'vue-uuid'
@@ -367,7 +358,7 @@ import '@/components/canvas/styles/animate.css'
 import { ApplicationContext } from '@/utils/ApplicationContext'
 import FilterDialog from '../filter/filterDialog'
 import toast from '@/components/canvas/utils/toast'
-import { commonStyle, commonAttr } from '@/components/canvas/custom-component/component-list'
+import { commonAttr } from '@/components/canvas/custom-component/component-list'
 import generateID from '@/components/canvas/utils/generateID'
 import TextAttr from '@/components/canvas/components/TextAttr'
 import ComponentWait from '@/views/panel/edit/ComponentWait'
@@ -376,7 +367,8 @@ import ChartEdit from '@/views/chart/view/ChartEdit'
 import OuterParamsSet from '@/views/panel/OuterParamsSet/index'
 import ChartStyleBatchSet from '@/views/chart/view/ChartStyleBatchSet'
 import Multiplexing from '@/views/panel/ViewSelect/multiplexing'
-
+import { listenGlobalKeyDown } from '@/components/canvas/utils/shortcutKey'
+import { adaptCurThemeCommonStyle } from '@/components/canvas/utils/style'
 export default {
   name: 'PanelEdit',
   components: {
@@ -388,7 +380,6 @@ export default {
     DeContainer,
     DeAsideContainer,
     FilterGroup,
-    ViewSelect,
     Editor,
     Toolbar,
     FilterDialog,
@@ -459,7 +450,8 @@ export default {
       enableSureButton: false,
       filterFromDrag: false,
       activeToolsName: 'view',
-      rightDrawOpen: false
+      rightDrawOpen: false,
+      editType: null
     }
   },
 
@@ -615,28 +607,12 @@ export default {
     }
   },
   created() {
+    // Global listening for key events
+    listenGlobalKeyDown()
     this.init(this.$store.state.panel.panelInfo.id)
   },
   mounted() {
-    // this.insertToBody()
-    bus.$on('component-on-drag', () => {
-      this.show = false
-    })
-
-    bus.$on('component-dialog-edit', () => {
-      this.editDialog()
-    })
-    bus.$on('component-dialog-style', () => {
-      this.styleDialogVisible = true
-    })
-
-    bus.$on('previewFullScreenClose', () => {
-      this.previewVisible = false
-    })
-
-    bus.$on('change_panel_right_draw', (param) => {
-      this.changeRightDrawOpen(param)
-    })
+    this.initEvents()
     const _this = this
     const erd = elementResizeDetectorMaker()
     // 监听div变动事件
@@ -648,10 +624,31 @@ export default {
     this.loadMultiplexingViewTree()
   },
   beforeDestroy() {
+    bus.$off('component-on-drag', this.componentOnDrag)
+    bus.$off('component-dialog-edit', this.editDialog)
+    bus.$off('component-dialog-style', this.componentDialogStyle)
+    bus.$off('previewFullScreenClose', this.previewFullScreenClose)
+    bus.$off('change_panel_right_draw', this.changeRightDrawOpen)
     const elx = this.$refs.rightPanel
     elx && elx.remove()
   },
   methods: {
+    componentOnDrag() {
+      this.show = false
+    },
+    componentDialogStyle() {
+      this.styleDialogVisible = true
+    },
+    previewFullScreenClose() {
+      this.previewVisible = false
+    },
+    initEvents() {
+      bus.$on('component-on-drag', this.componentOnDrag)
+      bus.$on('component-dialog-edit', this.editDialog)
+      bus.$on('component-dialog-style', this.componentDialogStyle)
+      bus.$on('previewFullScreenClose', this.previewFullScreenClose)
+      bus.$on('change_panel_right_draw', this.changeRightDrawOpen)
+    },
     loadMultiplexingViewTree() {
       queryPanelMultiplexingViewTree().then(res => {
         this.viewData = res.data
@@ -677,6 +674,8 @@ export default {
       this.$store.commit('initCanvas')
       if (panelId) {
         initPanelData(panelId, function() {
+          // 清空当前缓存,快照
+          _this.$store.commit('refreshSnapshot')
           // 初始化视图缓存
           initViewCache(panelId)
           // 初始化记录的视图信息
@@ -734,11 +733,12 @@ export default {
       const parent = evt.target.closest('.button-div-class')
       const self = evt.target.closest('.el-drawer__wrapper')
       // 点击样式按钮 排除
-      const stick = evt.target.closest('.el-icon-magic-stick')
+      const stick = evt.target.closest('.icon-icon_effects_outlined')
       const xuanfuanniu = evt.target.closest('.icon-xuanfuanniu')
       const shujujuzhen = evt.target.closest('.icon-shujujuzhen')
       const suffix = evt.target.closest('.el-input__suffix')
-      if (!parent && !self && !stick && !xuanfuanniu && !shujujuzhen && !suffix) {
+      const elButton = evt.target.closest('.el-button')
+      if (!parent && !self && !stick && !xuanfuanniu && !shujujuzhen && !suffix && !elButton) {
         this.show = false
         window.removeEventListener('click', this.closeSidebar)
         this.showIndex = -1
@@ -769,7 +769,6 @@ export default {
             component = deepCopy(componentTemp)
           }
         })
-
         if (component.type === 'picture-add') {
           this.goFile()
           this.clearCurrentInfo()
@@ -854,6 +853,7 @@ export default {
         this.$store.commit('addComponent', { component })
         this.$store.commit('recordSnapshot', 'handleDrop')
       }
+      adaptCurThemeCommonStyle(component)
       this.clearCurrentInfo()
     },
     clearCurrentInfo() {
@@ -892,6 +892,9 @@ export default {
     },
     sureFilter() {
       this.currentFilterCom = this.$refs['filter-setting-' + this.currentFilterCom.id].getElementInfo()
+      if (this.editType !== 'update') {
+        adaptCurThemeCommonStyle(this.currentFilterCom)
+      }
       this.$store.commit('setComponentWithId', this.currentFilterCom)
       this.$store.commit('recordSnapshot', 'sureFilter')
       this.$store.commit('setCurComponent', { component: this.currentFilterCom, index: this.curComponentIndex })
@@ -902,7 +905,8 @@ export default {
       this.currentFilterCom = component
       this.$forceUpdate()
     },
-    editDialog() {
+    editDialog(editType) {
+      this.editType = editType
       if (this.curComponent && this.curComponent.serviceName) {
         const serviceName = this.curComponent.serviceName
         this.currentWidget = ApplicationContext.getService(serviceName)
@@ -970,7 +974,7 @@ export default {
             propValue: fileResult,
             commonBackground: deepCopy(COMMON_BACKGROUND),
             style: {
-              ...commonStyle
+              ...PIC_STYLE
             }
           }
           component.auxiliaryMatrix = false
@@ -1041,6 +1045,8 @@ export default {
       component.id = newComponentId
       // 统一设置背景信息
       component.commonBackground = deepCopy(COMMON_BACKGROUND)
+      // 适配当前主题
+      adaptCurThemeCommonStyle(component)
       this.$store.commit('addComponent', { component })
       this.$store.commit('recordSnapshot', 'newViewInfo')
       this.clearCurrentInfo()
@@ -1132,24 +1138,25 @@ export default {
 
 <style scoped>
   .ms-aside-container {
-    height: calc(100vh - 35px);
+    height: calc(100vh - 56px);
     max-width: 60px;
     border: none;
     width: 60px;
   }
 
   .ms-main-container {
-    height: calc(100vh - 35px);
+    height: calc(100vh - 56px);
   }
 
   .de-header {
-    height: 35px !important;
+    height: 56px !important;
+    padding: 0px!important;
     border-bottom: 1px solid #E6E6E6;
-
+    background-color: var(--SiderBG, white);
   }
 
   .blackTheme .de-header {
-    background-color: var(--SiderBG) !important;
+    background-color: var(--SiderBG, white) !important;
     color: var(--TextActive);
   }
 
@@ -1174,7 +1181,7 @@ export default {
   .leftPanel {
     width: 100%;
     max-width: 300px;
-    height: calc(100vh - 35px);
+    height: calc(100vh - 56px);
     position: fixed;
     top: 91px;
     left: 60px;
@@ -1270,14 +1277,14 @@ export default {
 
   .this_canvas {
     width: 100%;
-    height: calc(100vh - 35px);
+    height: calc(100vh - 56px);
     overflow-x: hidden;
     overflow-y: auto;
     background-size: 100% 100% !important;
   }
 
   .el-main {
-    height: calc(100vh - 35px);
+    height: calc(100vh - 56px);
     padding: 0 !important;
     overflow: auto;
     position: relative;
@@ -1349,17 +1356,6 @@ export default {
   .mobile-canvas {
     width: 300px;
     height: 600px;
-  }
-
-  .info-class {
-    text-align: center;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #FFFFFF;
-    font-size: 12px;
-    color: #9ea6b2;
   }
 
   ::-webkit-scrollbar {

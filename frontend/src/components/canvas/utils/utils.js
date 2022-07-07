@@ -1,5 +1,5 @@
 import {
-  BASE_MOBILE_STYLE, COMMON_BACKGROUND, COMMON_BACKGROUND_NONE,
+  BASE_MOBILE_STYLE, COMMON_BACKGROUND_NONE,
   HYPERLINKS
 } from '@/components/canvas/custom-component/component-list'
 
@@ -8,7 +8,7 @@ import {
 } from '@/utils/ApplicationContext'
 import { uuid } from 'vue-uuid'
 import store from '@/store'
-import { AIDED_DESIGN } from '@/views/panel/panel'
+import { AIDED_DESIGN, PANEL_CHART_INFO } from '@/views/panel/panel'
 import html2canvas from 'html2canvasde'
 
 export function deepCopy(target) {
@@ -81,6 +81,9 @@ export function panelDataPrepare(componentData, componentStyle, callback) {
   componentStyle.refreshViewLoading = (componentStyle.refreshViewLoading || false)
   componentStyle.refreshUnit = (componentStyle.refreshUnit || 'minute')
   componentStyle.aidedDesign = (componentStyle.aidedDesign || deepCopy(AIDED_DESIGN))
+  componentStyle.chartInfo = (componentStyle.chartInfo || deepCopy(PANEL_CHART_INFO))
+  componentStyle.themeId = (componentStyle.themeId || 'NO_THEME')
+  componentStyle.panel.themeColor = (componentStyle.panel.themeColor || 'light')
   componentData.forEach((item, index) => {
     if (item.component && item.component === 'de-date') {
       if (item.options.attrs &&
@@ -114,6 +117,16 @@ export function panelDataPrepare(componentData, componentStyle, callback) {
     item.mobileStyle = (item.mobileStyle || deepCopy(BASE_MOBILE_STYLE))
     item.hyperlinks = (item.hyperlinks || deepCopy(HYPERLINKS))
     item.commonBackground = item.commonBackground || deepCopy(COMMON_BACKGROUND_NONE)
+    // Multi choice of colors and pictures
+    if (item.commonBackground.backgroundType === 'color') {
+      item.commonBackground['backgroundColorSelect'] = item.commonBackground.enable
+      item.commonBackground.enable = false
+      item.commonBackground.backgroundType = 'innerImage'
+    }
+    // picture component
+    if (item.component && item.component === 'Picture') {
+      item.style.adaptation = item.style.adaptation || 'adaptation'
+    }
   })
   // 初始化密度为最高密度
   componentStyle.aidedDesign.matrixBase = 4
@@ -161,7 +174,6 @@ export function checkViewTitle(opt, id, tile) {
       return false
     }
   } catch (e) {
-    console.log('checkViewTitle error', e)
     return false
   }
 }
@@ -191,4 +203,10 @@ export function dataURLToBlob(dataurl) { // ie 图片转格式
     u8arr[n] = bstr.charCodeAt(n)
   }
   return new Blob([u8arr], { type: mime })
+}
+
+export function colorReverse(OldColorValue) {
+  OldColorValue = '0x' + OldColorValue.replace(/#/g, '')
+  const str = '000000' + (0xFFFFFF - OldColorValue).toString(16)
+  return '#' + str.substring(str.length - 6, str.length)
 }

@@ -1,5 +1,6 @@
 import { hexColorToRGBA } from '@/views/chart/chart/util'
 import { componentStyle, seniorCfg } from '../common/common'
+import {BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP} from '@/views/chart/chart/chart'
 
 let bubbleArray = []
 let terminalType = 'pc'
@@ -19,6 +20,10 @@ export function baseScatterOption(chart_option, chart, terminal = 'pc') {
       const reg = new RegExp('\n', 'g')
       tooltip.formatter = tooltip.formatter.replace(reg, '<br/>')
       chart_option.tooltip = tooltip
+
+      const bgColor = tooltip.backgroundColor ? tooltip.backgroundColor : DEFAULT_TOOLTIP.backgroundColor
+      chart_option.tooltip.backgroundColor = bgColor
+      chart_option.tooltip.borderColor = bgColor
     }
   }
   // 处理data
@@ -51,11 +56,12 @@ export function baseScatterOption(chart_option, chart, terminal = 'pc') {
         y.label = customAttr.label
       }
       y.type = 'scatter'
+      y.selectedMode = true
+      y.select = BASE_ECHARTS_SELECT
       chart_option.legend.data.push(y.name)
       chart_option.series.push(y)
     }
   }
-  // console.log(chart_option);
   componentStyle(chart_option, chart)
   seniorCfg(chart_option, chart)
   return chart_option

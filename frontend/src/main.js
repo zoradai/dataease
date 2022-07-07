@@ -22,6 +22,7 @@ import '@riophae/vue-treeselect/dist/vue-treeselect.css'
 import './utils/dialog'
 import DeComplexInput from '@/components/business/condition-table/DeComplexInput'
 import DeComplexSelect from '@/components/business/condition-table/DeComplexSelect'
+import DeViewSelect from '@/components/DeViewSelect'
 import '@/components/canvas/custom-component' // 注册自定义组件
 
 import '@/utils/DateUtil'
@@ -72,6 +73,8 @@ if (process.env.NODE_ENV === 'production') {
 // set ElementUI lang to EN
 // Vue.use(ElementUI, { locale })
 // 如果想要中文版 element-ui，按如下方式声明
+ElementUI.Dialog.props.closeOnClickModal.default = false
+ElementUI.Dialog.props.closeOnPressEscape.default = false
 Vue.use(ElementUI, {
   size: Cookies.get('size') || 'medium', // set element-ui default size
   i18n: (key, value) => i18n.t(key, value)
@@ -86,6 +89,7 @@ Vue.use(message)
 Vue.component('Treeselect', Treeselect)
 Vue.component('DeComplexInput', DeComplexInput)
 Vue.component('DeComplexSelect', DeComplexSelect)
+Vue.component('DeViewSelect', DeViewSelect)
 Vue.config.productionTip = false
 
 import vueToPdf from 'vue-to-pdf'
@@ -118,6 +122,20 @@ Vue.prototype.checkPermission = function(pers) {
   return hasPermission
 }
 Vue.use(deWebsocket)
+
+Vue.prototype.$currentHttpRequestList = new Map()
+Vue.prototype.$cancelRequest = function(cancelkey) {
+  if (cancelkey) {
+    if (cancelkey.indexOf('/**') > -1) {
+      Vue.prototype.$currentHttpRequestList.forEach((item, key) => {
+        key.indexOf(cancelkey.split('/**')[0]) > -1 && item('Operation canceled by the user.')
+      })
+    } else {
+      Vue.prototype.$currentHttpRequestList.get(cancelkey) && Vue.prototype.$currentHttpRequestList.get(cancelkey)('Operation canceled by the user.')
+    }
+  }
+}
+
 new Vue({
 
   router,

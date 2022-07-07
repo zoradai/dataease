@@ -7,17 +7,16 @@ import io.dataease.plugins.common.base.domain.DatasetTableFieldExample;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.base.mapper.DatasetTableFieldMapper;
 import io.dataease.plugins.common.constants.DeTypeConstants;
-import io.dataease.plugins.common.constants.ImpalaConstants;
-import io.dataease.plugins.common.constants.SQLConstants;
-import io.dataease.plugins.common.constants.SqlServerSQLConstants;
+import io.dataease.plugins.common.constants.datasource.SQLConstants;
+import io.dataease.plugins.common.constants.datasource.SqlServerSQLConstants;
 import io.dataease.plugins.common.dto.chart.ChartCustomFilterItemDTO;
 import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
+import io.dataease.plugins.common.dto.datasource.DeSortField;
 import io.dataease.plugins.common.dto.sqlObj.SQLObj;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
 import io.dataease.plugins.datasource.entity.JdbcConfiguration;
 import io.dataease.plugins.datasource.query.QueryProvider;
-import io.dataease.provider.Utils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
+import io.dataease.plugins.datasource.query.Utils;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
@@ -34,7 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.dataease.plugins.common.constants.SQLConstants.TABLE_ALIAS_PREFIX;
+import static io.dataease.plugins.common.constants.datasource.SQLConstants.TABLE_ALIAS_PREFIX;
 
 @Service("sqlServerQueryProvider")
 public class SqlserverQueryProvider extends QueryProvider {
@@ -93,6 +93,21 @@ public class SqlserverQueryProvider extends QueryProvider {
     @Override
     public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
 
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, null);
+    }
+
+    @Override
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
+        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter);
+    }
+
+    @Override
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
+        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, sortFields);
+    }
+
+    @Override
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(SqlServerSQLConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(TABLE_ALIAS_PREFIX, 0))
@@ -157,12 +172,62 @@ public class SqlserverQueryProvider extends QueryProvider {
         List<String> wheres = new ArrayList<>();
         if (customWheres != null) wheres.add(customWheres);
         if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
+        List<SQLObj> xOrders = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(sortFields)) {
+            int step = fields.size();
+            for (int i = step; i < (step + sortFields.size()); i++) {
+                DeSortField deSortField = sortFields.get(i - step);
+                SQLObj order = buildSortField(deSortField, tableObj, i);
+                xOrders.add(order);
+            }
+        }
+        if (ObjectUtils.isNotEmpty(xOrders)) {
+            st_sql.add("orders", xOrders);
+        }
         return st_sql.render();
     }
 
-    @Override
-    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
-        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter);
+    private SQLObj buildSortField(DeSortField f, SQLObj tableObj, int index) {
+        String originField;
+        if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 2) {
+            // 解析origin name中有关联的字段生成sql表达式
+            originField = calcFieldRegex(f.getOriginName(), tableObj);
+        } else if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 1) {
+            originField = String.format(SqlServerSQLConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        } else {
+            originField = String.format(SqlServerSQLConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        }
+        String fieldAlias = String.format(SQLConstants.FIELD_ALIAS_X_PREFIX, index);
+        String fieldName;
+        // 处理横轴字段
+        if (f.getDeExtractType() == DeTypeConstants.DE_TIME) { // 时间 转为 数值
+            if (f.getDeType() == DeTypeConstants.DE_INT || f.getDeType() == DeTypeConstants.DE_FLOAT) {
+                fieldName = String.format(SqlServerSQLConstants.UNIX_TIMESTAMP, originField);
+            } else {
+                fieldName = originField;
+            }
+        } else if (f.getDeExtractType() == DeTypeConstants.DE_STRING) {
+            if (f.getDeType() == DeTypeConstants.DE_INT) {
+                fieldName = String.format(SqlServerSQLConstants.CONVERT, SqlServerSQLConstants.DEFAULT_INT_FORMAT, originField);
+            } else if (f.getDeType() == DeTypeConstants.DE_FLOAT) {
+                fieldName = String.format(SqlServerSQLConstants.CONVERT, SqlServerSQLConstants.DEFAULT_FLOAT_FORMAT, originField);
+            } else if (f.getDeType() == DeTypeConstants.DE_TIME) { //字符串转时间
+                fieldName = String.format(SqlServerSQLConstants.STRING_TO_DATE, originField);
+            } else {
+                fieldName = originField;
+            }
+        } else {
+            if (f.getDeType() == DeTypeConstants.DE_TIME) { // 数值转时间
+                String cast = String.format(SqlServerSQLConstants.LONG_TO_DATE, originField + "/1000");
+                fieldName = String.format(SqlServerSQLConstants.FROM_UNIXTIME, cast);
+            } else if (f.getDeType() == DeTypeConstants.DE_INT) {
+                fieldName = String.format(SqlServerSQLConstants.CONVERT, SqlServerSQLConstants.DEFAULT_INT_FORMAT, originField);
+            } else {
+                fieldName = originField;
+            }
+        }
+        SQLObj result = SQLObj.builder().orderField(originField).orderAlias(originField).orderDirection(f.getOrderDirection()).build();
+        return result;
     }
 
     @Override
@@ -1055,7 +1120,13 @@ public class SqlserverQueryProvider extends QueryProvider {
                     fieldName = transDateFormat(x.getDateStyle(), x.getDatePattern(), cast);
                 }
             } else {
-                fieldName = originField;
+                if (x.getDeType() == DeTypeConstants.DE_INT) {
+                    fieldName = String.format(SqlServerSQLConstants.CONVERT, SqlServerSQLConstants.DEFAULT_INT_FORMAT, originField);
+                } else if (x.getDeType() == DeTypeConstants.DE_FLOAT) {
+                    fieldName = String.format(SqlServerSQLConstants.CONVERT, SqlServerSQLConstants.DEFAULT_FLOAT_FORMAT, originField);
+                } else {
+                    fieldName = originField;
+                }
             }
         }
         return SQLObj.builder()

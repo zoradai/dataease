@@ -1,23 +1,23 @@
 package io.dataease.provider.query.oracle;
 
 import com.google.gson.Gson;
+import io.dataease.dto.datasource.OracleConfiguration;
 import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableFieldExample;
 import io.dataease.plugins.common.base.domain.Datasource;
 import io.dataease.plugins.common.base.mapper.DatasetTableFieldMapper;
-import io.dataease.dto.datasource.OracleConfiguration;
-import io.dataease.plugins.common.constants.MySQLConstants;
-import io.dataease.plugins.common.constants.OracleConstants;
-import io.dataease.plugins.common.constants.SQLConstants;
+import io.dataease.plugins.common.constants.DeTypeConstants;
+import io.dataease.plugins.common.constants.datasource.OracleConstants;
+import io.dataease.plugins.common.constants.datasource.SQLConstants;
 import io.dataease.plugins.common.dto.chart.ChartCustomFilterItemDTO;
 import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
 import io.dataease.plugins.common.dto.chart.ChartViewFieldDTO;
+import io.dataease.plugins.common.dto.datasource.DeSortField;
 import io.dataease.plugins.common.dto.sqlObj.SQLObj;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
 import io.dataease.plugins.datasource.entity.JdbcConfiguration;
 import io.dataease.plugins.datasource.query.QueryProvider;
-import io.dataease.provider.Utils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.stringtemplate.v4.ST;
 import org.stringtemplate.v4.STGroup;
 import org.stringtemplate.v4.STGroupFile;
+import io.dataease.plugins.datasource.query.Utils;
 
 import javax.annotation.Resource;
 import java.text.MessageFormat;
@@ -34,7 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.dataease.plugins.common.constants.SQLConstants.TABLE_ALIAS_PREFIX;
+import static io.dataease.plugins.common.constants.datasource.SQLConstants.TABLE_ALIAS_PREFIX;
 
 /**
  * @Author gin
@@ -98,7 +99,7 @@ public class OracleQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(OracleConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(OracleConstants.ALIAS_FIX, String.format(TABLE_ALIAS_PREFIX, 0)))
@@ -106,6 +107,7 @@ public class OracleQueryProvider extends QueryProvider {
 
         setSchema(tableObj, ds);
         List<SQLObj> xFields = xFields(table, fields);
+
 
         STGroup stg = new STGroupFile(SQLConstants.SQL_TEMPLATE);
         ST st_sql = stg.getInstanceOf("previewSql");
@@ -116,7 +118,31 @@ public class OracleQueryProvider extends QueryProvider {
         List<String> wheres = new ArrayList<>();
         if (customWheres != null) wheres.add(customWheres);
         if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
+
+        List<SQLObj> xOrders = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(sortFields)) {
+            int step = fields.size();
+            for (int i = step; i < (step + sortFields.size()); i++) {
+                DeSortField deSortField = sortFields.get(i - step);
+                SQLObj order = buildSortField(deSortField, tableObj, i);
+                xOrders.add(order);
+            }
+        }
+        if (ObjectUtils.isNotEmpty(xOrders)) {
+            st_sql.add("orders", xOrders);
+        }
         return st_sql.render();
+    }
+
+
+    @Override
+    public String createQuerySQL(String table, List<DatasetTableField> fields, boolean isGroup, Datasource ds, List<ChartFieldCustomFilterDTO> fieldCustomFilter) {
+        return createQuerySQL(table, fields, isGroup, ds, fieldCustomFilter, null);
+    }
+
+    @Override
+    public String createQuerySQLAsTmp(String sql, List<DatasetTableField> fields, boolean isGroup, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DeSortField> sortFields) {
+        return createQuerySQL("(" + sqlFix(sql) + ")", fields, isGroup, null, fieldCustomFilter, sortFields);
     }
 
     public void setSchema(SQLObj tableObj, Datasource ds) {
@@ -125,6 +151,49 @@ public class OracleQueryProvider extends QueryProvider {
             schema = String.format(OracleConstants.KEYWORD_TABLE, schema);
             tableObj.setTableName(schema + "." + tableObj.getTableName());
         }
+    }
+
+    private SQLObj buildSortField(DeSortField f, SQLObj tableObj, int index) {
+        String originField;
+        if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 2) {
+            // 解析origin name中有关联的字段生成sql表达式
+            originField = calcFieldRegex(f.getOriginName(), tableObj);
+        } else if (ObjectUtils.isNotEmpty(f.getExtField()) && f.getExtField() == 1) {
+            originField = String.format(OracleConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        } else {
+            originField = String.format(OracleConstants.KEYWORD_FIX, tableObj.getTableAlias(), f.getOriginName());
+        }
+        String fieldAlias = String.format(OracleConstants.ALIAS_FIX, String.format(SQLConstants.FIELD_ALIAS_X_PREFIX, index));
+        String fieldName = "";
+        // 处理横轴字段
+        if (f.getDeExtractType() == 1) {
+            if (f.getDeType() == 2 || f.getDeType() == 3) {
+                fieldName = String.format(OracleConstants.UNIX_TIMESTAMP, originField) + "*1000";
+            } else {
+                fieldName = originField;
+            }
+        } else if (f.getDeExtractType() == 0) {
+            if (f.getDeType() == 2) {
+                fieldName = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_INT_FORMAT);
+            } else if (f.getDeType() == 3) {
+                fieldName = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_FLOAT_FORMAT);
+            } else if (f.getDeType() == 1) {
+                fieldName = String.format(OracleConstants.DATE_FORMAT, originField, OracleConstants.DEFAULT_DATE_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        } else {
+            if (f.getDeType() == 1) {
+                String cast = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_INT_FORMAT) + "/1000";
+                fieldName = String.format(OracleConstants.FROM_UNIXTIME, cast, OracleConstants.DEFAULT_DATE_FORMAT);
+            } else if (f.getDeType() == 2) {
+                fieldName = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_INT_FORMAT);
+            } else {
+                fieldName = originField;
+            }
+        }
+        SQLObj result = SQLObj.builder().orderField(originField).orderAlias(originField).orderDirection(f.getOrderDirection()).build();
+        return result;
     }
 
     private List<SQLObj> xFields(String table, List<DatasetTableField> fields) {
@@ -1051,7 +1120,13 @@ public class OracleQueryProvider extends QueryProvider {
                     fieldName = String.format(OracleConstants.TO_CHAR, date, format);
                 }
             } else {
-                fieldName = originField;
+                if (x.getDeType() == DeTypeConstants.DE_INT) {
+                    fieldName = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_INT_FORMAT);
+                } else if (x.getDeType() == DeTypeConstants.DE_FLOAT) {
+                    fieldName = String.format(OracleConstants.CAST, originField, OracleConstants.DEFAULT_FLOAT_FORMAT);
+                } else {
+                    fieldName = originField;
+                }
             }
         }
         return SQLObj.builder()
@@ -1107,8 +1182,7 @@ public class OracleQueryProvider extends QueryProvider {
                 fieldName = String.format(OracleConstants.AGG_FIELD, "COUNT", "DISTINCT " + originField);
             } else if (StringUtils.equalsIgnoreCase(y.getSummary(), "group_concat")) {
                 fieldName = String.format(OracleConstants.GROUP_CONCAT, originField, originField);
-            }
-            else {
+            } else {
                 fieldName = String.format(OracleConstants.AGG_FIELD, y.getSummary(), originField);
             }
         } else {

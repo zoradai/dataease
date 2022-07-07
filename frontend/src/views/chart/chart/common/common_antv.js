@@ -1,4 +1,5 @@
 import { hexColorToRGBA } from '@/views/chart/chart/util'
+import { formatterItem, valueFormatter } from '@/views/chart/chart/formatter'
 
 export function getPadding(chart) {
   if (chart.drill) {
@@ -10,7 +11,7 @@ export function getPadding(chart) {
 // color,label,tooltip,axis,legend,background
 export function getTheme(chart) {
   const colors = []
-  let bgColor, labelFontsize, labelColor, tooltipColor, tooltipFontsize, legendColor, legendFontsize
+  let bgColor, labelFontsize, labelColor, tooltipColor, tooltipFontsize, tooltipBackgroundColor, legendColor, legendFontsize
   let customAttr = {}
   if (chart.customAttr) {
     customAttr = JSON.parse(chart.customAttr)
@@ -32,6 +33,7 @@ export function getTheme(chart) {
       const t = JSON.parse(JSON.stringify(customAttr.tooltip))
       tooltipColor = t.textStyle.color
       tooltipFontsize = t.textStyle.fontSize
+      tooltipBackgroundColor = t.backgroundColor
     }
   }
 
@@ -83,7 +85,8 @@ export function getTheme(chart) {
         domStyles: {
           'g2-tooltip': {
             color: tooltipColor,
-            fontSize: tooltipFontsize + 'px'
+            fontSize: tooltipFontsize + 'px',
+            background: tooltipBackgroundColor
           }
         }
       },
@@ -267,6 +270,17 @@ export function getXAxis(chart) {
           style: {
             fill: a.axisLabel.color,
             fontSize: parseInt(a.axisLabel.fontSize)
+          },
+          formatter: function(value) {
+            if (chart.type.includes('horizontal')) {
+              if (!a.axisLabelFormatter) {
+                return valueFormatter(value, formatterItem)
+              } else {
+                return valueFormatter(value, a.axisLabelFormatter)
+              }
+            } else {
+              return value
+            }
           }
         } : null
 
@@ -327,6 +341,17 @@ export function getYAxis(chart) {
           style: {
             fill: a.axisLabel.color,
             fontSize: parseInt(a.axisLabel.fontSize)
+          },
+          formatter: function(value) {
+            if (!chart.type.includes('horizontal')) {
+              if (!a.axisLabelFormatter) {
+                return valueFormatter(value, formatterItem)
+              } else {
+                return valueFormatter(value, a.axisLabelFormatter)
+              }
+            } else {
+              return value
+            }
           }
         } : null
 

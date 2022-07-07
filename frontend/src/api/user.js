@@ -22,9 +22,23 @@ export function logout() {
   })
 }
 
+export function deLogout() {
+  return request({
+    url: '/api/auth/deLogout',
+    method: 'post'
+  })
+}
+
 export function needModifyPwd() {
   return request({
     url: '/api/auth/useInitPwd',
+    method: 'post'
+  })
+}
+
+export function removePwdTips() {
+  return request({
+    url: '/api/auth/removeNoti',
     method: 'post'
   })
 }
@@ -75,6 +89,13 @@ export function ldapStatus() {
 export function oidcStatus() {
   return request({
     url: '/api/auth/isOpenOidc',
+    method: 'post'
+  })
+}
+
+export function casStatus() {
+  return request({
+    url: '/api/auth/isOpenCas',
     method: 'post'
   })
 }

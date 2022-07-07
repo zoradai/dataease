@@ -19,6 +19,7 @@
           <div class="first-element">
             <div
               :class="element.component === 'de-select-grid' ? 'first-element-grid-contaner': ''"
+              :style="deSelectGridBg"
               class="first-element-contaner"
             >
 
@@ -26,6 +27,7 @@
                 :is="element.component"
                 v-if="element.type==='custom'"
                 :id="'component' + element.id"
+                ref="deOutWidget"
                 class="component-custom"
                 :out-style="element.style"
                 :element="element"
@@ -44,8 +46,10 @@
 
 <script>
 import { mapState } from 'vuex'
+import inputStyleMixin from '@/components/widget/DeWidget/inputStyleMixin'
 export default {
   name: 'DeOutWidget',
+  mixins: [inputStyleMixin],
   props: {
     element: {
       type: Object,
@@ -99,7 +103,18 @@ export default {
     },
     ...mapState([
       'curCanvasScale'
-    ])
+    ]),
+    deSelectGridBg() {
+      if (this.element.component !== 'de-select-grid') return null
+      const { backgroundColorSelect, color } = this.element.commonBackground
+      return {
+        background: backgroundColorSelect ? color : '#fff',
+        border: backgroundColorSelect ? 'none' : '1px solid #d7dae2'
+      }
+    },
+    isFilterComponent() {
+      return ['de-select', 'de-select-grid', 'de-date', 'de-input-search', 'de-number-range', 'de-select-tree'].includes(this.element.component)
+    }
   },
   watch: {
     'element.style': {
@@ -111,13 +126,14 @@ export default {
     }
   },
   mounted() {
-    // this.watchSize()
   },
   created() {
-    // console.log('aaaaaa')
-    const { horizontal, vertical } = this.element.style
+    const { horizontal, vertical, brColor, wordColor, innerBgColor } = this.element.style
     this.$set(this.element.style, 'horizontal', horizontal || 'left')
     this.$set(this.element.style, 'vertical', vertical || 'center')
+    this.$set(this.element.style, 'brColor', brColor || '')
+    this.$set(this.element.style, 'wordColor', wordColor || '')
+    this.$set(this.element.style, 'innerBgColor', innerBgColor || '')
   },
   methods: {
     handlerPositionChange(val) {
@@ -129,7 +145,7 @@ export default {
       this.outsideStyle = {
         flexWrap: 'wrap'
       }
-      if (vertical !== 'top') {
+      if (vertical !== 'top' && this.element.component !== 'de-select-grid') {
         this.titleStyle = null
         this.outsideStyle = {
           flexDirection: horizontal === 'right' ? 'row-reverse' : '',

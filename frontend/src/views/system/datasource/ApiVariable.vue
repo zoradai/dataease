@@ -58,6 +58,7 @@
 
 <script>
 import {KeyValue, Scenario} from "./ApiTestModel";
+import { uuid } from 'vue-uuid'
 
 import Vue from 'vue';
 
@@ -159,12 +160,11 @@ export default {
         this.parameters.push(new KeyValue({
           type: 'text',
           enable: true,
-          uuid: this.uuid(),
+          uuid: uuid.v1(),
           contentType: 'text/plain'
         }));
       }
       this.$emit('change', this.parameters);
-      // TODO 检查key重复
     },
     isDisable: function (index) {
       return this.parameters.length - 1 == index;
@@ -183,9 +183,6 @@ export default {
       return (func) => {
         return (func.name.toLowerCase().indexOf(queryString.toLowerCase()) > -1);
       };
-    },
-    uuid: function () {
-      return (((1 + Math.random()) * 0x100000) | 0).toString(16).substring(1);
     },
     advanced(item) {
       if (item.type === 'json') {
@@ -234,7 +231,7 @@ export default {
         type: 'text',
         enable: true,
         required: true,
-        uuid: this.uuid(),
+        uuid: uuid.v1,
         contentType: 'text/plain'
       }));
     }

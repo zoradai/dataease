@@ -4,7 +4,7 @@
     style="height: 100%;width: 100%;"
     :element-loading-text="$t('panel.data_loading')"
     element-loading-spinner="el-icon-loading"
-    element-loading-background="rgba(0, 0, 0, 1)"
+    element-loading-background="rgba(220,220,220, 1)"
   >
     <el-col v-if="panelInfo.name.length>0" class="panel-design">
 
@@ -232,15 +232,21 @@ export default {
     }
   },
   mounted() {
-    bus.$on('set-panel-show-type', type => {
-      this.showType = type || 0
-    })
-    bus.$on('set-panel-share-user', userId => {
-      this.shareUserId = userId
-    })
+    bus.$on('set-panel-show-type', this.setPanelShowType)
+    bus.$on('set-panel-share-user', this.setPanelShareUser)
     this.initPdfTemplate()
   },
+  beforeDestroy() {
+    bus.$off('set-panel-show-type', this.setPanelShowType)
+    bus.$off('set-panel-share-user', this.setPanelShareUser)
+  },
   methods: {
+    setPanelShowType(type) {
+      this.showType = type || 0
+    },
+    setPanelShareUser(userId) {
+      this.shareUserId = userId
+    },
     initPdfTemplate() {
       queryAll().then(res => {
         this.pdfTemplateAll = res.data
@@ -326,7 +332,7 @@ export default {
             callBack(rsp.data)
           })
         } catch (e) {
-          console.log('findResourceAsBase64 error')
+          console.error('findResourceAsBase64 error', e)
           callBack()
         }
       } else {

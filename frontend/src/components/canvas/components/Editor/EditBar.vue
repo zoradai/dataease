@@ -24,7 +24,10 @@
         <i v-if="activeModel==='edit'&&!curComponent.auxiliaryMatrix" class="icon iconfont icon-xuanfuanniu" @click.stop="auxiliaryMatrixChange" />
       </span>
       <span :title="$t('panel.details')">
-        <i v-if="curComponent.type==='view'" class="icon iconfont icon-fangda" @click.stop="showViewDetails" />
+        <i v-if="curComponent.type==='view'" class="icon iconfont icon-chakan" @click.stop="showViewDetails('details')" />
+      </span>
+      <span :title="$t('panel.enlarge')">
+        <i v-if="curComponent.type==='view'" class="icon iconfont icon-fangda" @click.stop="showViewDetails('enlarge')" />
       </span>
       <span :title="$t('panel.cancel_linkage')">
         <i v-if="curComponent.type==='view'&&existLinkage" class="icon iconfont icon-quxiaoliandong" @click.stop="clearLinkage" />
@@ -154,12 +157,8 @@ export default {
         this.timer = null
       }
     },
-    showViewDetails() {
-      this.$emit('showViewDetails')
-    },
-    componentJump() {
-      window.open(url, '_blank')
-      // this.$emit('showViewDetails')
+    showViewDetails(openType = 'details') {
+      this.$emit('showViewDetails', { openType: openType })
     },
     auxiliaryMatrixChange() {
       if (this.curComponent.auxiliaryMatrix) {
@@ -197,26 +196,9 @@ export default {
       // resize
       this.$emit('resizeView')
     },
-    // edit() {
-    //   // 编辑时临时保存 当前修改的画布
-    //   this.$store.dispatch('panel/setComponentDataTemp', JSON.stringify(this.componentData))
-    //   this.$store.dispatch('panel/setCanvasStyleDataTemp', JSON.stringify(this.canvasStyleData))
-    //   if (this.curComponent.type === 'view') {
-    //     this.$store.dispatch('chart/setViewId', null)
-    //     this.$store.dispatch('chart/setViewId', this.curComponent.propValue.viewId)
-    //     bus.$emit('PanelSwitchComponent', { name: 'ChartEdit', param: { 'id': this.curComponent.propValue.viewId, 'optType': 'edit' }})
-    //   }
-    //   if (this.curComponent.type === 'custom') {
-    //     bus.$emit('component-dialog-edit')
-    //   }
-    //   // 编辑样式组件
-    //   if (this.curComponent.type === 'v-text' || this.curComponent.type === 'rect-shape') {
-    //     bus.$emit('component-dialog-style')
-    //   }
-    // },
     edit() {
       if (this.curComponent.type === 'custom') {
-        bus.$emit('component-dialog-edit')
+        bus.$emit('component-dialog-edit', 'update')
       } else if (this.curComponent.type === 'v-text' || this.curComponent.type === 'de-rich-text' || this.curComponent.type === 'rect-shape') {
         bus.$emit('component-dialog-style')
       } else { bus.$emit('change_panel_right_draw', true) }
@@ -241,6 +223,7 @@ export default {
           }
         }
       })
+      bus.$emit('clear_panel_linkage', { viewId: this.element.propValue.viewId })
     },
     linkJumpSet() {
       this.$emit('linkJumpSet')

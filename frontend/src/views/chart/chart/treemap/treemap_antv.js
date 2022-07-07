@@ -25,12 +25,6 @@ export function baseTreemapOptionAntV(plot, container, chart, action) {
     legend: legend,
     interactions: [
       {
-        type: 'element-active', cfg: {
-          start: [{ trigger: 'element:mouseenter', action: ['element-highlight:highlight', 'element-active:reset', 'cursor:pointer'] }],
-          end: [{ trigger: 'element:mouseleave', action: ['element-highlight:reset', 'element-active:reset', 'cursor:default'] }]
-        }
-      },
-      {
         type: 'legend-active', cfg: {
           start: [{ trigger: 'legend-item:mouseenter', action: ['element-active:reset'] }],
           end: [{ trigger: 'legend-item:mouseleave', action: ['element-active:reset'] }]
@@ -47,12 +41,6 @@ export function baseTreemapOptionAntV(plot, container, chart, action) {
           end: [{ trigger: 'element:mouseleave', action: 'tooltip:hide' }]
         }
       }
-      // {
-      //   type: 'active-region', cfg: {
-      //     start: [{ trigger: 'interval:mousemove', action: 'active-region:show' }],
-      //     end: [{ trigger: 'interval:mouseleave', action: 'active-region:hide' }]
-      //   }
-      // }
     ]
   }
   // size
