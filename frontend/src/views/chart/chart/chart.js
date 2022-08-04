@@ -1,3 +1,17 @@
+export const DEFAULT_TAB_COLOR_CASE_DARK = {
+  headFontColor: '#FFFFFF',
+  headFontActiveColor: '#FFFFFF',
+  headBorderColor: '',
+  headBorderActiveColor: ''
+}
+
+export const DEFAULT_TAB_COLOR_CASE_LIGHT = {
+  headFontColor: '#OOOOOO',
+  headFontActiveColor: '#OOOOOO',
+  headBorderColor: '',
+  headBorderActiveColor: ''
+}
+
 export const DEFAULT_COLOR_CASE = {
   value: 'default',
   colors: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
@@ -61,6 +75,16 @@ export const DEFAULT_SIZE = {
   spaceSplit: 10,
   dimensionShow: true,
   quotaShow: true,
+  quotaFontFamily: 'Microsoft YaHei',
+  quotaFontIsBolder: false,
+  quotaFontIsItalic: false,
+  quotaLetterSpace: '0',
+  quotaFontShadow: false,
+  dimensionFontFamily: 'Microsoft YaHei',
+  dimensionFontIsBolder: false,
+  dimensionFontIsItalic: false,
+  dimensionLetterSpace: '0',
+  dimensionFontShadow: false,
   scatterSymbol: 'circle',
   scatterSymbolSize: 20,
   treemapWidth: 80,
@@ -144,7 +168,13 @@ export const DEFAULT_TITLE_STYLE = {
   hPosition: 'left',
   vPosition: 'top',
   isItalic: false,
-  isBolder: true
+  isBolder: true,
+  remarkShow: false,
+  remark: '',
+  remarkBackgroundColor: '#ffffffff',
+  fontFamily: 'Microsoft YaHei',
+  letterSpace: '0',
+  fontShadow: false
 }
 
 export const DEFAULT_TITLE_STYLE_DARK = {
@@ -154,7 +184,13 @@ export const DEFAULT_TITLE_STYLE_DARK = {
   hPosition: 'left',
   vPosition: 'top',
   isItalic: false,
-  isBolder: true
+  isBolder: true,
+  remarkShow: false,
+  remark: '',
+  remarkBackgroundColor: '#ffffffff',
+  fontFamily: 'Microsoft YaHei',
+  letterSpace: '0',
+  fontShadow: false
 }
 
 export const DEFAULT_LEGEND_STYLE = {
@@ -337,7 +373,8 @@ export const DEFAULT_FUNCTION_CFG = {
 }
 export const DEFAULT_THRESHOLD = {
   gaugeThreshold: '',
-  labelThreshold: []
+  labelThreshold: [],
+  tableThreshold: []
 }
 export const DEFAULT_SCROLL = {
   open: false,
@@ -964,3 +1001,24 @@ export const BASE_ECHARTS_SELECT = {
     shadowBlur: 2
   }
 }
+
+export const CHART_FONT_FAMILY = [
+  { name: '微软雅黑', value: 'Microsoft YaHei' },
+  { name: '宋体', value: 'SimSun' },
+  { name: '黑体', value: 'SimHei' },
+  { name: '楷体', value: 'KaiTi' }
+]
+
+export const CHART_FONT_LETTER_SPACE = [
+  { name: '0px', value: '0' },
+  { name: '1px', value: '1' },
+  { name: '2px', value: '2' },
+  { name: '3px', value: '3' },
+  { name: '4px', value: '4' },
+  { name: '5px', value: '5' },
+  { name: '6px', value: '6' },
+  { name: '7px', value: '7' },
+  { name: '8px', value: '8' },
+  { name: '9px', value: '9' },
+  { name: '10px', value: '10' }
+]

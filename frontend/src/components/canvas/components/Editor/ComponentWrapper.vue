@@ -5,16 +5,18 @@
     @click="handleClick"
     @mousedown="elementMouseDown"
   >
-    <edit-bar v-if="componentActiveFlag" :element="config" @showViewDetails="showViewDetails" />
+    <edit-bar v-if="componentActiveFlag" :source-element="sourceConfig" :terminal="terminal" :element="config" :show-position="showPosition" @showViewDetails="showViewDetails" />
     <div :id="componentCanvasId" :style="commonStyle" class="main_view">
       <close-bar v-if="previewVisible" @closePreview="closePreview" />
       <de-out-widget
         v-if="config.type==='custom'"
         :id="'component' + config.id"
+        ref="deOutWidget"
         class="component-custom"
         :style="getComponentStyleDefault(config.style)"
         style="overflow: hidden"
         :out-style="config.style"
+        :is-relation="isRelation"
         :element="config"
         :in-screen="inScreen"
         :edit-mode="'preview'"
@@ -60,6 +62,11 @@ export default {
   components: { CloseBar, MobileCheckBar, DeOutWidget, EditBar },
   mixins: [mixins],
   props: {
+    sourceConfig: {
+      type: Object,
+      require: true,
+      default: null
+    },
     config: {
       type: Object,
       require: true,
@@ -103,6 +110,10 @@ export default {
       type: String,
       required: false,
       default: 'NotProvided'
+    },
+    isRelation: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -150,7 +161,7 @@ export default {
       return style
     },
     componentActiveFlag() {
-      return (this.curComponent && this.config === this.curComponent) && !this.previewVisible && !this.showPosition.includes('multiplexing') && !this.showPosition.includes('email-task')
+      return (this.curComponent && this.config === this.curComponent && !this.previewVisible && !this.showPosition.includes('email-task')) || this.showPosition.includes('multiplexing')
     },
     curGap() {
       return (this.canvasStyleData.panel.gap === 'yes' && this.config.auxiliaryMatrix) ? this.componentGap : 0
@@ -247,6 +258,13 @@ export default {
     },
     closePreview() {
       this.previewVisible = false
+    },
+    getCondition() {
+      if (this.$refs.deOutWidget && this.$refs.deOutWidget.getCondition) {
+        return this.$refs.deOutWidget.getCondition()
+      } else {
+        return null
+      }
     }
   }
 }

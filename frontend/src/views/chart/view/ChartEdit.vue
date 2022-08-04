@@ -207,7 +207,7 @@
                                 class="render-select"
                                 style="width: 100px"
                                 size="mini"
-                                @change="changeChartType()"
+                                @change="changeChartRender()"
                               >
                                 <el-option
                                   v-for="item in pluginRenderOptions"
@@ -635,6 +635,12 @@
                         <span>{{ $t('chart.drill') }}</span>
                         /
                         <span>{{ $t('chart.dimension') }}</span>
+                        <el-tooltip class="item" effect="dark" placement="bottom">
+                          <div slot="content">
+                            钻取字段仅支持数据集中的字段
+                          </div>
+                          <i class="el-icon-info" style="cursor: pointer;color: #606266;" />
+                        </el-tooltip>
                       </span>
                       <draggable
                         v-model="view.drillFields"
@@ -697,12 +703,12 @@
         <el-tab-pane name="senior" :label="$t('chart.senior')" class="padding-tab" style="width: 350px;">
           <el-row class="view-panel">
             <div
-              v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type.includes('gauge')) || view.type === 'text' || view.type === 'table-normal' || view.type === 'table-info'"
+              v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type.includes('gauge') || view.type === 'text' || view.type.includes('table') || view.type === 'map' || view.type === 'buddle-map')"
               style="overflow:auto;border-right: 1px solid #e6e6e6;height: 100%;width: 100%;"
               class="attr-style theme-border-class"
             >
               <el-row
-                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type.includes('table'))"
+                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type === 'table-normal' || view.type === 'table-info')"
               >
                 <span class="padding-lr">{{ $t('chart.senior_cfg') }}</span>
                 <el-collapse v-model="attrActiveNames" class="style-collapse">
@@ -714,7 +720,7 @@
                       @onFunctionCfgChange="onFunctionCfgChange"
                     />
                   </el-collapse-item>
-                  <el-collapse-item v-if="view.type && (view.type.includes('table'))" name="scroll" :title="$t('chart.scroll_cfg')">
+                  <el-collapse-item v-if="view.type && (view.type === 'table-normal' || view.type === 'table-info')" name="scroll" :title="$t('chart.scroll_cfg')">
                     <scroll-cfg
                       :param="param"
                       class="attr-selector"
@@ -725,7 +731,7 @@
                 </el-collapse>
               </el-row>
               <el-row
-                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type.includes('gauge') || view.type === 'text')"
+                v-if="view.type && (view.type.includes('bar') || view.type.includes('line') || view.type.includes('mix') || view.type.includes('gauge') || view.type === 'text' || (view.render === 'antv' && view.type.includes('table')))"
               >
                 <span class="padding-lr">{{ $t('chart.analyse_cfg') }}</span>
                 <el-collapse v-model="styleActiveNames" class="style-collapse">
@@ -742,7 +748,7 @@
                     />
                   </el-collapse-item>
                   <el-collapse-item
-                    v-if="view.type && (view.type.includes('gauge') || view.type === 'text')"
+                    v-if="view.type && (view.type.includes('gauge') || view.type === 'text' || (view.render === 'antv' && view.type.includes('table')))"
                     name="threshold"
                     :title="$t('chart.threshold')"
                   >
@@ -755,6 +761,26 @@
                   </el-collapse-item>
                 </el-collapse>
               </el-row>
+
+              <el-row v-if="view.type && (view.type === 'map' || view.type === 'buddle-map')">
+
+                <span v-if="false" class="padding-lr">{{ $t('chart.senior_cfg') }}</span>
+                <el-collapse v-model="mapActiveNames" class="style-collapse">
+
+                  <el-collapse-item title="地名映射" name="map-mapping">
+                    <map-mapping
+                      :param="param"
+                      class="attr-selector"
+                      :chart="chart"
+                      :dynamic-area-code="currentAreaCode"
+                      @onMapMappingChange="onMapMappingChange"
+                    />
+
+                  </el-collapse-item>
+
+                </el-collapse>
+              </el-row>
+
             </div>
             <div v-else class="no-senior">
               {{ $t('chart.chart_no_senior') }}
@@ -1078,6 +1104,7 @@ import PluginCom from '@/views/system/plugin/PluginCom'
 import { mapState } from 'vuex'
 
 import FunctionCfg from '@/views/chart/components/senior/FunctionCfg'
+import MapMapping from '@/views/chart/components/senior/MapMapping'
 import AssistLine from '@/views/chart/components/senior/AssistLine'
 import Threshold from '@/views/chart/components/senior/Threshold'
 import LabelNormalText from '@/views/chart/components/normal/LabelNormalText'
@@ -1123,7 +1150,8 @@ export default {
     ChartDragItem,
     DrillItem,
     DrillPath,
-    PluginCom
+    PluginCom,
+    MapMapping
   },
   props: {
     param: {
@@ -1220,6 +1248,7 @@ export default {
       filterItem: {},
       places: [],
       attrActiveNames: [],
+      mapActiveNames: ['map-mapping'],
       styleActiveNames: [],
       drillClickDimensionList: [],
       drillFilters: [],
@@ -1242,7 +1271,8 @@ export default {
       currEditField: {},
       editChartCalcField: false,
       fieldShow: false,
-      tabActive: 'data'
+      tabActive: 'data',
+      currentAreaCode: ''
 
     }
   },
@@ -1343,11 +1373,15 @@ export default {
     bus.$off('calc-data', this.calcData)
     bus.$off('plugins-calc-style', this.calcStyle)
     bus.$off('plugin-chart-click', this.chartClick)
+    bus.$off('set-dynamic-area-code', this.setDynamicAreaCode)
   },
   activated() {
   },
 
   methods: {
+    setDynamicAreaCode(code) {
+      this.currentAreaCode = code
+    },
     loadPluginType() {
       const plugins = localStorage.getItem('plugin-views') && JSON.parse(localStorage.getItem('plugin-views')) || []
       const pluginOptions = plugins.filter(plugin => !this.renderOptions.some(option => option.value === plugin.render)).map(plugin => {
@@ -1383,6 +1417,8 @@ export default {
       bus.$on('calc-data', this.calcData)
       bus.$on('plugins-calc-style', this.calcStyle)
       bus.$on('plugin-chart-click', this.chartClick)
+      bus.$on('set-dynamic-area-code', this.setDynamicAreaCode)
+      
     },
     initTableData(id, optType) {
       if (id != null) {
@@ -1469,13 +1505,18 @@ export default {
         })
       })
     },
-    buildParam(getData, trigger, needRefreshGroup = false, switchType = false) {
+    buildParam(getData, trigger, needRefreshGroup = false, switchType = false, switchRender = false) {
       if (!this.view.resultCount ||
         this.view.resultCount === '' ||
         isNaN(Number(this.view.resultCount)) ||
         String(this.view.resultCount).includes('.') ||
         parseInt(this.view.resultCount) < 1) {
         this.view.resultCount = '1000'
+      }
+      if (switchType) {
+        this.view.senior.threshold = {
+          tableThreshold: []
+        }
       }
       if (switchType && (this.view.type === 'table-info' || this.chart.type === 'table-info') && this.view.xaxis.length > 0) {
         this.$message({
@@ -1663,9 +1704,9 @@ export default {
       delete view.data
       return view
     },
-    calcData(getData, trigger, needRefreshGroup = false, switchType = false) {
+    calcData(getData, trigger, needRefreshGroup = false, switchType = false, switchRender = false) {
       this.changeEditStatus(true)
-      const view = this.buildParam(true, 'chart', false, switchType)
+      const view = this.buildParam(true, 'chart', false, switchType, switchRender)
       if (!view) return
       viewEditSave(this.panelInfo.id, view).then(() => {
         // this.getData(this.param.id)
@@ -1939,6 +1980,10 @@ export default {
 
     onScrollChange(val) {
       this.view.senior.scrollCfg = val
+      this.calcStyle()
+    },
+    onMapMappingChange(val) {
+      this.view.senior.mapMapping = val
       this.calcStyle()
     },
 
@@ -2221,6 +2266,17 @@ export default {
         }
       }
     },
+    dragRemoveChartField(list, e) {
+      const that = this
+      const dup = list.filter(function(m) {
+        return m.id === that.moveId
+      })
+      if (dup && dup.length > 0) {
+        if (dup[0].chartId) {
+          list.splice(e.newDraggableIndex, 1)
+        }
+      }
+    },
     addXaxis(e) {
       if (this.view.type !== 'table-info') {
         this.dragCheckType(this.view.xaxis, 'd')
@@ -2275,6 +2331,7 @@ export default {
         }
       }
       this.dragMoveDuplicate(this.view.customFilter, e)
+      this.dragRemoveChartField(this.view.customFilter, e)
       this.calcData(true)
     },
 
@@ -2328,6 +2385,7 @@ export default {
     addDrill(e) {
       this.dragCheckType(this.view.drillFields, 'd')
       this.dragMoveDuplicate(this.view.drillFields, e)
+      this.dragRemoveChartField(this.view.drillFields, e)
       this.calcData(true)
     },
 
@@ -2421,6 +2479,7 @@ export default {
     },
 
     setDetailMapCode(code) {
+      this.currentAreaCode = code
       this.curComponent.DetailAreaCode = code
       return true
     },
@@ -2489,6 +2548,10 @@ export default {
     changeEditStatus(status) {
       this.hasEdit = status
       this.$store.commit('recordViewEdit', { viewId: this.param.id, hasEdit: status })
+    },
+    changeChartRender() {
+      this.setChartDefaultOptions()
+      this.calcData(true, 'chart', true, false, true)
     },
     changeChartType() {
       this.setChartDefaultOptions()

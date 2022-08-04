@@ -26,6 +26,7 @@
 
     <div v-show="!editControlButton" class="toolbar">
       <div class="panel-info-area">
+        <!--back to panelList-->
         <svg-icon
           icon-class="icon_left_outlined"
           class="toolbar-icon-active icon20 margin-left20"
@@ -207,7 +208,8 @@ export default {
   methods: {
     close() {
       // 关闭页面清理缓存
-      this.clearCanvas()
+      this.$store.commit('initCanvasBase')
+      this.$store.commit('setInEditorStatus', false)
       this.$emit('close-left-panel')
       this.$nextTick(() => {
         bus.$emit('PanelSwitchComponent', { name: 'PanelMain' })
@@ -372,7 +374,6 @@ export default {
     clearCanvas() {
       this.$store.commit('setComponentData', [])
       this.$store.commit('recordSnapshot', 'clearCanvas')
-      this.$store.commit('setInEditorStatus', false)
     },
 
     handlePreviewChange() {

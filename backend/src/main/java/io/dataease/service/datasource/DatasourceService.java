@@ -1,15 +1,14 @@
 package io.dataease.service.datasource;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import io.dataease.auth.annotation.DeCleaner;
 import io.dataease.commons.constants.RedisConstants;
 import io.dataease.commons.utils.BeanUtils;
+import io.dataease.controller.sys.response.BasicInfo;
 import io.dataease.ext.ExtDataSourceMapper;
 import io.dataease.ext.query.GridExample;
 import io.dataease.commons.constants.DePermissionType;
@@ -46,6 +45,7 @@ import io.dataease.provider.datasource.ApiProvider;
 import io.dataease.service.dataset.DataSetGroupService;
 import io.dataease.service.message.DeMsgutil;
 import io.dataease.service.sys.SysAuthService;
+import io.dataease.service.system.SystemParameterService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -59,7 +59,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional(rollbackFor = Exception.class)
 public class DatasourceService {
 
     @Resource
@@ -76,6 +75,8 @@ public class DatasourceService {
     private SysAuthService sysAuthService;
     @Resource
     private Environment env;
+    @Resource
+    private SystemParameterService systemParameterService;
 
     public Collection<DataSourceType> types() {
         Collection<DataSourceType> types = new ArrayList<>();
@@ -87,6 +88,7 @@ public class DatasourceService {
     }
 
     @DeCleaner(DePermissionType.DATASOURCE)
+    @Transactional(rollbackFor = Exception.class)
     public Datasource addDatasource(Datasource datasource) throws Exception {
         if (!types().stream().map(DataSourceType::getType).collect(Collectors.toList()).contains(datasource.getType())) {
             throw new Exception("Datasource type not supported.");
@@ -124,7 +126,7 @@ public class DatasourceService {
                 DatasourceRequest datasourceRequest = new DatasourceRequest();
                 datasourceRequest.setDatasource(datasource);
                 datasourceProvider.handleDatasource(datasourceRequest, type);
-                LogUtil.info("Succsss to {} datasource connection pool: {}", type, datasource.getName());
+                LogUtil.info("Success to {} datasource connection pool: {}", type, datasource.getName());
             } catch (Exception e) {
                 LogUtil.error("Failed to handle datasource connection pool: " + datasource.getName(), e);
             }
@@ -147,26 +149,29 @@ public class DatasourceService {
                     datasourceDTO.setCalculationMode(DatasourceCalculationMode.DIRECT);
                 }
                 JSONObject jsonObject = JSONObject.parseObject(datasourceDTO.getConfiguration());
-                if(jsonObject.getString("queryTimeout") == null){
+                if (jsonObject.getString("queryTimeout") == null) {
                     jsonObject.put("queryTimeout", 30);
                     datasourceDTO.setConfiguration(jsonObject.toString());
                 }
             }
 
-            if(datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.mysql.toString())){
+            if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.mysql.toString())) {
                 MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasourceDTO.getConfiguration(), MysqlConfiguration.class);
                 datasourceDTO.setConfiguration(new Gson().toJson(mysqlConfiguration));
             }
             if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
-               List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasourceDTO.getConfiguration(), new TypeToken<ArrayList<ApiDefinition>>() {}.getType());
+                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasourceDTO.getConfiguration(), new TypeToken<ArrayList<ApiDefinition>>() {
+                }.getType());
                 List<ApiDefinition> apiDefinitionListWithStatus = new ArrayList<>();
                 int success = 0;
                 if (StringUtils.isNotEmpty(datasourceDTO.getStatus())) {
                     JsonObject apiItemStatuses = JsonParser.parseString(datasourceDTO.getStatus()).getAsJsonObject();
-                    for (ApiDefinition apiDefinition : apiDefinitionList) {
-                        String status = apiItemStatuses.get(apiDefinition.getName()).getAsString();
-                        apiDefinition.setStatus(status);
-                        apiDefinitionListWithStatus.add(apiDefinition);
+
+                    for (int i = 0; i < apiDefinitionList.size(); i++) {
+                        String status = apiItemStatuses.get(apiDefinitionList.get(i).getName()).getAsString();
+                        apiDefinitionList.get(i).setStatus(status);
+                        apiDefinitionList.get(i).setSerialNumber(i);
+                        apiDefinitionListWithStatus.add(apiDefinitionList.get(i));
                         if (StringUtils.isNotEmpty(status) && status.equalsIgnoreCase("Success")) {
                             success++;
                         }
@@ -227,6 +232,10 @@ public class DatasourceService {
         datasource.setCreateTime(null);
         datasource.setType(updataDsRequest.getType());
         datasource.setUpdateTime(System.currentTimeMillis());
+
+        Provider datasourceProvider = ProviderFactory.getProvider(updataDsRequest.getType());
+        datasourceProvider.checkConfiguration(datasource);
+
         checkAndUpdateDatasourceStatus(datasource);
         DatasourceExample example = new DatasourceExample();
         example.createCriteria().andIdEqualTo(updataDsRequest.getId());
@@ -250,12 +259,14 @@ public class DatasourceService {
         BeanUtils.copyBean(datasourceDTO, datasource);
         try {
             Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
+            datasourceProvider.checkConfiguration(datasource);
             DatasourceRequest datasourceRequest = new DatasourceRequest();
             datasourceRequest.setDatasource(datasource);
             String datasourceStatus = datasourceProvider.checkStatus(datasourceRequest);
             if (datasource.getType().equalsIgnoreCase("api")) {
                 int success = 0;
-                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(), new TypeToken<List<ApiDefinition>>() {}.getType());
+                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(), new TypeToken<List<ApiDefinition>>() {
+                }.getType());
                 List<ApiDefinition> apiDefinitionListWithStatus = new ArrayList<>();
 
                 if (StringUtils.isNotEmpty(datasourceStatus)) {
@@ -290,15 +301,16 @@ public class DatasourceService {
         if (datasource == null) {
             return ResultHolder.error("Can not find datasource: " + datasourceId);
         }
+        String datasourceStatus = null;
         try {
             Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
             DatasourceRequest datasourceRequest = new DatasourceRequest();
             datasourceRequest.setDatasource(datasource);
-            String datasourceStatus = datasourceProvider.checkStatus(datasourceRequest);
-            datasource.setStatus(datasourceStatus);
+            datasourceStatus = datasourceProvider.checkStatus(datasourceRequest);
 
             if (datasource.getType().equalsIgnoreCase("api")) {
-                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(),new TypeToken<List<ApiDefinition>>(){}.getType());
+                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasource.getConfiguration(), new TypeToken<List<ApiDefinition>>() {
+                }.getType());
                 JsonObject apiItemStatuses = JsonParser.parseString(datasourceStatus).getAsJsonObject();
                 int success = 0;
                 for (ApiDefinition apiDefinition : apiDefinitionList) {
@@ -319,10 +331,14 @@ public class DatasourceService {
 
             return ResultHolder.success("Success");
         } catch (Exception e) {
-            datasource.setStatus("Error");
+            datasourceStatus = "Error";
             return ResultHolder.error("Datasource is invalid: " + e.getMessage());
         } finally {
-            datasourceMapper.updateByPrimaryKey(datasource);
+            Datasource record = new Datasource();
+            record.setStatus(datasourceStatus);
+            DatasourceExample example = new DatasourceExample();
+            example.createCriteria().andIdEqualTo(datasource.getId());
+            datasourceMapper.updateByExampleSelective(record, example);
         }
     }
 
@@ -419,7 +435,8 @@ public class DatasourceService {
     }
 
     public ApiDefinition checkApiDatasource(ApiDefinition apiDefinition) throws Exception {
-        String response = ApiProvider.execHttpRequest(apiDefinition);
+        BasicInfo basicInfo = systemParameterService.basicInfo();
+        String response = ApiProvider.execHttpRequest(apiDefinition, StringUtils.isNotBlank(basicInfo.getFrontTimeOut()) ? Integer.parseInt(basicInfo.getFrontTimeOut()) : 10);
         return ApiProvider.checkApiDefinition(apiDefinition, response);
     }
 
@@ -442,21 +459,23 @@ public class DatasourceService {
     }
 
     private void checkAndUpdateDatasourceStatus(Datasource datasource, Boolean withMsg) {
+        Datasource record = new Datasource();
+        DatasourceExample example = new DatasourceExample();
+        example.createCriteria().andIdEqualTo(datasource.getId());
         try {
             Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
             DatasourceRequest datasourceRequest = new DatasourceRequest();
             datasourceRequest.setDatasource(datasource);
             String status = datasourceProvider.checkStatus(datasourceRequest);
-            datasource.setStatus(status);
-            datasourceMapper.updateByPrimaryKeySelective(datasource);
+            record.setStatus(status);
+            datasourceMapper.updateByExampleSelective(record, example);
         } catch (Exception e) {
             Datasource temp = datasourceMapper.selectByPrimaryKey(datasource.getId());
-            datasource.setStatus("Error");
+            record.setStatus("Error");
             if (!StringUtils.equals(temp.getStatus(), "Error")) {
                 sendWebMsg(datasource);
-                datasourceMapper.updateByPrimaryKeySelective(datasource);
+                datasourceMapper.updateByExampleSelective(record, example);
             }
-
         }
     }
 

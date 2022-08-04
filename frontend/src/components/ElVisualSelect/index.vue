@@ -6,12 +6,14 @@
     :class="classId"
     popper-class="VisualSelects coustom-de-select"
     no-match-text=" "
+    clearable
     v-bind="$attrs"
     v-on="$listeners"
     @change="visualChange"
     @visible-change="popChange"
   >
-    <el-option v-for="item in options" :key="item.id" :label="item.text" :value="item.id" />
+    <p v-if="startIndex === 0 && $attrs.multiple" class="select-all"><el-checkbox v-model="selectAll" v-customStyle="customStyle" :indeterminate="isIndeterminate" @change="selectAllChane">{{ $t('dataset.check_all') }}</el-checkbox></p>
+    <el-option v-for="item in options" :key="item.id" :label="item.text" :value="item.id" :class="setSelect(item.id)" />
   </el-select>
 </template>
 
@@ -31,6 +33,10 @@ export default {
       require: true,
       default: uuid.v1()
     },
+    customStyle: {
+      type: Object,
+      default: () => {}
+    },
     list: {
       type: Array,
       default: () => {
@@ -39,6 +45,10 @@ export default {
     },
     value: {
       type: [String, Number, Array],
+      default: ''
+    },
+    keyWord: {
+      type: String,
       default: ''
     }
   },
@@ -56,7 +66,13 @@ export default {
       itemHeight: 34, // select组件选项高度
       maxHeightDom: null,
       defaultFirst: false,
-      show: true
+      show: true,
+      selectAll: false
+    }
+  },
+  computed: {
+    isIndeterminate() {
+      return Array.isArray(this.selectValue) && this.selectValue.length > 0 && this.selectValue.length !== this.list.length
     }
   },
   watch: {
@@ -80,6 +96,15 @@ export default {
           this.init()
         })
       })
+    },
+    keyWord(val, old) {
+      if (val === old) return
+      const results = val ? this.list.filter(item => item.text.includes(val)) : null
+      this.resetList(results)
+      this.reCacularHeight()
+      this.$nextTick(() => {
+        this.callback()
+      })
     }
   },
   mounted() {
@@ -89,6 +114,19 @@ export default {
     })
   },
   methods: {
+    setSelect(id) {
+      if (Array.isArray(this.selectValue)) {
+        return this.selectValue.map(ele => ele.id).includes(id) && 'selected'
+      }
+      return this.selectValue === id && 'selected'
+    },
+    selectAllChane(val) {
+      const vals = val ? [...this.list.map(ele => ele.id)] : []
+      this.visualChange(vals)
+      this.selectValue = vals
+      this.$emit('change', vals)
+      this.$emit('handleShowNumber')
+    },
     addScrollDiv(selectDom) {
       this.maxHeightDom = document.createElement('div')
       this.maxHeightDom.className = 'el-select-height'
@@ -109,9 +147,9 @@ export default {
       this.options = this.newList.slice(0, this.maxLength)
     },
     customInputStyle() {
-      if (!this.$parent.$parent.handlerInputStyle) return;
+      if (!this.$parent.$parent.handlerInputStyle) return
       handlerInputStyle(this.$refs.visualSelect.$el.querySelector('.el-input__inner'), this.$parent.element.style)
-      handlerInputStyle(this.$refs.visualSelect.$el.querySelector('.el-select__input'), {wordColor: this.$parent.element.style.wordColor})
+      handlerInputStyle(this.$refs.visualSelect.$el.querySelector('.el-select__input'), { wordColor: this.$parent.element.style.wordColor })
     },
     init() {
       if (this.defaultFirst && this.list.length > 0) {
@@ -158,6 +196,9 @@ export default {
       this.reCacularHeight()
     },
     visualChange(val) {
+      if (this.$attrs.multiple) {
+        this.selectAll = val.length === this.list.length
+      }
       this.$emit('visual-change', val)
     }
   }
@@ -193,4 +234,7 @@ export default {
     height: 0;
   }
 }
+.select-all {
+    padding: 10px 20px 0 20px;
+  }
 </style>

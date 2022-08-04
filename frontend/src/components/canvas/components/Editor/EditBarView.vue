@@ -14,7 +14,7 @@
     <div v-if="positionCheck('multiplexing')" style="margin-right: -1px;width: 18px;z-index: 5">
       <el-checkbox v-model="multiplexingCheckModel" size="medium" @change="multiplexingCheck" />
     </div>
-    <div v-if="positionCheck('email-task')" style="margin-right: -1px;width: 18px;z-index: 5">
+    <div v-if="positionCheck('email-task') && element.component === 'user-view'" style="margin-right: -1px;width: 18px;z-index: 5">
       <el-checkbox v-model="isTaskChecked" size="medium" @change="emailTaskCheck" />
     </div>
   </div>
@@ -45,10 +45,6 @@ export default {
       default: 'NotProvided'
     },
     panelId: {
-      type: String,
-      default: null
-    },
-    chartTitle: {
       type: String,
       default: null
     }
@@ -85,7 +81,7 @@ export default {
 
     taskChecked() {
       const panelId = this.panelId
-      return !!this.panelViews && !!this.panelViews[panelId] && !!this.panelViews[panelId].some(view => view.viewId === this.viewId)
+      return !!this.panelViews && !!this.panelViews[panelId] && !!this.panelViews[panelId].some(viewId => viewId === this.viewId)
     }
   },
   watch: {
@@ -100,7 +96,6 @@ export default {
     }
     if (this.showPosition === 'email-task') {
       this.isTaskChecked = !!this.taskChecked
-      // this.emailTaskCheck(this.isTaskChecked)
     }
   },
   beforeDestroy() {
@@ -134,7 +129,7 @@ export default {
     },
     emailTaskCheck(val) {
       if (val) {
-        this.$store.dispatch('task/addView', { 'panelId': this.panelId, 'viewId': this.viewId, 'title': this.chartTitle })
+        this.$store.dispatch('task/addView', { 'panelId': this.panelId, 'viewId': this.viewId })
       } else {
         this.$store.dispatch('task/delView', { 'panelId': this.panelId, 'viewId': this.viewId })
       }
@@ -154,7 +149,7 @@ export default {
     padding-left: 3px!important;
     padding-right: 0px!important;
     cursor:pointer!important;
-    background-color: #0a7be0;
+    background-color: #3370ff;
   }
   .bar-main i{
     color: white;

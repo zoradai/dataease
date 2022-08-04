@@ -64,6 +64,41 @@ export const bottom2TopDrag = {
   }
 }
 
+const closePress =  {
+  inserted: function (el) {
+    el.querySelector('.el-drawer__close-btn').onmousedown = function (e) {
+      e.currentTarget.style.setProperty('background', '#d2d3d4', 'important');
+    }
+    el.querySelector('.el-drawer__close-btn').onmouseup = function(e) {
+      e.currentTarget.style.background = 'none'
+    }
+  }
+}
+
+const btnPress = {
+  update: function(el, binding) {
+    el.onmousedown = function(e) {
+      e.currentTarget.style.setProperty('background', binding.value || '#EFF0F1', 'important')
+    }
+    el.onmouseup = function(e) {
+      e.currentTarget.style.background = 'none'
+    }
+  },
+}
+
+const customStyle = {
+  inserted: function(el, binding) {
+    const label = el.querySelector('.el-checkbox__label')
+    if (label) {
+      if (label.getAttribute('data-color') === binding.value.wordColor) {
+        return
+      }
+      label.style.setProperty('color', binding.value.wordColor, 'important')
+      label.setAttribute('data-color', binding.value.wordColor)
+    }
+  },
+}
+
 export default {
   install(Vue) {
     // Vue.directive('data-permission', dataPermission)
@@ -71,6 +106,9 @@ export default {
     Vue.directive('left-to-right-drag', left2RightDrag)
     Vue.directive('right-to-left-drag', right2LeftDrag)
     Vue.directive('bottom-to-top-drag', bottom2TopDrag)
+    Vue.directive('closePress', closePress)
+    Vue.directive('btnPress', btnPress)
+    Vue.directive('customStyle', customStyle)
   }
 }
 

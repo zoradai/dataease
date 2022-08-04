@@ -3,14 +3,12 @@ package io.dataease.service.panel;
 import com.google.gson.Gson;
 import io.dataease.auth.annotation.DeCleaner;
 import io.dataease.commons.constants.*;
-import io.dataease.commons.utils.AuthUtils;
-import io.dataease.commons.utils.DeLogUtils;
-import io.dataease.commons.utils.LogUtil;
-import io.dataease.commons.utils.TreeUtils;
+import io.dataease.commons.utils.*;
 import io.dataease.controller.request.authModel.VAuthModelRequest;
 import io.dataease.controller.request.dataset.DataSetTableRequest;
 import io.dataease.controller.request.panel.PanelGroupBaseInfoRequest;
 import io.dataease.controller.request.panel.PanelGroupRequest;
+import io.dataease.controller.request.panel.PanelTemplateRequest;
 import io.dataease.controller.request.panel.PanelViewDetailsRequest;
 import io.dataease.dto.PanelGroupExtendDataDTO;
 import io.dataease.dto.SysLogDTO;
@@ -18,6 +16,7 @@ import io.dataease.dto.authModel.VAuthModelDTO;
 import io.dataease.dto.chart.ChartViewDTO;
 import io.dataease.dto.dataset.DataSetTableDTO;
 import io.dataease.dto.panel.PanelGroupDTO;
+import io.dataease.dto.panel.PanelTemplateFileDTO;
 import io.dataease.dto.panel.po.PanelViewInsertDTO;
 import io.dataease.exception.DataEaseException;
 import io.dataease.ext.*;
@@ -57,6 +56,8 @@ import java.util.stream.Collectors;
 public class PanelGroupService {
 
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+
+    private final Gson gson = new Gson();
 
     private final SysLogConstants.SOURCE_TYPE sourceType = SysLogConstants.SOURCE_TYPE.PANEL;
 
@@ -135,6 +136,8 @@ public class PanelGroupService {
 
     public String update(PanelGroupRequest request) {
         String panelId = request.getId();
+        request.setUpdateTime(System.currentTimeMillis());
+        request.setUpdateBy(AuthUtils.getUser().getUsername());
         panelViewService.syncPanelViews(request);
         if ("toDefaultPanel".equals(request.getOptType())) { // 转存为默认仪表板
             panelId = UUID.randomUUID().toString();
@@ -147,6 +150,7 @@ public class PanelGroupService {
             newDefaultPanel.setLevel(0);
             newDefaultPanel.setSource(request.getId());
             newDefaultPanel.setCreateBy(AuthUtils.getUser().getUsername());
+            newDefaultPanel.setCreateTime(System.currentTimeMillis());
             checkPanelName(newDefaultPanel.getName(), newDefaultPanel.getPid(), PanelConstants.OPT_TYPE_INSERT, newDefaultPanel.getId(), newDefaultPanel.getNodeType());
             panelGroupMapper.insertSelective(newDefaultPanel);
             // 清理权限缓存
@@ -178,6 +182,8 @@ public class PanelGroupService {
             record.setName(request.getName());
             record.setId(request.getId());
             record.setPid(request.getPid());
+            record.setUpdateTime(request.getUpdateTime());
+            record.setUpdateBy(request.getUpdateBy());
             panelGroupMapper.updateByPrimaryKeySelective(record);
             DeLogUtils.save(SysLogConstants.OPERATE_TYPE.MODIFY, sourceType, request.getId(), panelInfo.getPid(), request.getPid(), sourceType);
 
@@ -337,6 +343,7 @@ public class PanelGroupService {
         newPanel.setName(request.getName());
         newPanel.setId(newPanelId);
         newPanel.setCreateBy(AuthUtils.getUser().getUsername());
+        newPanel.setCreateTime(System.currentTimeMillis());
         //TODO copy panelView
         extPanelViewMapper.copyFromPanel(newPanelId, sourcePanelId, copyId);
         //TODO 复制视图 chart_view
@@ -365,7 +372,7 @@ public class PanelGroupService {
     }
 
     public String newPanel(PanelGroupRequest request) {
-        Gson gson = new Gson();
+
         String newPanelId = UUIDUtil.getUUIDAsString();
         String newFrom = request.getNewFrom();
         String templateStyle = null;
@@ -389,14 +396,26 @@ public class PanelGroupService {
                 dynamicData = request.getDynamicData();
                 staticResource = request.getStaticResource();
                 mobileLayout = panelViewService.havaMobileLayout(templateData);
+            } else if (PanelConstants.NEW_PANEL_FROM.NEW_MARKET_TEMPLATE.equals(newFrom)){
+                PanelTemplateFileDTO templateFileInfo =  getTemplateFromMarket(request.getTemplateUrl());
+                if(templateFileInfo == null){
+                    DataEaseException.throwException("Can't find the template's info from market,please check");
+                }
+                templateStyle = templateFileInfo.getPanelStyle();
+                templateData = templateFileInfo.getPanelData();
+                dynamicData = templateFileInfo.getDynamicData();
+                staticResource = templateFileInfo.getStaticResource();
+                mobileLayout = panelViewService.havaMobileLayout(templateData);
             }
             Map<String, String> dynamicDataMap = gson.fromJson(dynamicData, Map.class);
+
             List<PanelViewInsertDTO> panelViews = new ArrayList<>();
             List<PanelGroupExtendDataDTO> viewsData = new ArrayList<>();
             for (Map.Entry<String, String> entry : dynamicDataMap.entrySet()) {
                 String originViewId = entry.getKey();
                 String originViewData = entry.getValue();
                 ChartViewDTO chartView = gson.fromJson(originViewData, ChartViewDTO.class);
+                chartView = transferTemplateMapAreaCode(chartView);
                 String position = chartView.getPosition();
                 String newViewId = UUIDUtil.getUUIDAsString();
                 chartView.setId(newViewId);
@@ -423,6 +442,20 @@ public class PanelGroupService {
         request.setCreateBy(AuthUtils.getUser().getUsername());
         request.setMobileLayout(mobileLayout);
         return newPanelId;
+    }
+
+    private ChartViewDTO transferTemplateMapAreaCode(ChartViewDTO chartViewDTO) {
+        Object areaCodeObj = null;
+        String areaCodeKey = "areaCode";
+        if (StringUtils.equals(chartViewDTO.getType(), "map") || StringUtils.equals(chartViewDTO.getType(), "buddle-map")) {
+            String customAttrJson = chartViewDTO.getCustomAttr();
+            Map map = gson.fromJson(customAttrJson, Map.class);
+            if (map.containsKey(areaCodeKey) && ObjectUtils.isNotEmpty((areaCodeObj = map.get(areaCodeKey))) && areaCodeObj.toString().length() == 6) {
+                map.put(areaCodeKey, "156" + areaCodeObj.toString());
+                chartViewDTO.setCustomAttr(gson.toJson(map));
+            }
+        }
+        return chartViewDTO;
     }
 
     public void sysInit1HistoryPanel() {
@@ -582,5 +615,16 @@ public class PanelGroupService {
         panelGroup.setId(panelId);
         panelGroup.setStatus(request.getStatus());
         panelGroupMapper.updateByPrimaryKeySelective(panelGroup);
+    }
+
+
+    public PanelTemplateFileDTO getTemplateFromMarket(String templateUrl){
+        if(StringUtils.isNotEmpty(templateUrl)){
+            Gson gson = new Gson();
+            String templateInfo =  HttpClientUtil.get(templateUrl,null);
+            return gson.fromJson(templateInfo, PanelTemplateFileDTO.class);
+        }else{
+            return null;
+        }
     }
 }

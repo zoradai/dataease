@@ -30,6 +30,7 @@
                 ref="deOutWidget"
                 class="component-custom"
                 :out-style="element.style"
+                :is-relation="isRelation"
                 :element="element"
                 :in-draw="inDraw"
                 :in-screen="inScreen"
@@ -72,6 +73,10 @@ export default {
       type: String,
       require: false,
       default: 'edit'
+    },
+    isRelation: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -152,6 +157,12 @@ export default {
           alignItems: 'center'
         }
       }
+    },
+    getCondition() {
+      if (this.$refs && this.$refs['deOutWidget'] && this.$refs['deOutWidget'].getCondition) {
+        return this.$refs['deOutWidget'].getCondition()
+      }
+      return null
     }
   }
 }
@@ -160,7 +171,7 @@ export default {
 <style lang="scss" scoped>
   .my-container {
     position: relative;
-    overflow: auto;
+    overflow: auto !important;
     top: 0px;
     right: 0px;
     bottom: 0px;

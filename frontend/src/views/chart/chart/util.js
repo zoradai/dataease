@@ -1,3 +1,5 @@
+import { DEFAULT_TITLE_STYLE } from '@/views/chart/chart/chart'
+
 export function hexColorToRGBA(hex, alpha) {
   const rgb = [] // 定义rgb数组
   if (/^\#[0-9A-F]{3}$/i.test(hex)) { // 判断传入是否为#三位十六进制数
@@ -63,7 +65,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -104,7 +110,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -148,7 +158,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -170,8 +184,16 @@ export const TYPE_CONFIGS = [
       ],
       'size-selector-ant-v': [
         'quotaFontSize',
+        'quotaFontFamily',
+        'quotaFontStyle',
+        'quotaLetterSpace',
+        'quotaFontShadow',
         'dimensionShow',
         'dimensionFontSize',
+        'dimensionFontFamily',
+        'dimensionFontStyle',
+        'dimensionLetterSpace',
+        'dimensionFontShadow',
         'spaceSplit'
       ],
       'title-selector-ant-v': [
@@ -181,7 +203,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -203,8 +229,16 @@ export const TYPE_CONFIGS = [
       ],
       'size-selector-ant-v': [
         'quotaFontSize',
+        'quotaFontFamily',
+        'quotaFontStyle',
+        'quotaLetterSpace',
+        'quotaFontShadow',
         'dimensionShow',
         'dimensionFontSize',
+        'dimensionFontFamily',
+        'dimensionFontStyle',
+        'dimensionLetterSpace',
+        'dimensionFontShadow',
         'spaceSplit'
       ],
       'title-selector-ant-v': [
@@ -214,7 +248,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -253,7 +291,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -281,9 +323,7 @@ export const TYPE_CONFIGS = [
         'liquidSize'
       ],
       'label-selector-ant-v': [
-        'show',
-        'fontSize',
-        'color'
+        'labelGauge'
       ],
       'title-selector-ant-v': [
         'show',
@@ -292,7 +332,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -360,7 +404,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -436,7 +484,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -512,7 +564,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -587,7 +643,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -655,7 +715,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -722,7 +786,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -797,7 +865,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -851,7 +923,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -905,7 +981,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -960,7 +1040,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -1012,7 +1096,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -1051,7 +1139,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -1118,7 +1210,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -1167,7 +1263,11 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ],
       'legend-selector-ant-v': [
         'show',
@@ -1274,8 +1374,16 @@ export const TYPE_CONFIGS = [
       ],
       'size-selector': [
         'quotaFontSize',
+        'quotaFontFamily',
+        'quotaFontStyle',
+        'quotaLetterSpace',
+        'quotaFontShadow',
         'dimensionShow',
         'dimensionFontSize',
+        'dimensionFontFamily',
+        'dimensionFontStyle',
+        'dimensionLetterSpace',
+        'dimensionFontShadow',
         'spaceSplit'
       ],
       'title-selector': [
@@ -1284,9 +1392,11 @@ export const TYPE_CONFIGS = [
         'fontSize',
         'color',
         'hPosition',
-        'vPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -1308,8 +1418,16 @@ export const TYPE_CONFIGS = [
       ],
       'size-selector': [
         'quotaFontSize',
+        'quotaFontFamily',
+        'quotaFontStyle',
+        'quotaLetterSpace',
+        'quotaFontShadow',
         'dimensionShow',
         'dimensionFontSize',
+        'dimensionFontFamily',
+        'dimensionFontStyle',
+        'dimensionLetterSpace',
+        'dimensionFontShadow',
         'spaceSplit'
       ],
       'title-selector': [
@@ -1319,7 +1437,10 @@ export const TYPE_CONFIGS = [
         'color',
         'hPosition',
         'isItalic',
-        'isBolder'
+        'isBolder',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
       ]
     }
   },
@@ -1351,8 +1472,6 @@ export const TYPE_CONFIGS = [
         'show',
         'fontSize',
         'color',
-        'position-v',
-        'formatter',
         'gaugeFormatter'
       ],
       'title-selector': [
@@ -2319,11 +2438,13 @@ export const TYPE_CONFIGS = [
         'show',
         'fontSize',
         'color',
-        'formatter'
+        'formatter',
+        'label-bg',
+        'label-show-shadow',
+        'label-shadow-color'
       ],
       'tooltip-selector': [
         'show',
-        'trigger',
         'textStyle',
         'formatter'
       ],
@@ -2495,4 +2616,18 @@ export function antVCustomColor(chart) {
     }
   }
   return colors
+}
+
+export function getRemark(chart) {
+  const remark = {}
+  if (chart.customStyle) {
+    const customStyle = JSON.parse(chart.customStyle)
+    if (customStyle.text) {
+      const title = JSON.parse(JSON.stringify(customStyle.text))
+      remark.show = title.remarkShow ? title.remarkShow : DEFAULT_TITLE_STYLE.remarkShow
+      remark.content = title.remark ? title.remark : DEFAULT_TITLE_STYLE.remark
+      remark.bgFill = title.remarkBackgroundColor ? title.remarkBackgroundColor : DEFAULT_TITLE_STYLE.remarkBackgroundColor
+    }
+  }
+  return remark
 }

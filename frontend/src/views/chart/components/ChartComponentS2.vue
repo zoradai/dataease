@@ -2,7 +2,10 @@
   <div ref="chartContainer" style="padding: 0;width: 100%;height: 100%;overflow: hidden;" :style="bg_class">
     <view-track-bar ref="viewTrack" :track-menu="trackMenu" class="track-bar" :style="trackBarStyleTime" @trackClick="trackClick" />
     <span v-if="chart.type" v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
-      <p style="padding:6px 10px 0 10px;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;">{{ chart.title }}</p>
+      <div>
+        <p style="padding:6px 4px 0;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
+        <title-remark v-if="remarkCfg.show" style="text-shadow: none!important;" :remark-cfg="remarkCfg" />
+      </div>
     </span>
     <div ref="tableContainer" style="width: 100%;overflow: hidden;" :style="{background:container_bg_class.background}">
       <div v-if="chart.type === 'table-normal'" :id="chartId" style="width: 100%;overflow: hidden;" :class="chart.drill ? 'table-dom-normal-drill' : 'table-dom-normal'" />
@@ -34,12 +37,14 @@
 <script>
 import { uuid } from 'vue-uuid'
 import ViewTrackBar from '@/components/canvas/components/Editor/ViewTrackBar'
-import { hexColorToRGBA } from '@/views/chart/chart/util'
+import { getRemark, hexColorToRGBA } from '@/views/chart/chart/util'
 import { baseTableInfo, baseTableNormal, baseTablePivot } from '@/views/chart/chart/table/table-info'
+import TitleRemark from '@/views/chart/view/TitleRemark'
+import { DEFAULT_TITLE_STYLE } from '@/views/chart/chart/chart'
 
 export default {
   name: 'ChartComponentS2',
-  components: { ViewTrackBar },
+  components: { TitleRemark, ViewTrackBar },
   props: {
     chart: {
       type: Object,
@@ -102,7 +107,11 @@ export default {
       tableData: [],
       showPage: false,
       scrollTimer: null,
-      scrollTop: 0
+      scrollTop: 0,
+      remarkCfg: {
+        show: false,
+        content: ''
+      }
     }
   },
 
@@ -221,38 +230,20 @@ export default {
     antVAction(param) {
       const cell = this.myChart.getCell(param.target)
       const meta = cell.getMeta()
-
-      let xAxis = []
-      if (this.chart.xaxis) {
-        xAxis = JSON.parse(this.chart.xaxis)
-      }
-      let drillFields = []
-      if (this.chart.drillFields) {
-        try {
-          drillFields = JSON.parse(this.chart.drillFields)
-        } catch (err) {
-          drillFields = JSON.parse(JSON.stringify(this.chart.drillFields))
-        }
-      }
-
-      let field = {}
-      if (this.chart.drill) {
-        field = drillFields[this.chart.drillFilters.length]
-        // check click field is drill?
-        if (field.dataeaseName !== meta.valueField) {
-          return
-        }
-      } else {
-        if (meta.colIndex < xAxis.length) {
-          field = xAxis[meta.colIndex]
-        }
-      }
-
+      const nameIdMap = this.chart.data.fields.reduce((pre, next) => {
+        pre[next['dataeaseName']] = next['id']
+        return pre
+      }, {})
+      const rowData = this.chart.data.tableRow[meta.rowIndex]
       const dimensionList = []
-      dimensionList.push({ id: field.id, value: meta.fieldValue })
+      for (const key in rowData) {
+        dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+      }
       this.pointParam = {
         data: {
-          dimensionList: dimensionList
+          dimensionList: dimensionList,
+          quotaList: [],
+          name: meta.fieldValue
         }
       }
 
@@ -291,12 +282,14 @@ export default {
       }
       const linkageParam = {
         option: 'linkage',
+        name: this.pointParam.data.name,
         viewId: this.chart.id,
         dimensionList: this.pointParam.data.dimensionList,
         quotaList: this.pointParam.data.quotaList
       }
       const jumpParam = {
         option: 'jump',
+        name: this.pointParam.data.name,
         viewId: this.chart.id,
         dimensionList: this.pointParam.data.dimensionList,
         quotaList: this.pointParam.data.quotaList
@@ -330,6 +323,10 @@ export default {
           if (this.$refs.title) {
             this.$refs.title.style.fontSize = customStyle.text.fontSize + 'px'
           }
+
+          this.title_class.fontFamily = customStyle.text.fontFamily ? customStyle.text.fontFamily : DEFAULT_TITLE_STYLE.fontFamily
+          this.title_class.letterSpacing = (customStyle.text.letterSpace ? customStyle.text.letterSpace : DEFAULT_TITLE_STYLE.letterSpace) + 'px'
+          this.title_class.textShadow = customStyle.text.fontShadow ? '2px 2px 4px' : 'none'
         }
         if (customStyle.background) {
           this.title_class.background = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
@@ -338,6 +335,7 @@ export default {
           this.container_bg_class.background = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
         }
       }
+      this.initRemark()
     },
 
     calcHeightRightNow() {
@@ -405,6 +403,9 @@ export default {
           this.myChart.render()
         }, senior.scrollCfg.interval)
       }
+    },
+    initRemark() {
+      this.remarkCfg = getRemark(this.chart)
     }
   }
 }

@@ -139,6 +139,7 @@ export function get(url) {
 export function delGroup(groupId) {
   return request({
     url: '/panel/group/deleteCircle/' + groupId,
+    loading: true,
     method: 'post'
   })
 }
@@ -154,7 +155,11 @@ export function initPanelData(panelId, callback) {
       name: response.data.name,
       privileges: response.data.privileges,
       sourcePanelName: response.data.sourcePanelName,
-      status: response.data.status
+      status: response.data.status,
+      createBy: response.data.createBy,
+      createTime: response.data.createTime,
+      updateBy: response.data.updateBy,
+      updateTime: response.data.updateTime
     })
     // 刷新联动信息
     getPanelAllLinkageInfo(panelId).then(rsp => {

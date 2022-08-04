@@ -20,7 +20,7 @@
       <el-tab-pane
         v-for="(item, index) in element.options.tabList"
         :key="item.name+index"
-        :lazy="true"
+        :lazy="false"
         :name="item.name"
       >
         <span slot="label">
@@ -69,7 +69,7 @@
           :edit-mode="editMode"
           :h="tabH"
         />
-        <div v-if="activeTabName === item.name" class="de-tab-content">
+        <div class="de-tab-content">
           <user-view
             v-if="item.content && item.content.type==='view' && item.content.propValue && item.content.propValue.viewId"
             :ref="item.name"
@@ -80,6 +80,7 @@
             :filters="filterMap[item.content.propValue && item.content.propValue.viewId] || []"
             :out-style="outStyle"
             :canvas-style-data="canvasStyleData"
+            :show-position="showPosition"
           />
         </div>
 
@@ -161,6 +162,7 @@ import { mapState } from 'vuex'
 import { chartCopy } from '@/api/chart/chart'
 import { buildFilterMap } from '@/utils/conditionUtil'
 import TabUseList from '@/views/panel/AssistComponent/tabUseList'
+import { $error } from '@/utils/message'
 
 export default {
   name: 'DeTabls',
@@ -193,6 +195,11 @@ export default {
     h: {
       type: Number,
       default: 200
+    },
+    showPosition: {
+      type: String,
+      required: false,
+      default: 'NotProvided'
     }
   },
   data() {
@@ -257,11 +264,18 @@ export default {
     }
   },
   watch: {
-    // curComponent: {
-    //   handler(newVal, oldVla) {
-    //   },
-    //   deep: true
-    // },
+    activeTabName: {
+      handler(newVal, oldVla) {
+        const _this = this
+        _this.$nextTick(() => {
+          try {
+            _this.$refs[this.activeTabName][0].resizeChart()
+          } catch (e) {
+            // ignore
+          }
+        })
+      }
+    },
     active: {
       handler(newVal, oldVla) {
         let activeTabInner

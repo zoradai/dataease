@@ -1,16 +1,17 @@
 <template>
   <el-date-picker
-    v-if="element.options!== null && element.options.attrs!==null"
+    v-if="element.options!== null && element.options.attrs!==null && show"
     ref="dateRef"
     v-model="values"
-    popper-class="coustom-date-picker"
-    :type="element.options.attrs.type"
+    :popper-class="'coustom-date-picker' + ' ' + extPoperClass"
+    :type="componentType"
     :range-separator="$t(element.options.attrs.rangeSeparator)"
     :start-placeholder="$t(element.options.attrs.startPlaceholder)"
     :end-placeholder="$t(element.options.attrs.endPlaceholder)"
     :placeholder="$t(element.options.attrs.placeholder)"
     :append-to-body="inScreen"
     value-format="timestamp"
+    :format="labelFormat"
     :size="size"
     :editable="false"
     @change="dateChange"
@@ -45,17 +46,27 @@ export default {
       required: false,
       default: true
     },
-    size: String
+    size: String,
+    isRelation: {
+      type: Boolean,
+      default: false
+    }
   },
   data() {
     return {
       operator: 'between',
       values: null,
-      onFocus: false
-
+      onFocus: false,
+      show: true
     }
   },
   computed: {
+    extPoperClass() {
+      if (this.labelFormat && this.labelFormat.includes('HH') && !this.labelFormat.includes('HH:mm')) {
+        return 'de-no-minite'
+      }
+      return ''
+    },
     defaultoptions() {
       if (!this.element || !this.element.options || !this.element.options.attrs.default) return ''
       return JSON.stringify(this.element.options.attrs.default)
@@ -70,7 +81,26 @@ export default {
     },
     manualModify() {
       return !!this.element.options.manualModify
+    },
+    isTimeWidget() {
+      const widget = ApplicationContext.getService(this.element.serviceName)
+      return widget.isTimeWidget && widget.isTimeWidget()
+    },
+    componentType() {
+      let result = this.element.options.attrs.type || 'date'
+      if (this.isTimeWidget && this.element.options.attrs.showTime) {
+        result = this.element.serviceName === 'timeDateWidget' ? 'datetime' : 'datetimerange'
+      }
+      return result
+    },
+    labelFormat() {
+      const result = 'yyyy-MM-dd'
+      if (this.isTimeWidget && this.element.options.attrs.showTime && this.element.options.attrs.accuracy) {
+        return result + ' ' + this.element.options.attrs.accuracy
+      }
+      return null
     }
+
   },
   watch: {
     'viewIds': function(value, old) {
@@ -95,6 +125,14 @@ export default {
       const widget = ApplicationContext.getService(this.element.serviceName)
       this.values = widget.dynamicDateFormNow(this.element)
       this.dateChange(this.values)
+    },
+    'labelFormat': function(val, old) {
+      if (val !== old) {
+        this.show = false
+        this.$nextTick(() => {
+          this.show = true
+        })
+      }
     }
   },
   created() {
@@ -113,7 +151,9 @@ export default {
   },
   mounted() {
     bus.$on('onScroll', this.onScroll)
-    bus.$on('reset-default-value', this.resetDefaultValue)
+    if (this.inDraw) {
+      bus.$on('reset-default-value', this.resetDefaultValue)
+    }
   },
   beforeDestroy() {
     bus.$off('onScroll', this.onScroll)
@@ -149,14 +189,18 @@ export default {
     search() {
       this.setCondition()
     },
-    setCondition() {
+    getCondition() {
       const param = {
         component: this.element,
         value: this.formatFilterValue(),
         operator: this.operator
       }
       param.value = this.formatValues(param.value)
-      this.inDraw && this.$store.commit('addViewFilter', param)
+      return param
+    },
+    setCondition() {
+      const param = this.getCondition()
+      !this.isRelation && this.inDraw && this.$store.commit('addViewFilter', param)
     },
     dateChange(value) {
       if (!this.inDraw) {
@@ -192,7 +236,7 @@ export default {
         return results
       } else {
         const value = values[0]
-        return timeSection(parseFloat(value), this.element.options.attrs.type)
+        return timeSection(parseFloat(value), this.componentType || this.element.options.attrs.type, this.labelFormat)
       }
     },
     fillValueDerfault() {
@@ -254,6 +298,15 @@ export default {
   .el-year-table td.current:not(.disabled) .cell,
   .el-year-table td.today:not(.disabled) .cell {
     color: #409EFF;
+  }
+}
+
+.de-no-minite {
+  .el-time-spinner__wrapper {
+    width: 100% !important;
+  }
+  .el-scrollbar:nth-of-type(2) {
+    display: none;
   }
 }
 </style>

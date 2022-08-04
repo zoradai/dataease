@@ -7,12 +7,6 @@ import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import io.dataease.auth.annotation.DeCleaner;
 import io.dataease.auth.api.dto.CurrentUserDto;
-import io.dataease.controller.sys.base.BaseGridRequest;
-import io.dataease.controller.sys.base.ConditionEntity;
-import io.dataease.dto.SysLogDTO;
-import io.dataease.ext.ExtDataSetGroupMapper;
-import io.dataease.ext.ExtDataSetTableMapper;
-import io.dataease.ext.UtilMapper;
 import io.dataease.commons.constants.*;
 import io.dataease.commons.exception.DEException;
 import io.dataease.commons.utils.*;
@@ -20,26 +14,34 @@ import io.dataease.controller.request.dataset.DataSetGroupRequest;
 import io.dataease.controller.request.dataset.DataSetTableRequest;
 import io.dataease.controller.request.dataset.DataSetTaskRequest;
 import io.dataease.controller.response.DataSetDetail;
+import io.dataease.controller.sys.base.BaseGridRequest;
+import io.dataease.controller.sys.base.ConditionEntity;
+import io.dataease.dto.SysLogDTO;
 import io.dataease.dto.dataset.*;
 import io.dataease.dto.dataset.union.UnionDTO;
 import io.dataease.dto.dataset.union.UnionItemDTO;
 import io.dataease.dto.dataset.union.UnionParamDTO;
 import io.dataease.exception.DataEaseException;
+import io.dataease.ext.ExtDataSetGroupMapper;
+import io.dataease.ext.ExtDataSetTableMapper;
+import io.dataease.ext.UtilMapper;
 import io.dataease.i18n.Translator;
 import io.dataease.listener.util.CacheUtils;
 import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.*;
 import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceTypes;
-import io.dataease.plugins.common.dto.chart.ChartFieldCustomFilterDTO;
+import io.dataease.plugins.common.dto.datasource.DataSourceType;
 import io.dataease.plugins.common.dto.datasource.TableField;
 import io.dataease.plugins.common.request.datasource.DatasourceRequest;
+import io.dataease.plugins.common.request.permission.DataSetRowPermissionsTreeDTO;
 import io.dataease.plugins.datasource.provider.Provider;
 import io.dataease.plugins.datasource.query.QueryProvider;
 import io.dataease.plugins.loader.ClassloaderResponsity;
+import io.dataease.provider.DDLProvider;
 import io.dataease.provider.ProviderFactory;
 import io.dataease.provider.datasource.JdbcProvider;
-import io.dataease.provider.DDLProvider;
+import io.dataease.service.datasource.DatasourceService;
 import io.dataease.service.engine.EngineService;
 import io.dataease.service.sys.SysAuthService;
 import net.sf.jsqlparser.expression.BinaryExpression;
@@ -47,14 +49,13 @@ import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Parenthesis;
 import net.sf.jsqlparser.expression.operators.conditional.AndExpression;
 import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
-import net.sf.jsqlparser.expression.operators.relational.ExpressionList;
-import net.sf.jsqlparser.expression.operators.relational.InExpression;
-import net.sf.jsqlparser.expression.operators.relational.LikeExpression;
+import net.sf.jsqlparser.expression.operators.relational.*;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
 import net.sf.jsqlparser.statement.select.PlainSelect;
 import net.sf.jsqlparser.statement.select.Select;
 import net.sf.jsqlparser.statement.select.SubSelect;
+import net.sf.jsqlparser.statement.select.WithItem;
 import net.sf.jsqlparser.util.deparser.ExpressionDeParser;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -134,6 +135,10 @@ public class DataSetTableService {
     private ChartViewMapper chartViewMapper;
     @Resource
     private DataSetTableTaskLogService dataSetTableTaskLogService;
+    @Resource
+    private PermissionsTreeService permissionsTreeService;
+    @Resource
+    private DatasourceService datasourceService;
 
     private static boolean isUpdatingDatasetTableStatus = false;
     private static final String lastUpdateTime = "${__last_update_time__}";
@@ -542,7 +547,7 @@ public class DataSetTableService {
         }
         DatasetTable datasetTable = datasetTableMapper.selectByPrimaryKey(dataSetTableRequest.getId());
         // 行权限
-        List<ChartFieldCustomFilterDTO> customFilter = permissionService.getCustomFilters(fields, datasetTable, null);
+        List<DataSetRowPermissionsTreeDTO> rowPermissionsTree = permissionsTreeService.getRowPermissionsTree(fields, datasetTable, null);
         // 列权限
         List<String> desensitizationList = new ArrayList<>();
         fields = permissionService.filterColumnPermissons(fields, desensitizationList, datasetTable.getId(), null);
@@ -584,7 +589,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
 
                 datasourceRequest.setQuery(
-                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
 
                 map.put("sql", datasourceRequest.getQuery());
                 datasourceRequest.setPage(page);
@@ -602,7 +607,7 @@ public class DataSetTableService {
 
                 try {
                     datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                     datasourceRequest.setPageable(false);
                     dataSetPreviewPage.setTotal(datasourceProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
@@ -625,7 +630,7 @@ public class DataSetTableService {
                 String table = TableUtils.tableName(dataSetTableRequest.getId());
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
@@ -635,7 +640,7 @@ public class DataSetTableService {
                 }
                 try {
                     datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(jdbcProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -660,7 +665,7 @@ public class DataSetTableService {
 
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, customFilter));
+                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
@@ -677,7 +682,7 @@ public class DataSetTableService {
                 try {
                     datasourceRequest.setPageable(false);
                     datasourceRequest.setQuery(qp.createQuerySqlWithLimit(sql, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(datasourceProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -695,7 +700,7 @@ public class DataSetTableService {
                 String table = TableUtils.tableName(dataSetTableRequest.getId());
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
@@ -705,7 +710,7 @@ public class DataSetTableService {
                 }
                 try {
                     datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(jdbcProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -724,7 +729,7 @@ public class DataSetTableService {
             String table = TableUtils.tableName(dataSetTableRequest.getId());
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
             datasourceRequest.setQuery(
-                    qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                    qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
             map.put("sql", datasourceRequest.getQuery());
             try {
                 data.addAll(jdbcProvider.getData(datasourceRequest));
@@ -734,7 +739,7 @@ public class DataSetTableService {
             }
             try {
                 datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                        Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                        Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                 dataSetPreviewPage.setTotal(jdbcProvider.getData(datasourceRequest).size());
             } catch (Exception e) {
                 logger.error(e.getMessage());
@@ -777,7 +782,7 @@ public class DataSetTableService {
                 }
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, customFilter));
+                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
@@ -794,7 +799,7 @@ public class DataSetTableService {
                 try {
                     datasourceRequest.setPageable(false);
                     datasourceRequest.setQuery(qp.createQuerySqlWithLimit(sql, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(datasourceProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -808,7 +813,7 @@ public class DataSetTableService {
                 String table = TableUtils.tableName(dataSetTableRequest.getId());
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
@@ -819,7 +824,7 @@ public class DataSetTableService {
 
                 try {
                     datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(jdbcProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -847,7 +852,7 @@ public class DataSetTableService {
                 }
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, customFilter));
+                        qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
@@ -864,7 +869,7 @@ public class DataSetTableService {
                 try {
                     datasourceRequest.setPageable(false);
                     datasourceRequest.setQuery(qp.createQuerySqlWithLimit(sql, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(datasourceProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -878,7 +883,7 @@ public class DataSetTableService {
                 String table = TableUtils.tableName(dataSetTableRequest.getId());
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
-                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, customFilter));
+                        qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
                 map.put("sql", datasourceRequest.getQuery());
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
@@ -889,7 +894,7 @@ public class DataSetTableService {
 
                 try {
                     datasourceRequest.setQuery(qp.createQueryTableWithLimit(table, fields,
-                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, customFilter));
+                            Integer.valueOf(dataSetTableRequest.getRow()), false, ds, null, rowPermissionsTree));
                     dataSetPreviewPage.setTotal(jdbcProvider.getData(datasourceRequest).size());
                 } catch (Exception e) {
                     logger.error(e.getMessage());
@@ -952,7 +957,7 @@ public class DataSetTableService {
     }
 
 
-    public void checkVariable(final String sql) throws Exception{
+    public void checkVariable(final String sql) throws Exception {
         String tmpSql = removeVariables(sql);
         if (tmpSql.contains(SubstitutedParams)) {
             throw new Exception(Translator.get("I18N_SQL_variable_limit"));
@@ -963,7 +968,7 @@ public class DataSetTableService {
         if (StringUtils.isEmpty(sql)) {
             DataEaseException.throwException(Translator.get("i18n_sql_not_empty"));
         }
-        if(sqlVariableDetails != null){
+        if (sqlVariableDetails != null) {
             Pattern pattern = Pattern.compile(regex);
             Matcher matcher = pattern.matcher(sql);
             while (matcher.find()) {
@@ -1011,16 +1016,32 @@ public class DataSetTableService {
         }
         StringBuilder stringBuilder = new StringBuilder();
         BinaryExpression binaryExpression = null;
-        try{
-            binaryExpression = (BinaryExpression)expr;
-        }catch (Exception e){ }
+        try {
+            binaryExpression = (BinaryExpression) expr;
+        } catch (Exception e) {
+        }
         if (binaryExpression != null && !(binaryExpression.getLeftExpression() instanceof BinaryExpression) && !(binaryExpression.getRightExpression() instanceof BinaryExpression) && hasVarible(binaryExpression.toString())) {
             stringBuilder.append(SubstitutedSql);
         } else {
             expr.accept(getExpressionDeParser(stringBuilder));
         }
         plainSelect.setWhere(CCJSqlParserUtil.parseCondExpression(stringBuilder.toString()));
-        return plainSelect.toString();
+
+        StringBuilder builder = new StringBuilder();
+        if (CollectionUtils.isNotEmpty(select.getWithItemsList())) {
+            builder.append("WITH");
+            builder.append(" ");
+            for (Iterator<WithItem> iter = select.getWithItemsList().iterator(); iter.hasNext();) {
+                WithItem withItem = iter.next();
+                builder.append(withItem.toString());
+                if (iter.hasNext()) {
+                    builder.append(",");
+                }
+            }
+        }
+
+        builder.append( " " + plainSelect);
+        return builder.toString();
     }
 
     public Map<String, Object> getSQLPreview(DataSetTableRequest dataSetTableRequest) throws Exception {
@@ -1259,10 +1280,9 @@ public class DataSetTableService {
         }
     }
 
-    public String getCustomSQLDatasource(DataTableInfoDTO dataTableInfoDTO, List<DataSetTableUnionDTO> list,
-                                         Datasource ds) {
-        DatasourceTypes datasourceTypes = DatasourceTypes.valueOf(ds.getType());
-        String keyword = datasourceTypes.getKeywordPrefix() + "%s" + datasourceTypes.getKeywordSuffix();
+    public String getCustomSQLDatasource(DataTableInfoDTO dataTableInfoDTO, List<DataSetTableUnionDTO> list, Datasource ds) {
+        DataSourceType dataSourceType = datasourceService.types().stream().filter(obj -> Objects.equals(obj.getType(), ds.getType())).collect(Collectors.toList()).get(0);
+        String keyword = dataSourceType.getKeywordPrefix() + "%s" + dataSourceType.getKeywordSuffix();
         Map<String, String[]> customInfo = new TreeMap<>();
         for (DataTableInfoCustomUnion ele : dataTableInfoDTO.getList()) {
             DatasetTable datasetTable = datasetTableMapper.selectByPrimaryKey(ele.getTableId());
@@ -1483,8 +1503,8 @@ public class DataSetTableService {
 
     // 关联数据集 直连模式
     public Map<String, Object> getUnionSQLDatasource(DataTableInfoDTO dataTableInfoDTO, Datasource ds) {
-        DatasourceTypes datasourceTypes = DatasourceTypes.valueOf(ds.getType());
-        String keyword = datasourceTypes.getKeywordPrefix() + "%s" + datasourceTypes.getKeywordSuffix();
+        DataSourceType dataSourceType = datasourceService.types().stream().filter(obj -> Objects.equals(obj.getType(), ds.getType())).collect(Collectors.toList()).get(0);
+        String keyword = dataSourceType.getKeywordPrefix() + "%s" + dataSourceType.getKeywordSuffix();
 
         String configuration = ds.getConfiguration();
         JsonObject jsonObject = JsonParser.parseString(configuration).getAsJsonObject();
@@ -2450,13 +2470,29 @@ public class DataSetTableService {
         DatasetTableExample example = new DatasetTableExample();
         example.createCriteria().andSyncStatusEqualTo(JobStatus.Underway.name());
         List<DatasetTable> jobStoppeddDatasetTables = new ArrayList<>();
+        List<DatasetTable> syncDatasetTables = new ArrayList<>();
 
-        datasetTableMapper.selectByExample(example).forEach(datasetTable -> {
+        List<DatasetTable> datasetTables = datasetTableMapper.selectByExample(example);
+        datasetTables.forEach(datasetTable -> {
             if (StringUtils.isNotEmpty(datasetTable.getQrtzInstance()) && !activeQrtzInstances.contains(datasetTable.getQrtzInstance().substring(0, datasetTable.getQrtzInstance().length() - 13))) {
                 jobStoppeddDatasetTables.add(datasetTable);
+            }else {
+                syncDatasetTables.add(datasetTable);
             }
         });
 
+        datasetTables.forEach(datasetTable -> {
+            DatasetTableTaskExample datasetTableTaskExample = new DatasetTableTaskExample();
+            DatasetTableTaskExample.Criteria criteria = datasetTableTaskExample.createCriteria();
+            criteria.andTableIdEqualTo(datasetTable.getId()).andLastExecStatusEqualTo(JobStatus.Underway.name());
+            if(CollectionUtils.isEmpty(dataSetTableTaskService.list(datasetTableTaskExample))){
+                DatasetTable record = new DatasetTable();
+                record.setSyncStatus(JobStatus.Error.name());
+                example.clear();
+                example.createCriteria().andIdEqualTo(datasetTable.getId());
+                datasetTableMapper.updateByExampleSelective(record, example);
+            }
+        });
         if (CollectionUtils.isEmpty(jobStoppeddDatasetTables)) {
             return;
         }
@@ -2546,9 +2582,50 @@ public class DataSetTableService {
 
 
             @Override
+            public void visit(MinorThan minorThan) {
+                getBuffer().append(minorThan.getLeftExpression());
+                getBuffer().append(" < ");
+                getBuffer().append( minorThan.getRightExpression());
+            }
+
+            @Override
+            public void visit(MinorThanEquals minorThan) {
+                getBuffer().append(minorThan.getLeftExpression());
+                getBuffer().append(" <= ");
+                getBuffer().append( minorThan.getRightExpression());
+            }
+
+            @Override
+            public void visit(GreaterThanEquals minorThan) {
+                getBuffer().append(minorThan.getLeftExpression());
+                getBuffer().append(" >= ");
+                getBuffer().append( minorThan.getRightExpression());
+            }
+
+            @Override
+            public void visit(GreaterThan minorThan) {
+                getBuffer().append(minorThan.getLeftExpression());
+                getBuffer().append(" > ");
+                getBuffer().append( minorThan.getRightExpression());
+            }
+
+            @Override
             public void visit(ExpressionList expressionList) {
-                for (Expression expression : expressionList.getExpressions()) {
+                for (Iterator<Expression> iter = expressionList.getExpressions().iterator(); iter.hasNext();) {
+                    Expression expression = iter.next();
                     expression.accept(this);
+                    if (iter.hasNext()) {
+                        buffer.append(", ");
+                    }
+                }
+            }
+
+            @Override
+            public void visit(Between between) {
+                if(hasVarible(between.getBetweenExpressionStart().toString()) || hasVarible(between.getBetweenExpressionEnd().toString())){
+                    getBuffer().append(SubstitutedSql);
+                }else {
+                    getBuffer().append(between.getLeftExpression()).append(" BETWEEN ").append(between.getBetweenExpressionStart()).append(" AND ").append(between.getBetweenExpressionEnd());
                 }
             }
 
@@ -2581,7 +2658,7 @@ public class DataSetTableService {
                 if (inExpression.isNot()) {
                     getBuffer().append(" " + " NOT IN " + " ");
                 } else {
-                    getBuffer().append(" IN "  );
+                    getBuffer().append(" IN ");
                 }
                 if (inExpression.getRightItemsList() != null) {
                     getBuffer().append(inExpression.getRightItemsList());

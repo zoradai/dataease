@@ -1,7 +1,9 @@
 package io.dataease.service.sys;
 
 import io.dataease.auth.api.dto.CurrentUserDto;
+import io.dataease.auth.service.AuthUserService;
 import io.dataease.auth.service.ExtAuthService;
+import io.dataease.controller.sys.request.*;
 import io.dataease.ext.ExtSysUserAssistMapper;
 import io.dataease.ext.ExtSysUserMapper;
 import io.dataease.ext.query.GridExample;
@@ -9,11 +11,6 @@ import io.dataease.commons.constants.AuthConstants;
 import io.dataease.commons.utils.AuthUtils;
 import io.dataease.commons.utils.BeanUtils;
 import io.dataease.commons.utils.CodingUtil;
-import io.dataease.controller.sys.base.BaseGridRequest;
-import io.dataease.controller.sys.request.LdapAddRequest;
-import io.dataease.controller.sys.request.SysUserCreateRequest;
-import io.dataease.controller.sys.request.SysUserPwdRequest;
-import io.dataease.controller.sys.request.SysUserStateRequest;
 import io.dataease.controller.sys.response.SysUserGridResponse;
 import io.dataease.controller.sys.response.SysUserRole;
 import io.dataease.i18n.Translator;
@@ -59,13 +56,16 @@ public class SysUserService {
     @Resource
     private ExtSysUserAssistMapper extSysUserAssistMapper;
 
+    @Resource
+    private AuthUserService authUserService;
 
-    public List<SysUserGridResponse> query(BaseGridRequest request) {
 
+    public List<SysUserGridResponse> query(UserGridRequest request) {
+        String keyWord = request.getKeyWord();
         GridExample gridExample = request.convertExample();
+        gridExample.setExtendCondition(keyWord);
         List<SysUserGridResponse> lists = extSysUserMapper.query(gridExample);
         lists.forEach(item -> {
-
             List<SysUserRole> roles = item.getRoles();
             List<Long> roleIds = roles.stream().map(SysUserRole::getRoleId).collect(Collectors.toList());
             item.setRoleIds(roleIds);
@@ -75,6 +75,7 @@ public class SysUserService {
 
     @Transactional
     public int save(SysUserCreateRequest request) {
+        request.setUsername(request.getUsername().trim());
         checkUsername(request);
         checkEmail(request);
         checkNickName(request);
@@ -200,7 +201,6 @@ public class SysUserService {
      * @param request
      * @return
      */
-    @CacheEvict(value = AuthConstants.USER_CACHE_NAME, key = "'user' + #request.userId")
     @Transactional
     public int update(SysUserCreateRequest request) {
         checkUsername(request);
@@ -215,6 +215,7 @@ public class SysUserService {
         deleteUserRoles(user.getUserId());//先删除用户角色关联
         saveUserRoles(user.getUserId(), request.getRoleIds());//再插入角色关联
         if (ObjectUtils.isEmpty(user.getDeptId())) user.setDeptId(0L);
+        authUserService.clearCache(user.getUserId());
         return sysUserMapper.updateByPrimaryKeySelective(user);
     }
 
@@ -241,7 +242,7 @@ public class SysUserService {
      * @param request
      * @return
      */
-    @CacheEvict(value = AuthConstants.USER_CACHE_NAME, key = "'user' + #request.userId")
+
     @Transactional
     public int updatePersonBasicInfo(SysUserCreateRequest request) {
         checkEmail(request);
@@ -253,6 +254,7 @@ public class SysUserService {
         user.setEmail(request.getEmail());
         user.setNickName(request.getNickName());
         user.setPhone(request.getPhone());
+        authUserService.clearCache(request.getUserId());
         return sysUserMapper.updateByPrimaryKeySelective(user);
     }
 

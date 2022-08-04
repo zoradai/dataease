@@ -2,7 +2,7 @@
 import { componentStyle, reverseColor } from '../common/common'
 import { BASE_ECHARTS_SELECT, DEFAULT_TOOLTIP } from '@/views/chart/chart/chart'
 
-export function baseMapOption(chart_option, chart, themeStyle) {
+export function baseMapOption(chart_option, chart, themeStyle, curAreaCode) {
   // 处理shape attr
   let customAttr = {}
   if (chart.customAttr) {
@@ -46,6 +46,13 @@ export function baseMapOption(chart_option, chart, themeStyle) {
           return text.replace(new RegExp('{a}', 'g'), a).replace(new RegExp('{b}', 'g'), b).replace(new RegExp('{c}', 'g'), c)
         }
         chart_option.series[0].labelLine = customAttr.label.labelLine
+        if (customAttr.label.bgColor) {
+          chart_option.series[0].label.backgroundColor = customAttr.label.bgColor
+        }
+        if (customAttr.label.showShadow) {
+          chart_option.series[0].label.shadowBlur = 2
+          chart_option.series[0].label.showdowColor = customAttr.label.shadowColor
+        }
       }
       // visualMap
       const valueArr = chart.data.series[0].data
@@ -80,6 +87,11 @@ export function baseMapOption(chart_option, chart, themeStyle) {
         const y = valueArr[i]
         y.name = chart.data.x[i]
         chart_option.series[0].data.push(y)
+      }
+      if (chart.senior) {
+        const senior = JSON.parse(chart.senior)
+
+        senior && senior.mapMapping && senior.mapMapping[curAreaCode] && (chart_option.series[0].nameMap = senior.mapMapping[curAreaCode])
       }
     }
   }

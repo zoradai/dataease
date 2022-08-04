@@ -10,6 +10,8 @@
     :tree-params="treeParams"
     :filter-node-method="_filterFun"
     :tree-render-fun="_renderFun"
+    :custom-style="customStyle"
+    :popper-append-to-body="inScreen"
     @searchFun="_searchFun"
     @node-click="changeNode"
     @removeTag="changeNodeIds"
@@ -47,7 +49,11 @@ export default {
       required: false,
       default: true
     },
-    size: String
+    size: String,
+    isRelation: {
+      type: Boolean,
+      default: false
+    }
   },
   data() {
     return {
@@ -102,6 +108,10 @@ export default {
     },
     isSingle() {
       return this.element.options.attrs.multiple
+    },
+    customStyle() {
+      const { brColor, wordColor, innerBgColor } = this.element.style
+      return { brColor, wordColor, innerBgColor }
     }
   },
 
@@ -203,7 +213,9 @@ export default {
     this.initLoad()
   },
   mounted() {
-    bus.$on('reset-default-value', this.resetDefaultValue)
+    if (this.inDraw) {
+      bus.$on('reset-default-value', this.resetDefaultValue)
+    }
   },
   beforeDestroy() {
     bus.$off('reset-default-value', this.resetDefaultValue)
@@ -277,7 +289,7 @@ export default {
       this.setCondition()
     },
 
-    setCondition() {
+    getCondition() {
       const val = this.formatFilterValue()
 
       const param = {
@@ -286,7 +298,12 @@ export default {
         operator: this.operator,
         isTree: true
       }
-      this.inDraw && this.$store.commit('addViewFilter', param)
+      return param
+    },
+
+    setCondition() {
+      const param = this.getCondition()
+      !this.isRelation && this.inDraw && this.$store.commit('addViewFilter', param)
     },
     formatFilterValue() {
       const SEPARATOR = '-de-'
@@ -395,8 +412,6 @@ export default {
       background-color: rgb(245, 247, 250, .5) !important;
     }
   }
-
-  
 
   .el-input-group--append {
     .el-input__inner {

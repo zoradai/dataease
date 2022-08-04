@@ -57,7 +57,7 @@
                 <el-dropdown-item v-if="item.id !== 'count' && item.deType !== 0 && item.deType !== 1 && item.deType !== 5" :command="beforeSummary('stddev_pop')">{{ $t('chart.stddev_pop') }}</el-dropdown-item>
                 <el-dropdown-item v-if="item.id !== 'count' && item.deType !== 0 && item.deType !== 1 && item.deType !== 5" :command="beforeSummary('var_pop')">{{ $t('chart.var_pop') }}</el-dropdown-item>
                 <el-dropdown-item :command="beforeSummary('count')">{{ $t('chart.count') }}</el-dropdown-item>
-                <el-dropdown-item :command="beforeSummary('count_distinct')">{{ $t('chart.count_distinct') }}</el-dropdown-item>
+                <el-dropdown-item v-if="item.id !== 'count'" :command="beforeSummary('count_distinct')">{{ $t('chart.count_distinct') }}</el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
           </el-dropdown-item>
@@ -100,7 +100,7 @@
           <el-dropdown-item icon="el-icon-files" :command="beforeClickItem('filter')">
             <span>{{ $t('chart.filter') }}...</span>
           </el-dropdown-item>
-          <el-dropdown-item v-if="chart.render === 'antv' && (chart.type.includes('table') || chart.type === 'text')" icon="el-icon-notebook-2" divided :command="beforeClickItem('formatter')">
+          <el-dropdown-item v-if="chart.render === 'antv' && chart.type !== 'gauge' && chart.type !== 'liquid'" icon="el-icon-notebook-2" divided :command="beforeClickItem('formatter')">
             <span>{{ $t('chart.value_formatter') }}...</span>
           </el-dropdown-item>
           <el-dropdown-item icon="el-icon-edit-outline" divided :command="beforeClickItem('rename')">

@@ -31,7 +31,11 @@ export default {
       type: Boolean,
       default: true
     },
-    size: String
+    size: String,
+    isRelation: {
+      type: Boolean,
+      default: false
+    }
   },
   data() {
     return {
@@ -71,7 +75,9 @@ export default {
     }
   },
   mounted() {
-    bus.$on('reset-default-value', this.resetDefaultValue)
+    if (this.inDraw) {
+      bus.$on('reset-default-value', this.resetDefaultValue)
+    }
   },
   beforeDestroy() {
     bus.$off('reset-default-value', this.resetDefaultValue)
@@ -89,13 +95,17 @@ export default {
       }
       this.setCondition()
     },
-    setCondition() {
+    getCondition() {
       const param = {
         component: this.element,
         value: !this.value ? [] : Array.isArray(this.value) ? this.value : [this.value],
         operator: this.operator
       }
-      this.inDraw && this.$store.commit('addViewFilter', param)
+      return param
+    },
+    setCondition() {
+      const param = this.getCondition()
+      !this.isRelation && this.inDraw && this.$store.commit('addViewFilter', param)
     },
     setEdit() {
       this.canEdit = true

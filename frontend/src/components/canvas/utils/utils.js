@@ -8,7 +8,7 @@ import {
 } from '@/utils/ApplicationContext'
 import { uuid } from 'vue-uuid'
 import store from '@/store'
-import { AIDED_DESIGN, PANEL_CHART_INFO } from '@/views/panel/panel'
+import { AIDED_DESIGN, PANEL_CHART_INFO, TAB_COMMON_STYLE } from '@/views/panel/panel'
 import html2canvas from 'html2canvasde'
 
 export function deepCopy(target) {
@@ -82,16 +82,21 @@ export function panelDataPrepare(componentData, componentStyle, callback) {
   componentStyle.refreshUnit = (componentStyle.refreshUnit || 'minute')
   componentStyle.aidedDesign = (componentStyle.aidedDesign || deepCopy(AIDED_DESIGN))
   componentStyle.chartInfo = (componentStyle.chartInfo || deepCopy(PANEL_CHART_INFO))
+  componentStyle.chartInfo.tabStyle = (componentStyle.chartInfo.tabStyle || deepCopy(TAB_COMMON_STYLE))
   componentStyle.themeId = (componentStyle.themeId || 'NO_THEME')
   componentStyle.panel.themeColor = (componentStyle.panel.themeColor || 'light')
   componentData.forEach((item, index) => {
     if (item.component && item.component === 'de-date') {
+      const widget = ApplicationContext.getService(item.serviceName)
       if (item.options.attrs &&
         (!item.options.attrs.default || (item.serviceName === 'timeYearWidget' && item.options.attrs.default.dynamicInfill !== 'year') || (item.serviceName === 'timeMonthWidget' && item.options.attrs.default.dynamicInfill !== 'month'))) {
-        const widget = ApplicationContext.getService(item.serviceName)
         if (widget && widget.defaultSetting) {
           item.options.attrs.default = widget.defaultSetting()
         }
+      }
+      if (item.options.attrs && widget.isTimeWidget && widget.isTimeWidget() && !item.options.attrs.hasOwnProperty('showTime')) {
+        item.options.attrs.showTime = false
+        item.options.attrs.accuracy = 'HH:mm'
       }
     }
     if (item.type === 'custom') {

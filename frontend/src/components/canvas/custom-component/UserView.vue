@@ -128,6 +128,8 @@ import ChartComponentS2 from '@/views/chart/components/ChartComponentS2'
 import PluginCom from '@/views/system/plugin/PluginCom'
 import LabelNormalText from '@/views/chart/components/normal/LabelNormalText'
 import { viewPropsSave } from '@/api/chart/chart'
+import { checkAddHttp } from '@/utils/urlUtils'
+
 export default {
   name: 'UserView',
   components: { LabelNormalText, PluginCom, ChartComponentS2, EditBarView, ChartComponent, TableNormal, LabelNormal, DrillPath, ChartComponentG2 },
@@ -236,7 +238,7 @@ export default {
       }
     },
     editBarViewShowFlag() {
-      return (this.active && this.inTab && !this.mobileLayoutStatus) || this.showPosition.includes('multiplexing') || this.showPosition.includes('email-task')
+      return (this.active && this.inTab && !this.mobileLayoutStatus) && !this.showPosition.includes('multiplexing') || this.showPosition.includes('email-task')
     },
     charViewShowFlag() {
       return this.httpRequest.status && this.chart.type && !this.chart.type.includes('table') && !this.chart.type.includes('text') && this.chart.type !== 'label' && this.renderComponent() === 'echarts'
@@ -287,13 +289,13 @@ export default {
       const trackMenuInfo = []
       let linkageCount = 0
       let jumpCount = 0
-      this.chart.data && this.chart.data.sourceFields && this.chart.data.sourceFields.forEach(item => {
+      this.chart.data && this.chart.data.fields && this.chart.data.fields.forEach(item => {
         const sourceInfo = this.chart.id + '#' + item.id
         if (this.nowPanelTrackInfo[sourceInfo]) {
           linkageCount++
         }
       })
-      this.chart.data && this.chart.data.sourceFields && this.chart.data.sourceFields.forEach(item => {
+      this.chart.data && this.chart.data.fields && this.chart.data.fields.forEach(item => {
         const sourceInfo = this.chart.id + '#' + item.id
         if (this.nowPanelJumpInfo[sourceInfo]) {
           jumpCount++
@@ -458,7 +460,7 @@ export default {
       const updateParams = { 'id': this.chart.id }
       const sourceCustomAttr = JSON.parse(this.sourceCustomAttrStr)
       const sourceCustomStyle = JSON.parse(this.sourceCustomStyleStr)
-      adaptCurTheme(sourceCustomStyle, sourceCustomAttr)
+      adaptCurTheme(sourceCustomStyle, sourceCustomAttr, this.chart.type)
       this.sourceCustomAttrStr = JSON.stringify(sourceCustomAttr)
       this.chart.customAttr = this.sourceCustomAttrStr
       updateParams['customAttr'] = this.sourceCustomAttrStr
@@ -625,14 +627,24 @@ export default {
     },
 
     jumpClick(param) {
-      let dimension, jumpInfo, sourceInfo, jumpFieldName
-      // 倒序取最后一个能匹配的
-      for (let i = param.dimensionList.length - 1; i >= 0; i--) {
-        dimension = param.dimensionList[i]
-        sourceInfo = param.viewId + '#' + dimension.id
-        jumpInfo = this.nowPanelJumpInfo[sourceInfo]
-        if (jumpInfo) {
-          break
+      let dimension, jumpInfo, sourceInfo
+      // 如果有名称name 获取和name匹配的dimension 否则倒序取最后一个能匹配的
+      if (param.name) {
+        param.dimensionList.forEach(dimensionItem => {
+          if (dimensionItem.value === param.name) {
+            dimension = dimensionItem
+            sourceInfo = param.viewId + '#' + dimension.id
+            jumpInfo = this.nowPanelJumpInfo[sourceInfo]
+          }
+        })
+      } else {
+        for (let i = param.dimensionList.length - 1; i >= 0; i--) {
+          dimension = param.dimensionList[i]
+          sourceInfo = param.viewId + '#' + dimension.id
+          jumpInfo = this.nowPanelJumpInfo[sourceInfo]
+          if (jumpInfo) {
+            break
+          }
         }
       }
       if (jumpInfo) {
@@ -667,30 +679,38 @@ export default {
             })
           }
         } else {
-          let url = jumpInfo.content
-          // 是否追加点击参数
-          if (jumpInfo.attachParams && this.chart.data && this.chart.data.sourceFields) {
-            this.chart.data.sourceFields.forEach(item => {
-              if (item.id === dimension.id) {
-                jumpFieldName = item.name
-              }
-            })
-            const urlAttachParams = jumpFieldName + '=' + dimension.value
-            if (url.indexOf('?') > -1) {
-              url = url + '&' + urlAttachParams
-            } else {
-              url = url + '?' + urlAttachParams
-            }
-          }
+          const colList = [...param.dimensionList, ...param.quotaList]
+          let url = this.setIdValueTrans('id', 'value', jumpInfo.content, colList)
+          url = checkAddHttp(url)
           window.open(url, jumpInfo.jumpType)
         }
       } else {
-        this.$message({
-          type: 'warn',
-          message: '未获取跳转信息',
-          showClose: true
+        if (this.chart.type.indexOf('table') === -1) {
+          this.$message({
+            type: 'warn',
+            message: '未获取跳转信息',
+            showClose: true
+          })
+        }
+      }
+    },
+    setIdValueTrans(from, to, content, colList) {
+      if (!content) {
+        return content
+      }
+      let name2Id = content
+      const nameIdMap = colList.reduce((pre, next) => {
+        pre[next[from]] = next[to]
+        return pre
+      }, {})
+      const on = content.match(/\[(.+?)\]/g)
+      if (on) {
+        on.forEach(itm => {
+          const ele = itm.slice(1, -1)
+          name2Id = name2Id.replace(itm, nameIdMap[ele])
         })
       }
+      return name2Id
     },
 
     resetDrill() {
@@ -739,6 +759,7 @@ export default {
 
     setDetailMapCode(code) {
       this.element.DetailAreaCode = code
+      bus.$emit('set-dynamic-area-code', code)
       return true
     },
 

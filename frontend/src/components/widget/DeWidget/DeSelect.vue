@@ -12,12 +12,16 @@
     :popper-append-to-body="inScreen"
     :size="size"
     :filterable="true"
+    :filter-method="filterMethod"
+    :key-word="keyWord"
     popper-class="coustom-de-select"
     :list="datas"
+    :custom-style="customStyle"
     @change="changeValue"
     @focus="setOptionWidth"
     @blur="onBlur"
     @visual-change="visualChange"
+    @handleShowNumber="handleShowNumber"
   >
     <el-option
       v-for="item in templateDatas || datas"
@@ -58,7 +62,11 @@ export default {
       required: false,
       default: true
     },
-    size: String
+    size: String,
+    isRelation: {
+      type: Boolean,
+      default: false
+    }
   },
   data() {
     return {
@@ -67,7 +75,8 @@ export default {
       show: true,
       value: null,
       datas: [],
-      onFocus: false
+      onFocus: false,
+      keyWord: ''
     }
   },
   computed: {
@@ -97,6 +106,10 @@ export default {
     },
     panelInfo() {
       return this.$store.state.panel.panelInfo
+    },
+    customStyle() {
+      const { brColor, wordColor, innerBgColor } = this.element.style
+      return { brColor, wordColor, innerBgColor }
     }
   },
 
@@ -190,16 +203,21 @@ export default {
 
   mounted() {
     bus.$on('onScroll', this.onScroll)
-    bus.$on('reset-default-value', this.resetDefaultValue)
+    if (this.inDraw) {
+      bus.$on('reset-default-value', this.resetDefaultValue)
+    }
   },
   beforeDestroy() {
     bus.$off('onScroll', this.onScroll)
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    filterMethod(key) {
+      this.keyWord = key
+    },
     onScroll() {
       if (this.onFocus) {
-        this.$refs.deSelect.blur()
+        this.$refs.deSelect.$refs.visualSelect.blur()
       }
     },
     resetDefaultValue(id) {
@@ -209,7 +227,7 @@ export default {
       }
     },
     onBlur() {
-      this.onFocus = false
+      // this.onFocus = false
     },
     handleElTagStyle() {
       setTimeout(() => {
@@ -259,29 +277,36 @@ export default {
         this.element.options.manualModify = true
       }
       this.setCondition()
+      this.handleShowNumber()
+    },
+    handleShowNumber() {
       this.showNumber = false
+      const tags = this.$refs.deSelect.$refs.visualSelect.$refs.tags
 
       this.$nextTick(() => {
-        if (!this.element.options.attrs.multiple || !this.$refs.deSelect || !this.$refs.deSelect.$refs.tags) {
+        if (!this.element.options.attrs.multiple || !this.$refs.deSelect || !tags) {
           return
         }
-        const kids = this.$refs.deSelect.$refs.tags.children[0].children
+        const kids = tags.children[0].children
         let contentWidth = 0
         kids.forEach(kid => {
           contentWidth += kid.offsetWidth
         })
-        this.showNumber = contentWidth > ((this.$refs.deSelect.$refs.tags.clientWidth - 30) * 0.9)
+        this.showNumber = contentWidth > ((tags.clientWidth - 30) * 0.9)
         this.handleElTagStyle()
       })
     },
-
-    setCondition() {
+    getCondition() {
       const param = {
         component: this.element,
         value: this.formatFilterValue(),
         operator: this.operator
       }
-      this.inDraw && this.$store.commit('addViewFilter', param)
+      return param
+    },
+    setCondition() {
+      const param = this.getCondition()
+      !this.isRelation && this.inDraw && this.$store.commit('addViewFilter', param)
     },
     formatFilterValue() {
       if (this.value === null) return []
