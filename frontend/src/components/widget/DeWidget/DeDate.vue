@@ -14,6 +14,8 @@
     :format="labelFormat"
     :size="size"
     :editable="false"
+    :picker-options="pickerOptions"
+    :default-time="defaultRangeTime"
     @change="dateChange"
     @focus="toFocus"
     @blur="onBlur"
@@ -99,6 +101,31 @@ export default {
         return result + ' ' + this.element.options.attrs.accuracy
       }
       return null
+    },
+    pickerOptions() {
+      const widget = ApplicationContext.getService(this.element.serviceName)
+      if (this.element.options.attrs.type === 'daterange' && widget.shortcuts) {
+        const cuts = widget.shortcuts()
+        const result = cuts.map(cut => {
+          return {
+            text: this.$t(cut.text),
+            onClick: picker => {
+              const param = cut.callBack()
+              picker.$emit('pick', param)
+            }
+          }
+        })
+        return {
+          shortcuts: result
+        }
+      }
+      return null
+    },
+    defaultRangeTime() {
+      if (this.element.options.attrs.type === 'daterange' && this.element.options.attrs.showTime) {
+        return ['00:00:00', '23:59:59']
+      }
+      return null
     }
 
   },
@@ -160,6 +187,9 @@ export default {
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    clearHandler() {
+      this.values = null
+    },
     onScroll() {
       if (this.onFocus) {
         this.$refs.dateRef.hidePicker()
@@ -230,8 +260,9 @@ export default {
         }
         let start = values[0]
         let end = values[1]
-        start = timeSection(start, 'date')[0]
-        end = timeSection(end, 'date')[1]
+        start = timeSection(start, 'datetime', this.labelFormat)[0]
+        end = timeSection(end, 'datetime', this.labelFormat)[1]
+
         const results = [start, end]
         return results
       } else {
@@ -264,9 +295,41 @@ export default {
 .coustom-date-picker {
   border:1px solid var(--BrDateColor, #dfe4ed) !important;
   background: var(--BgDateColor, #FFFFFF) !important;
-  // .popper__arrow::after{
-  //   border-bottom-color: var(--BgDateColor, #FFFFFF) !important;
-  // }
+
+  .el-picker-panel__sidebar {
+    background: var(--BgDateColor, #FFFFFF) !important;
+    border-right: 1px solid var(--BrDateColor, #dfe4ed) !important;
+
+    .el-picker-panel__shortcut {
+      color: var(--DateColor, #606266);
+    }
+  }
+
+  .el-date-range-picker__time-header,
+  .el-date-picker__time-header {
+    border-bottom: 1px solid var(--BrDateColor, #dfe4ed) !important;
+  }
+  
+  .el-picker-panel__footer {
+    border-top: 1px solid var(--BrDateColor, #dfe4ed) !important;
+    background: var(--BgDateColor, #FFFFFF) !important;
+  }
+
+  .el-date-range-picker__time-picker-wrap,
+  .el-date-picker__time-header {
+    .el-input__inner {
+      border:1px solid var(--BrDateColor, #dfe4ed) !important;
+      color: var(--DateColor, #606266);
+      background: var(--BgDateColor, #FFFFFF) !important;
+    }
+  }
+
+  .el-picker-panel__link-btn:nth-child(2) {
+    color: var(--DateColor, #409eff);
+    background: var(--BgDateColor, #FFFFFF) !important;
+    border:1px solid var(--BrDateColor, #dfe4ed) !important;
+  }
+  
 
   .popper__arrow,
   .popper__arrow::after {
@@ -280,6 +343,10 @@ export default {
   .el-date-table th,
   .el-date-picker__header--bordered {
     border-bottom:1px solid var(--BrDateColor, #e6ebf5) !important;
+  }
+
+  .el-date-table td.in-range:not(.end-date):not(.start-date) div span {
+    color: #3370ff;
   }
 
   .el-date-range-picker__header,

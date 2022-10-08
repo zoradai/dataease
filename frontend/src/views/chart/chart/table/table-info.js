@@ -145,6 +145,7 @@ export function baseTableInfo(s2, container, chart, action, tableData) {
 
 export function baseTableNormal(s2, container, chart, action, tableData) {
   const containerDom = document.getElementById(container)
+  if (!containerDom) return
 
   // fields
   const fields = chart.data.fields
@@ -535,6 +536,13 @@ function mappingColor(value, defaultColor, field, type) {
           color = t[type]
           flag = true
         }
+      } else if (t.term === 'between') {
+        const min = parseFloat(t.min)
+        const max = parseFloat(t.max)
+        if (min <= value && value <= max) {
+          color = t[type]
+          flag = true
+        }
       }
       if (flag) {
         break
@@ -581,8 +589,8 @@ function mappingColor(value, defaultColor, field, type) {
       }
     } else {
       // time
-      const tv = new Date(t.value + ' GMT+8').getTime()
-      const v = new Date(value + ' GMT+8').getTime()
+      const tv = new Date(t.value.replace(/-/g, '/') + ' GMT+8').getTime()
+      const v = new Date(value.replace(/-/g, '/') + ' GMT+8').getTime()
       if (t.term === 'eq') {
         if (v === tv) {
           color = t[type]

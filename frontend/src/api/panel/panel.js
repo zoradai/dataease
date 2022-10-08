@@ -90,6 +90,15 @@ export function findOne(id) {
   })
 }
 
+export function viewPanelLog(data) {
+  return request({
+    url: 'panel/group/viewLog',
+    method: 'post',
+    loading: true,
+    data
+  })
+}
+
 export function getTable(id) {
   return request({
     url: '/panel/table/get/' + id,
@@ -144,9 +153,10 @@ export function delGroup(groupId) {
   })
 }
 
-export function initPanelData(panelId, callback) {
+export function initPanelData(panelId, useCache = false, callback) {
+  const queryMethod = useCache ? findUserCacheRequest : findOne
   // 加载视图数据
-  findOne(panelId).then(response => {
+  queryMethod(panelId).then(response => {
     // 初始化视图data和style 数据
     panelInit(JSON.parse(response.data.panelData), JSON.parse(response.data.panelStyle))
     // 设置当前仪表板全局信息
@@ -158,7 +168,9 @@ export function initPanelData(panelId, callback) {
       status: response.data.status,
       createBy: response.data.createBy,
       createTime: response.data.createTime,
+      creatorName: response.data.creatorName,
       updateBy: response.data.updateBy,
+      updateName: response.data.updateName,
       updateTime: response.data.updateTime
     })
     // 刷新联动信息
@@ -223,6 +235,16 @@ export function exportDetails(data) {
   })
 }
 
+export function innerExportDetails(data) {
+  return request({
+    url: 'panel/group/innerExportDetails',
+    method: 'post',
+    data: data,
+    loading: true,
+    responseType: 'blob'
+  })
+}
+
 export function updatePanelStatus(panelId, param) {
   return request({
     url: '/panel/group/updatePanelStatus/' + panelId,
@@ -232,3 +254,67 @@ export function updatePanelStatus(panelId, param) {
   })
 }
 
+export function saveCache(data) {
+  return request({
+    url: 'panel/group/autoCache',
+    method: 'post',
+    loading: false,
+    data
+  })
+}
+export function findUserCacheRequest(panelId) {
+  return request({
+    url: 'panel/group/findUserCache/' + panelId,
+    method: 'get',
+    loading: false
+  })
+}
+
+export function checkUserCacheRequest(panelId) {
+  return request({
+    url: 'panel/group/checkUserCache/' + panelId,
+    method: 'get',
+    loading: false
+  })
+}
+
+export function checkUserCache(panelId, callback) {
+  // 加载视图数据
+  checkUserCacheRequest(panelId).then(response => {
+    callback(response)
+  })
+}
+
+export function removePanelCache(panelId) {
+  return request({
+    url: 'panel/group/removePanelCache/' + panelId,
+    method: 'delete',
+    loading: false
+  })
+}
+
+
+export function findPanelElementInfo(viewId) {
+  return request({
+    url: 'panel/group/findPanelElementInfo/'+viewId,
+    method: 'get',
+    loading: false
+  })
+}
+
+export function export2AppCheck(panelId){
+  return request({
+    url: 'panel/group/export2AppCheck/'+panelId,
+    method: 'get',
+    loading: false
+  })
+}
+
+export function appApply(data) {
+  return request({
+    url: 'panel/group/appApply',
+    method: 'post',
+    loading: true,
+    data
+  })
+}

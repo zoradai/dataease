@@ -1,5 +1,8 @@
 <template>
   <el-row class="view-panel">
+    <div v-if="properties.length===0" class="no-properties">
+      {{ $t('chart.chart_no_properties') }}
+    </div>
     <plugin-com
       v-if="pluginShow"
       style="overflow:auto;border-right: 1px solid #e6e6e6;height: 100%;width: 100%;"
@@ -8,7 +11,7 @@
       :obj="{view, param, chart, dimensionData, quotaData}"
     />
     <div
-      v-else
+      v-if="!pluginShow&&properties.length>0"
       style="overflow:auto;border-right: 1px solid #e6e6e6;height: 100%;width: 100%;padding-right: 6px"
       class="attr-style theme-border-class"
     >
@@ -47,6 +50,7 @@
               class="attr-selector"
               :chart="chart"
               :property-inner="propertyInnerAll['size-selector-ant-v']"
+              :quota-fields="quotaData"
               @onSizeChange="onSizeChange($event,'size-selector-ant-v')"
             />
           </el-collapse-item>
@@ -256,6 +260,21 @@
               @onChangeBackgroundForm="onChangeBackgroundForm($event,'background-color-selector')"
             />
           </el-collapse-item>
+          <el-collapse-item
+            v-show="showPropertiesCollapse(['margin-selector'])"
+            name="margin"
+            :title="$t('panel.margin')"
+          >
+            <margin-selector
+              v-if="showProperties('margin-selector')"
+              :param="param"
+              class="attr-selector"
+              :chart="chart"
+              :property-inner="propertyInnerAll['margin-selector']"
+              @onMarginChange="onMarginChange($event,'margin-selector')"
+            />
+
+          </el-collapse-item>
         </el-collapse>
       </el-row>
     </div>
@@ -280,6 +299,7 @@ import YAxisExtSelectorAntV from '@/views/chart/components/component-style/YAxis
 import TitleSelector from '@/views/chart/components/component-style/TitleSelector'
 import TitleSelectorAntV from '@/views/chart/components/component-style/TitleSelectorAntV'
 import LegendSelector from '@/views/chart/components/component-style/LegendSelector'
+import MarginSelector from '@/views/chart/components/component-style/MarginSelector'
 import LegendSelectorAntV from '@/views/chart/components/component-style/LegendSelectorAntV'
 import BackgroundColorSelector from '@/views/chart/components/component-style/BackgroundColorSelector'
 import SplitSelector from '@/views/chart/components/component-style/SplitSelector'
@@ -310,6 +330,7 @@ export default {
     SizeSelectorAntV,
     SizeSelector,
     ColorSelector,
+    MarginSelector,
     PluginCom
   },
   props: {
@@ -428,6 +449,10 @@ export default {
       val['propertyName'] = propertyName
       this.$emit('onLegendChange', val)
     },
+    onMarginChange(val, propertyName) {
+      val['propertyName'] = propertyName
+      this.$emit('onMarginChange', val)
+    },
     onChangeBackgroundForm(val, propertyName) {
       val['propertyName'] = propertyName
       this.$emit('onChangeBackgroundForm', val)
@@ -471,29 +496,29 @@ export default {
     font-size: 12px;
   }
 
-  .tab-header > > > .el-tabs__header {
+  .tab-header ::v-deep .el-tabs__header {
     border-top: solid 1px #eee;
     border-right: solid 1px #eee;
   }
 
-  .tab-header > > > .el-tabs__item {
+  .tab-header ::v-deep .el-tabs__item {
     font-size: 12px;
     padding: 0 20px !important;
   }
 
-  .blackTheme .tab-header > > > .el-tabs__item {
+  .blackTheme .tab-header ::v-deep .el-tabs__item {
     background-color: var(--MainBG);
   }
 
-  .tab-header > > > .el-tabs__nav-scroll {
+  .tab-header ::v-deep .el-tabs__nav-scroll {
     padding-left: 0 !important;
   }
 
-  .tab-header > > > .el-tabs__header {
+  .tab-header ::v-deep .el-tabs__header {
     margin: 0 !important;
   }
 
-  .tab-header > > > .el-tabs__content {
+  .tab-header ::v-deep .el-tabs__content {
     height: calc(100% - 40px);
   }
 
@@ -506,7 +531,7 @@ export default {
     margin: 5px;
   }
 
-  .el-radio > > > .el-radio__label {
+  .el-radio ::v-deep .el-radio__label {
     padding-left: 0;
   }
 
@@ -533,15 +558,15 @@ export default {
     background-color: var(--MainBG)
   }
 
-  .dialog-css > > > .el-dialog__title {
+  .dialog-css ::v-deep .el-dialog__title {
     font-size: 14px;
   }
 
-  .dialog-css > > > .el-dialog__header {
+  .dialog-css ::v-deep .el-dialog__header {
     padding: 20px 20px 0;
   }
 
-  .dialog-css > > > .el-dialog__body {
+  .dialog-css ::v-deep .el-dialog__body {
     padding: 10px 20px 20px;
   }
 
@@ -567,7 +592,7 @@ export default {
     color: #cccccc;
   }
 
-  .radio-span > > > .el-radio__label {
+  .radio-span ::v-deep .el-radio__label {
     margin-left: 4px;
   }
 
@@ -607,11 +632,20 @@ export default {
     height: 100%;
   }
 
-  .form-item-slider>>>.el-form-item__label{
+  .form-item-slider ::v-deep .el-form-item__label{
     font-size: 12px;
     line-height: 38px;
   }
-  .form-item>>>.el-form-item__label{
+  .form-item ::v-deep .el-form-item__label{
     font-size: 12px;
+  }
+
+  .no-properties {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    padding-top: 40px;
+    overflow: auto;
+    height: 100%;
   }
   </style>

@@ -62,6 +62,19 @@ public interface AuthApi {
     @PostMapping("/isOpenCas")
     boolean isOpenCas();
 
+
+    @ApiOperation("是否开启企业微信")
+    @PostMapping("/isOpenWecom")
+    boolean isOpenWecom();
+
+    @ApiOperation("是否开启钉钉")
+    @PostMapping("/isOpenDingtalk")
+    boolean isOpenDingtalk();
+
+    @ApiOperation("是否开启飞书")
+    @PostMapping("/isOpenLark")
+    boolean isOpenLark();
+
     @ApiIgnore
     @PostMapping("/isPluginLoaded")
     boolean isPluginLoaded();

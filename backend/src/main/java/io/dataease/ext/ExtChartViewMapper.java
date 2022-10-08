@@ -3,6 +3,7 @@ package io.dataease.ext;
 import io.dataease.controller.request.chart.ChartViewRequest;
 import io.dataease.dto.chart.ChartViewDTO;
 import io.dataease.dto.chart.ViewOption;
+import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -27,6 +28,8 @@ public interface ExtChartViewMapper {
     ChartViewDTO searchOne(@Param("id") String id );
 
     void chartCopyWithPanel(@Param("copyId") String copyId);
+
+    void chartFiledCopyWithPanel(@Param("copyId") String copyId);
 
     void deleteCircleView(@Param("pid") String pid);
 
@@ -53,4 +56,7 @@ public interface ExtChartViewMapper {
     void initPanelChartViewCache(@Param("panelId") String panelId);
 
     List<ViewOption> chartOptions(@Param("panelId") String panelId);
+
+    List<ChartViewWithBLOBs> findByPanelId(@Param("panelId") String panelId);
+
 }

@@ -5,7 +5,9 @@ import io.dataease.auth.entity.SysUserEntity;
 import io.dataease.auth.entity.TokenInfo;
 import io.dataease.auth.service.AuthUserService;
 import io.dataease.auth.util.JWTUtils;
+import io.dataease.commons.constants.SysLogConstants;
 import io.dataease.commons.utils.CodingUtil;
+import io.dataease.commons.utils.DeLogUtils;
 import io.dataease.commons.utils.LogUtil;
 import io.dataease.commons.utils.ServletUtils;
 
@@ -62,12 +64,13 @@ public class CasServer {
                 sysUserService.saveCASUser(name, email);
                 sysUserEntity = authUserService.getUserByName(name);
             }
-            String realPwd = CodingUtil.md5(sysUserService.defaultPWD());
+            String realPwd = sysUserEntity.getPassword();
             TokenInfo tokenInfo = TokenInfo.builder().userId(sysUserEntity.getUserId()).username(sysUserEntity.getUsername()).build();
             String token = JWTUtils.sign(tokenInfo, realPwd);
             ServletUtils.setToken(token);
             Cookie cookie_token = new Cookie("Authorization", token);cookie_token.setPath("/");
             response.addCookie(cookie_token);
+            DeLogUtils.save(SysLogConstants.OPERATE_TYPE.LOGIN, SysLogConstants.SOURCE_TYPE.USER, sysUserEntity.getUserId(), null, null, null);
 
         }catch(Exception e) {
 

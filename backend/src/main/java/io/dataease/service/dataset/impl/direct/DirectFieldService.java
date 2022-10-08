@@ -54,16 +54,16 @@ public class DirectFieldService implements DataSetFieldService {
 
     @Override
     public List<Object> fieldValues(String fieldId, Long userId, Boolean userPermissions, Boolean rowAndColumnMgm) throws Exception {
-        List<String> filedIds = new ArrayList<>();
-        filedIds.add(fieldId);
-        return fieldValues(filedIds, null, userId, userPermissions, false, rowAndColumnMgm);
+        List<String> fieldIds = new ArrayList<>();
+        fieldIds.add(fieldId);
+        return fieldValues(fieldIds, null, userId, userPermissions, false, rowAndColumnMgm);
     }
 
     @Override
     public List<Object> fieldValues(String fieldId, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean rowAndColumnMgm) throws Exception {
-        List<String> filedIds = new ArrayList<>();
-        filedIds.add(fieldId);
-        return fieldValues(filedIds, sortDTO, userId, userPermissions, false, rowAndColumnMgm);
+        List<String> fieldIds = new ArrayList<>();
+        fieldIds.add(fieldId);
+        return fieldValues(fieldIds, sortDTO, userId, userPermissions, false, rowAndColumnMgm);
     }
 
     public List<DeSortField> buildSorts(List<DatasetTableField> allFields, DeSortDTO sortDTO) {
@@ -145,8 +145,10 @@ public class DirectFieldService implements DataSetFieldService {
                 datasourceRequest.setQuery(qp.createQuerySQL(dataTableInfoDTO.getTable(), permissionFields, !needSort, ds, customFilter, rowPermissionsTree, deSortFields));
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.toString())) {
                 String sql = dataTableInfoDTO.getSql();
-
-                sql = dataSetTableService.removeVariables(sql);
+                if(dataTableInfoDTO.isBase64Encryption()){
+                    sql = new String(java.util.Base64.getDecoder().decode(sql));
+                }
+                sql = dataSetTableService.removeVariables(sql, ds.getType());
                 datasourceRequest.setQuery(qp.createQuerySQLAsTmp(sql, permissionFields, !needSort, customFilter, rowPermissionsTree, deSortFields));
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.CUSTOM.toString())) {
                 DataTableInfoDTO dt = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);

@@ -14,10 +14,14 @@ import io.dataease.plugins.common.base.mapper.SystemParameterMapper;
 import io.dataease.plugins.config.SpringContextUtil;
 import io.dataease.plugins.xpack.cas.dto.CasSaveResult;
 import io.dataease.plugins.xpack.cas.service.CasXpackService;
+import io.dataease.plugins.xpack.display.service.DisplayXpackService;
+import io.dataease.plugins.xpack.loginlimit.service.LoginLimitXpackService;
 import io.dataease.service.FileService;
+import io.dataease.service.datasource.DatasourceService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,6 +47,9 @@ public class SystemParameterService {
     private ExtSystemParameterMapper extSystemParameterMapper;
     @Resource
     private FileService fileService;
+    @Resource
+    @Lazy
+    private DatasourceService datasourceService;
 
     public String searchEmail() {
         return extSystemParameterMapper.email();
@@ -52,10 +59,14 @@ public class SystemParameterService {
         List<SystemParameter> paramList = this.getParamList("basic");
         List<SystemParameter> homePageList = this.getParamList("ui.openHomePage");
         List<SystemParameter> marketPageList = this.getParamList("ui.openMarketPage");
+        List<SystemParameter> loginLimitList = this.getParamList("loginlimit");
         paramList.addAll(homePageList);
         paramList.addAll(marketPageList);
+        paramList.addAll(loginLimitList);
         BasicInfo result = new BasicInfo();
         result.setOpenHomePage("true");
+        Map<String, LoginLimitXpackService> beansOfType = SpringContextUtil.getApplicationContext().getBeansOfType((LoginLimitXpackService.class));
+        Boolean loginLimitPluginLoaded = beansOfType.keySet().size() > 0;
         if (!CollectionUtils.isEmpty(paramList)) {
             for (SystemParameter param : paramList) {
                 if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.FRONT_TIME_OUT.getValue())) {
@@ -82,6 +93,32 @@ public class SystemParameterService {
                 if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.TEMPLATE_ACCESS_KEY.getValue())) {
                     result.setTemplateAccessKey(param.getParamValue());
                 }
+                if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.DS_CHECK_INTERVAL.getValue())) {
+                    result.setDsCheckInterval(param.getParamValue());
+                }
+                if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.DS_CHECK_INTERVAL_TYPE.getValue())) {
+                    result.setDsCheckIntervalType(param.getParamValue());
+                }
+
+
+                if (loginLimitPluginLoaded) {
+                    if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.LOGIN_LIMIT_LIMITTIMES.getValue())) {
+                        String paramValue = param.getParamValue();
+                        if (StringUtils.isNotBlank(paramValue)) {
+                            result.setLimitTimes(Integer.parseInt(paramValue));
+                        }
+                    }
+                    if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.LOGIN_LIMIT_RELIEVETIMES.getValue())) {
+                        String paramValue = param.getParamValue();
+                        if (StringUtils.isNotBlank(paramValue)) {
+                            result.setRelieveTimes(Integer.parseInt(paramValue));
+                        }
+                    }
+                    if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.LOGIN_LIMIT_OPEN.getValue())) {
+                        boolean open = StringUtils.equals("true", param.getParamValue());
+                        result.setOpen(open ? "true" : "false");
+                    }
+                }
 
             }
         }
@@ -105,6 +142,7 @@ public class SystemParameterService {
     @Transactional
     public CasSaveResult editBasic(List<SystemParameter> parameters) {
         CasSaveResult casSaveResult = afterSwitchDefaultLogin(parameters);
+        BasicInfo basicInfo = basicInfo();
         for (int i = 0; i < parameters.size(); i++) {
             SystemParameter parameter = parameters.get(i);
             SystemParameterExample example = new SystemParameterExample();
@@ -117,8 +155,10 @@ public class SystemParameterService {
             }
             example.clear();
         }
+        datasourceService.updateDatasourceStatusJob(basicInfo, parameters);
         return casSaveResult;
     }
+
 
     @Transactional
     public void resetCas() {
@@ -184,7 +224,6 @@ public class SystemParameterService {
     }
 
 
-
     public String getVersion() {
         return System.getenv("MS_VERSION");
     }
@@ -229,6 +268,20 @@ public class SystemParameterService {
                 FileMetadata fileMetadata = fileService.getFileMetadataById(systemParameter.getParamValue());
                 if (fileMetadata != null) {
                     systemParameterDTO.setFileName(fileMetadata.getName());
+                }
+            }
+            if (systemParameter.getType().equalsIgnoreCase("blob")) {
+                Map<String, DisplayXpackService> beansOfType = SpringContextUtil.getApplicationContext().getBeansOfType((DisplayXpackService.class));
+                DisplayXpackService displayXpackService = null;
+                if (beansOfType.keySet().size() > 0 && (displayXpackService = SpringContextUtil.getBean(DisplayXpackService.class)) != null) {
+                    String paramValue = systemParameter.getParamValue();
+                    if (StringUtils.isNotBlank(paramValue)) {
+                        long blobId = Long.parseLong(paramValue);
+                        String content = displayXpackService.readBlob(blobId);
+                        systemParameterDTO.setParamValue(content);
+                    }
+                } else {
+                    systemParameterDTO.setParamValue(null);
                 }
             }
             dtoList.add(systemParameterDTO);
@@ -284,10 +337,11 @@ public class SystemParameterService {
         }
 
     }
-    public BasicInfo templateMarketInfo(){
+
+    public BasicInfo templateMarketInfo() {
         BasicInfo basicInfo = new BasicInfo();
         List<SystemParameter> result = this.getParamList("basic.template");
-        if(CollectionUtils.isNotEmpty(result)){
+        if (CollectionUtils.isNotEmpty(result)) {
             result.stream().forEach(param -> {
                 if (StringUtils.equals(param.getParamKey(), ParamConstants.BASIC.TEMPLATE_MARKET_ULR.getValue())) {
                     basicInfo.setTemplateMarketUlr(param.getParamValue());
@@ -297,7 +351,7 @@ public class SystemParameterService {
                 }
             });
         }
-        if(StringUtils.isEmpty(basicInfo.getTemplateMarketUlr())|| StringUtils.isEmpty(basicInfo.getTemplateAccessKey())){
+        if (StringUtils.isEmpty(basicInfo.getTemplateMarketUlr()) || StringUtils.isEmpty(basicInfo.getTemplateAccessKey())) {
             DataEaseException.throwException("Please check market setting info");
         }
         return basicInfo;

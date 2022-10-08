@@ -122,7 +122,7 @@ export default {
   watch: {
     formatInfo: {
       handler(newVal, oldVla) {
-        this.$store.state.styleChangeTimes++
+        this.$store.commit('canvasChange')
       },
       deep: true
     }
@@ -198,7 +198,7 @@ export default {
     height: 35px;
     border-radius: 3px;
   }
-  >>>.el-popover{
+  ::v-deep .el-popover{
     height: 200px;
     overflow: auto;
   }

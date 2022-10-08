@@ -1,6 +1,6 @@
 <template>
   <de-container v-loading="$store.getters.loadingMap[$store.getters.currentPath]" :class="isAbsoluteContainer ? 'abs-container' : ''">
-    <de-main-container v-show="showChartCanvas">
+    <de-main-container v-show="showChartCanvas" class="">
       <div id="chartCanvas" class="canvas-class" :style="customStyle">
         <div class="canvas-class" :style="commonStyle">
           <plugin-com
@@ -8,9 +8,11 @@
             :component-name="chart.type + '-view'"
             :obj="{chart: mapChart || chart}"
             :chart="mapChart || chart"
+            :theme-style="element.commonBackground"
+            :canvas-style-data="canvasStyleData"
             class="chart-class"
           />
-          <chart-component v-else-if="!chart.type.includes('text') && chart.type !== 'label' && !chart.type.includes('table') && renderComponent() === 'echarts'" class="chart-class" :chart="mapChart || chart" />
+          <chart-component v-else-if="!chart.type.includes('text') && chart.type !== 'label' && !chart.type.includes('table') && renderComponent() === 'echarts'" :theme-style="element.commonBackground" class="chart-class" :chart="mapChart || chart" />
           <chart-component-g2 v-else-if="!chart.type.includes('text') && chart.type !== 'label' && !chart.type.includes('table') && renderComponent() === 'antv'" class="chart-class" :chart="chart" />
           <chart-component-s2 v-else-if="chart.type.includes('table') && renderComponent() === 'antv'" class="chart-class" :chart="chart" />
           <label-normal v-else-if="chart.type.includes('text')" :chart="chart" class="table-class" />
@@ -38,10 +40,11 @@ import ChartComponentG2 from '@/views/chart/components/ChartComponentG2'
 import PluginCom from '@/views/system/plugin/PluginCom'
 import ChartComponentS2 from '@/views/chart/components/ChartComponentS2'
 import LabelNormalText from '@/views/chart/components/normal/LabelNormalText'
-import { exportDetails } from '@/api/panel/panel'
+import { exportDetails, innerExportDetails } from '@/api/panel/panel'
 import html2canvas from 'html2canvasde'
 import { hexColorToRGBA } from '@/views/chart/chart/util'
-import { deepCopy, exportImg } from '@/components/canvas/utils/utils'
+import { deepCopy, exportImg, imgUrlTrans } from '@/components/canvas/utils/utils'
+import { getLinkToken, getToken } from '@/utils/auth'
 export default {
   name: 'UserViewDialog',
   components: { LabelNormalText, ChartComponentS2, ChartComponentG2, DeMainContainer, DeContainer, DeAsideContainer, ChartComponent, TableNormal, LabelNormal, PluginCom },
@@ -58,6 +61,7 @@ export default {
       type: String,
       default: 'details'
     }
+    
   },
   data() {
     return {
@@ -82,7 +86,7 @@ export default {
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && this.canvasStyleData.panel.imageUrl) {
           style = {
-            background: `url(${this.canvasStyleData.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.canvasStyleData.panel.imageUrl)}) no-repeat`,
             ...style
           }
         } else if (this.canvasStyleData.panel.backgroundType === 'color') {
@@ -97,20 +101,40 @@ export default {
       }
       return style
     },
+
+    svgInnerEnable() {
+      return !this.screenShot && this.element.commonBackground.enable && this.element.commonBackground.backgroundType === 'innerImage' && typeof this.element.commonBackground.innerImage === 'string'
+    },
+    mainSlotSvgInner() {
+      if (this.svgInnerEnable) {
+        return this.element.commonBackground.innerImage.replace('board/', '').replace('.svg', '')
+      } else {
+        return null
+      }
+    },
     commonStyle() {
-      const style = {}
-      if (this.element && this.element.commonBackground) {
+      const style = {
+        width: '100%',
+        height: '100%'
+      }
+      if (this.element.commonBackground) {
         style['padding'] = (this.element.commonBackground.innerPadding || 0) + 'px'
         style['border-radius'] = (this.element.commonBackground.borderRadius || 0) + 'px'
+        let colorRGBA = ''
+        if (this.element.commonBackground.backgroundColorSelect) {
+          colorRGBA = hexColorToRGBA(this.element.commonBackground.color, this.element.commonBackground.alpha)
+        }
         if (this.element.commonBackground.enable) {
-          if (this.element.commonBackground.backgroundType === 'innerImage') {
+          if (this.screenShot && this.element.commonBackground.backgroundType === 'innerImage' && typeof this.element.commonBackground.innerImage === 'string') {
             const innerImage = this.element.commonBackground.innerImage.replace('svg', 'png')
-            style['background'] = `url(${innerImage}) no-repeat`
-          } else if (this.element.commonBackground.backgroundType === 'outerImage') {
-            style['background'] = `url(${this.element.commonBackground.outerImage}) no-repeat`
-          } else if (this.element.commonBackground.backgroundType === 'color') {
-            style['background-color'] = hexColorToRGBA(this.element.commonBackground.color, this.element.commonBackground.alpha)
+            style['background'] = `url(${imgUrlTrans(innerImage)}) no-repeat ${colorRGBA}`
+          } else if (this.element.commonBackground.backgroundType === 'outerImage' && typeof this.element.commonBackground.outerImage === 'string') {
+            style['background'] = `url(${imgUrlTrans(this.element.commonBackground.outerImage)}) no-repeat ${colorRGBA}`
+          } else {
+            style['background-color'] = colorRGBA
           }
+        } else {
+          style['background-color'] = colorRGBA
         }
         style['overflow'] = 'hidden'
       }
@@ -153,8 +177,10 @@ export default {
       return null
     }
   },
-  mounted() {
+  created() {
     this.element = deepCopy(this.curComponent)
+  },
+  mounted() {
   },
   methods: {
     exportExcel() {
@@ -180,18 +206,27 @@ export default {
     },
     exportExcelDownload(snapshot, width, height) {
       const excelHeader = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.name)
+      const excelTypes = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.deType)
       const excelHeaderKeys = JSON.parse(JSON.stringify(this.chart.data.fields)).map(item => item.dataeaseName)
       const excelData = JSON.parse(JSON.stringify(this.chart.data.tableRow)).map(item => excelHeaderKeys.map(i => item[i]))
       const excelName = this.chart.name
       const request = {
+        viewId: this.chart.id,
         viewName: excelName,
         header: excelHeader,
         details: excelData,
+        excelTypes: excelTypes,
         snapshot: snapshot,
         snapshotWidth: width,
         snapshotHeight: height
       }
-      exportDetails(request).then((res) => {
+      let method = innerExportDetails
+      const token = this.$store.getters.token || getToken()
+      const linkToken = this.$store.getters.linkToken || getLinkToken()
+      if (!token && linkToken) {
+        method = exportDetails
+      }
+      method(request).then((res) => {
         const blob = new Blob([res], { type: 'application/vnd.ms-excel' })
         const link = document.createElement('a')
         link.style.display = 'none'
@@ -228,6 +263,7 @@ export default {
     height: 100%;
   }
   .canvas-class{
+    position: relative;
     width: 100%;
     height: 100%;
     background-size: 100% 100% !important;
@@ -236,5 +272,17 @@ export default {
     position: absolute;
     width: 100%;
     margin-left: -20px;
+    .ms-main-container {
+      padding: 0px !important;
+    }
   }
+
+  .svg-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
 </style>

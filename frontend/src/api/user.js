@@ -100,6 +100,27 @@ export function casStatus() {
   })
 }
 
+export function wecomStatus() {
+  return request({
+    url: '/api/auth/isOpenWecom',
+    method: 'post'
+  })
+}
+
+export function dingtalkStatus() {
+  return request({
+    url: '/api/auth/isOpenDingtalk',
+    method: 'post'
+  })
+}
+
+export function larkStatus() {
+  return request({
+    url: '/api/auth/isOpenLark',
+    method: 'post'
+  })
+}
+
 export function pluginLoaded() {
   return request({
     url: '/api/auth/isPluginLoaded',

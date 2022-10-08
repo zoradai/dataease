@@ -46,7 +46,7 @@
 
 <script>
     import {addRecent, getToken} from '@/common/utils'
-    import {linkInfo, switchLink, star, unstar, starStatus} from '@/api/panel'
+    import {linkInfo, switchLink, star, unstar, starStatus, viewPanelLog} from '@/api/panel'
 	const DETAIL_PAGE_PATH = '/pages/tabBar/home/detail'
 
 	// import htmlParser from '@/common/html-parser.js'
@@ -188,6 +188,10 @@
                         uni.hideLoading()
                     }
                 }, 1000);
+								const param = {panelId: this.banner.id, mobile: true}
+								viewPanelLog(param).then(res => {
+									
+								})
 
             },
 			caclViewHeight() {
@@ -219,13 +223,10 @@
                 uni.navigateBack(1)
             },
 			upper: function(e) {
-				console.log(e)
 			},
 			lower: function(e) {
-				console.log(e)
 			},
 			scroll: function(e) {
-				console.log(e)
 				this.old.scrollTop = e.detail.scrollTop
 			},
 			goTop: function(e) {

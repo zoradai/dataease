@@ -111,7 +111,7 @@ export default {
       } else {
         this.curActiveTabInner.streamMediaLinks = this.streamMediaInfoTemp
       }
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       bus.$emit('streamMediaLinksChange-' + this.curComponent.id)
       this.popoverClose()
     },
@@ -166,7 +166,7 @@ export default {
     border-radius: 3px;
   }
 
-  >>> .el-popover {
+  ::v-deep .el-popover {
     height: 200px;
     overflow: auto;
   }

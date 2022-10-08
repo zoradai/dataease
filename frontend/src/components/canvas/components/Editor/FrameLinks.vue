@@ -84,7 +84,7 @@ export default {
       } else {
         this.curActiveTabInner.frameLinks = this.linkInfoTemp
       }
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       bus.$emit('frameLinksChange-' + this.curComponent.id)
       this.popoverClose()
     },
@@ -137,7 +137,7 @@ export default {
     height: 35px;
     border-radius: 3px;
   }
-  >>>.el-popover{
+  ::v-deep .el-popover{
     height: 200px;
     overflow: auto;
   }

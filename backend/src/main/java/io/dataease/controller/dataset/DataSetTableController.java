@@ -11,10 +11,10 @@ import io.dataease.controller.request.dataset.DataSetTableRequest;
 import io.dataease.controller.response.DataSetDetail;
 import io.dataease.dto.dataset.DataSetTableDTO;
 import io.dataease.dto.dataset.ExcelFileData;
-import io.dataease.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.base.domain.DatasetTable;
 import io.dataease.plugins.common.base.domain.DatasetTableField;
 import io.dataease.plugins.common.base.domain.DatasetTableIncrementalConfig;
+import io.dataease.plugins.common.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.dto.datasource.TableField;
 import io.dataease.service.dataset.DataSetTableService;
 import io.swagger.annotations.*;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -44,8 +45,8 @@ public class DataSetTableController {
     }, logical = Logical.AND)
     @ApiOperation("批量保存")
     @PostMapping("batchAdd")
-    public void batchAdd(@RequestBody List<DataSetTableRequest> datasetTable) throws Exception {
-        dataSetTableService.batchInsert(datasetTable);
+    public List<DatasetTable> batchAdd(@RequestBody List<DataSetTableRequest> datasetTable) throws Exception {
+        return dataSetTableService.batchInsert(datasetTable);
     }
 
     @DePermissions(value = {
@@ -55,11 +56,11 @@ public class DataSetTableController {
     }, logical = Logical.AND)
     @ApiOperation("更新")
     @PostMapping("update")
-    public void save(@RequestBody DataSetTableRequest datasetTable) throws Exception {
+    public List<DatasetTable> save(@RequestBody DataSetTableRequest datasetTable) throws Exception {
         if (datasetTable.getType().equalsIgnoreCase("excel")) {
-            dataSetTableService.saveExcel(datasetTable);
+            return dataSetTableService.saveExcel(datasetTable);
         } else {
-            dataSetTableService.save(datasetTable);
+            return Collections.singletonList(dataSetTableService.save(datasetTable));
         }
     }
 
@@ -70,11 +71,11 @@ public class DataSetTableController {
     @ApiOperation("修改")
     @PostMapping("alter")
     @DeLog(
-        operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
-        sourcetype = SysLogConstants.SOURCE_TYPE.DATASET,
-        value = "id",
-        positionIndex = 0,
-        positionKey = "sceneId"
+            operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
+            sourcetype = SysLogConstants.SOURCE_TYPE.DATASET,
+            value = "id",
+            positionIndex = 0,
+            positionKey = "sceneId"
     )
     public void alter(@RequestBody DataSetTableRequest request) throws Exception {
         dataSetTableService.alter(request);
@@ -133,6 +134,16 @@ public class DataSetTableController {
     @PostMapping("getPreviewData/{page}/{pageSize}")
     public Map<String, Object> getPreviewData(@RequestBody DataSetTableRequest dataSetTableRequest, @PathVariable Integer page, @PathVariable Integer pageSize) throws Exception {
         return dataSetTableService.getPreviewData(dataSetTableRequest, page, pageSize, null);
+    }
+
+    @ApiOperation("db数据库表预览数据")
+    @PostMapping("dbPreview")
+    @DePermissions(value = {
+            @DePermission(type = DePermissionType.DATASET, value = "id", level = ResourceAuthLevel.DATASET_LEVEL_USE),
+            @DePermission(type = DePermissionType.DATASOURCE, value = "dataSourceId", level = ResourceAuthLevel.DATASOURCE_LEVEL_USE)
+    }, logical = Logical.AND)
+    public Map<String, Object> getDBPreview(@RequestBody DataSetTableRequest dataSetTableRequest) throws Exception {
+        return dataSetTableService.getDBPreview(dataSetTableRequest);
     }
 
     @ApiOperation("根据sql查询预览数据")
@@ -211,8 +222,14 @@ public class DataSetTableController {
     }
 
     @ApiOperation("根据仪表板视图ID查询数据集变量")
-    @PostMapping("/paramsWithIds")
-    List<SqlVariableDetails> paramsWithIds(@RequestBody List<String> viewIds){
-        return dataSetTableService.paramsWithIds(viewIds);
-    };
+    @PostMapping("/paramsWithIds/{type}")
+    List<SqlVariableDetails> paramsWithIds(@PathVariable String type, @RequestBody List<String> viewIds) {
+        return dataSetTableService.paramsWithIds(type, viewIds);
+    }
+
+    @ApiOperation("根据数据集文件夹ID查询数据集名称")
+    @PostMapping("/getDatasetNameFromGroup/{sceneId}")
+    public List<String> getDatasetNameFromGroup(@PathVariable String sceneId) {
+        return dataSetTableService.getDatasetNameFromGroup(sceneId);
+    }
 }

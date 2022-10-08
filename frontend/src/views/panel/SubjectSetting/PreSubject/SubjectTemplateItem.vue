@@ -133,6 +133,7 @@ import { chartTransStr2Object } from '@/views/panel/panel'
 import { mapState } from 'vuex'
 import bus from '@/utils/bus'
 import { saveOrUpdateSubject } from '@/api/panel/panel'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   name: 'StyleTemplateItem',
@@ -159,7 +160,7 @@ export default {
           style = {
             width: '100%',
             height: '100%',
-            background: `url(${this.subjectItemDetails.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.subjectItemDetails.panel.imageUrl)}) no-repeat`,
             'background-size': '100% 100% !important'
           }
         } else {
@@ -261,7 +262,8 @@ export default {
         this.$confirm(this.$t('panel.theme_change_tips'), this.$t('panel.theme_change_warn'), {
           confirmButtonText: this.$t('commons.confirm'),
           cancelButtonText: this.$t('commons.cancel'),
-          type: 'warning'
+          type: 'warning',
+          showClose: false
         }).then(() => {
           this.$store.commit('setCanvasStyle', JSON.parse(this.subjectItem.details))
           this.$store.commit('recordSnapshot', 'subjectChange')

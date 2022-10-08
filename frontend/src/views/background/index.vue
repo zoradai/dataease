@@ -49,9 +49,9 @@
           </span>
         </el-col>
       </el-row>
-      <el-row v-if="curComponent.commonBackground.enable" style="padding-left: 20px">
+      <el-row v-if="curComponent.commonBackground.enable" style="padding-left: 10px">
         <el-row style="height: 80px;margin-top:10px;margin-bottom:20px;overflow: hidden">
-          <el-col :span="3" style="padding-left: 10px">
+          <el-col :span="4" style="padding-left: 10px">
             <el-radio v-model="curComponent.commonBackground.backgroundType" label="outerImage" @change="onChangeType">{{ $t('panel.photo') }}</el-radio>
           </el-col>
           <el-col style="width: 130px!important;">
@@ -74,12 +74,13 @@
           </el-col>
         </el-row>
         <el-row>
-          <el-col :span="3" style="padding-left: 10px">
+          <el-col :span="4" style="padding-left: 10px;position: relative">
             <el-radio v-model="curComponent.commonBackground.backgroundType" label="innerImage" @change="onChangeType">边框</el-radio>
+            <el-color-picker v-model="curComponent.commonBackground.innerImageColor" :title="'边框配色'" style="position: absolute;right:15px;top: -3px" size="mini" class="color-picker-style" :predefine="predefineColors" />
           </el-col>
-          <el-col :span="21" class="main-row">
+          <el-col :span="20" class="main-row">
             <el-row v-for="(value, key) in BackgroundShowMap" :key="key">
-              <el-col :span="24"><span>{{ key }}</span> </el-col>
+
               <el-col
                 v-for="item in value"
                 :key="item.id"
@@ -131,7 +132,7 @@
 import { queryBackground } from '@/api/background/background'
 import BackgroundItem from '@/views/background/BackgroundItem'
 import { mapState } from 'vuex'
-import { deepCopy } from '@/components/canvas/utils/utils'
+import { deepCopy, imgUrlTrans } from '@/components/canvas/utils/utils'
 import { COLOR_PANEL } from '@/views/chart/chart/chart'
 import { uploadFileResult } from '@/api/staticResource/staticResource'
 import { COMMON_BACKGROUND_NONE } from '@/components/canvas/custom-component/component-list'
@@ -164,13 +165,13 @@ export default {
       'componentData'
     ]),
     isFilterComponent() {
-      return ['de-select', 'de-select-grid', 'de-date',  "de-input-search", "de-number-range", "de-select-tree"].includes(this.curComponent.component)
+      return ['de-select', 'de-select-grid', 'de-date', 'de-input-search', 'de-number-range', 'de-select-tree'].includes(this.curComponent.component)
     }
   },
   methods: {
     init() {
       if (this.curComponent && this.curComponent.commonBackground && this.curComponent.commonBackground.outerImage && typeof (this.curComponent.commonBackground.outerImage) === 'string') {
-        this.fileList.push({ url: this.curComponent.commonBackground.outerImage })
+        this.fileList.push({ url: imgUrlTrans(this.curComponent.commonBackground.outerImage) })
       }
       this.backgroundOrigin = deepCopy(this.curComponent.commonBackground ? this.curComponent.commonBackground : COMMON_BACKGROUND_NONE)
       this.queryBackground()
@@ -239,16 +240,16 @@ export default {
     margin: 15px 0px 5px;
     text-align: center;
   }
-  .avatar-uploader>>>.el-upload {
+  .avatar-uploader ::v-deep .el-upload {
     width: 120px;
     height: 80px;
     line-height: 90px;
   }
-  .avatar-uploader>>>.el-upload-list li{
+  .avatar-uploader ::v-deep .el-upload-list li{
     width: 120px !important;
     height: 80px !important;
   }
-  .disabled>>>.el-upload--picture-card {
+  .disabled ::v-deep .el-upload--picture-card {
     display: none;
   }
   .shape-item{
@@ -259,11 +260,11 @@ export default {
     justify-content: space-between;
     align-items: center;
   }
-  .form-item-slider>>>.el-form-item__label{
+  .form-item-slider ::v-deep .el-form-item__label{
     font-size: 12px;
     line-height: 38px;
   }
-  .form-item>>>.el-form-item__label{
+  .form-item ::v-deep .el-form-item__label{
     font-size: 12px;
   }
   .el-select-dropdown__item{

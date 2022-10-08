@@ -1,8 +1,8 @@
 <template>
   <div class="de-tabs-div">
-    <async-solt-component
+
+    <dataease-tabs
       v-model="activeTabName"
-      :url="url"
       type="card"
       style-type="radioGroup"
       class="de-tabs-height"
@@ -15,8 +15,7 @@
       @tab-add="addTab"
       @tab-click="handleClick"
     >
-      <!--  <plugin-com ref="dataease-tabs" v-model="activeTabName" type="card" class="de-tabs" component-name="dataease-tabs" @tab-click="handleClick"> -->
-      <!-- <el-tabs v-model="activeTabName" type="card" class="de-tabs" @tab-click="handleClick"> -->
+
       <el-tab-pane
         v-for="(item, index) in element.options.tabList"
         :key="item.name+index"
@@ -29,7 +28,6 @@
           <el-dropdown v-if="dropdownShow" slot="label" class="de-tab-drop" trigger="click" @command="handleCommand">
             <span class="el-dropdown-link">
 
-              <!-- <span>{{ item.title }}</span> -->
               <i v-if="isEdit" class="de-tab-i el-icon-arrow-down el-icon--right" />
             </span>
 
@@ -85,8 +83,7 @@
         </div>
 
       </el-tab-pane>
-    </async-solt-component>
-    <!-- </el-tabs> -->
+    </dataease-tabs>
 
     <el-dialog
       :title="$t('detabs.eidttitle')"
@@ -153,7 +150,7 @@
 </template>
 
 <script>
-import AsyncSoltComponent from '@/components/AsyncSoltComponent'
+import DataeaseTabs from '@/components/dataease-tabs'
 import ViewSelect from '@/views/panel/ViewSelect'
 import { uuid } from 'vue-uuid'
 import bus from '@/utils/bus'
@@ -162,11 +159,11 @@ import { mapState } from 'vuex'
 import { chartCopy } from '@/api/chart/chart'
 import { buildFilterMap } from '@/utils/conditionUtil'
 import TabUseList from '@/views/panel/AssistComponent/tabUseList'
-import { $error } from '@/utils/message'
+import {findPanelElementInfo} from "@/api/panel/panel";
 
 export default {
   name: 'DeTabls',
-  components: { TabUseList, ViewSelect, AsyncSoltComponent },
+  components: { TabUseList, ViewSelect, DataeaseTabs },
   props: {
     element: {
       type: Object,
@@ -208,18 +205,12 @@ export default {
       activeTabName: null,
 
       tabIndex: 1,
-      // isEdit: true,
       dialogVisible: false,
       textarea: '',
       curItem: null,
       viewDialogVisible: false,
       otherComponentDialogVisible: false,
       url: '/api/pluginCommon/component/dataease-tabs'
-      /* fontColor: '#999999',
-        activeColor: '#f18406',
-
-        borderColor: '#999999',
-        borderActiveColor: '#f18406' */
 
     }
   },
@@ -261,6 +252,9 @@ export default {
     },
     isCurrentEdit() {
       return this.isEdit && this.curComponent && this.curComponent.id === this.element.id
+    },
+    themeStyle() {
+      return this.element.commonBackground
     }
   },
   watch: {
@@ -286,21 +280,39 @@ export default {
         })
         if (newVal && activeTabInner) {
           this.$store.commit('setCurActiveTabInner', activeTabInner)
+          this.$store.dispatch('chart/setViewId', activeTabInner.propValue.viewId)
         } else {
           this.$store.commit('setCurActiveTabInner', null)
         }
       }
-
+    },
+    'themeStyle.color'(value, old) {
+      if (value !== old) {
+        this.setContentThemeStyle()
+      }
+    },
+    'themeStyle.backgroundColorSelect'(value, old) {
+      if (value !== old) {
+        this.setContentThemeStyle()
+      }
     }
   },
   created() {
     bus.$on('add-new-tab', this.addNewTab)
     this.activeTabName = this.element.options.tabList[0].name
+    this.setContentThemeStyle()
   },
   beforeDestroy() {
     bus.$off('add-new-tab', this.addNewTab)
   },
   methods: {
+    setContentThemeStyle() {
+      this.element.options.tabList.forEach(tab => {
+        if(tab.content && tab.content.type === 'view') {
+          tab.content.commonBackground = this.themeStyle ? JSON.parse(JSON.stringify(this.themeStyle)) : null
+        }
+      })
+    },
     beforeHandleCommond(item, param) {
       return {
         'command': item,
@@ -368,7 +380,6 @@ export default {
       const newComponentId = uuid.v1()
       const componentInfo = {
         type: 'view',
-        /* id: node.id */
         id: node.innerId
       }
 
@@ -377,11 +388,14 @@ export default {
           component = JSON.parse(JSON.stringify(componentTemp))
           const propValue = {
             id: newComponentId,
-            viewId: componentInfo.id
+            viewId: componentInfo.id,
+            textValue: ''
           }
           component.propValue = propValue
           component.filters = []
           component.linkageFilters = []
+          if(this.themeStyle)
+          component.commonBackground = JSON.parse(JSON.stringify(this.themeStyle))
         }
       })
       component.id = newComponentId
@@ -393,10 +407,20 @@ export default {
         this.curItem.name = newComponentId
         this.viewDialogVisible = false
         this.activeTabName = newComponentId
-        this.$store.dispatch('chart/setViewId', component.propValue.viewId)
-        this.styleChange()
+        if(node.modelInnerType==='richTextView'){
+          findPanelElementInfo(node.innerId).then(viewElement =>{
+            if(viewElement.data){
+              this.curItem.content.propValue.textValue = viewElement.data.propValue.textValue
+            }
+            this.$store.dispatch('chart/setViewId', component.propValue.viewId)
+            this.styleChange()
+          })
+        }else{
+          this.$store.dispatch('chart/setViewId', component.propValue.viewId)
+          this.styleChange()
+        }
       })
-      // this.setComponentInfo()
+
     },
 
     setComponentInfo() {
@@ -444,10 +468,9 @@ export default {
       this.styleChange()
     },
     styleChange() {
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
     },
     chartResize() {
-      // this.$refs[this.activeTabName]
     },
     handleClick(tab) {
       const name = tab.name

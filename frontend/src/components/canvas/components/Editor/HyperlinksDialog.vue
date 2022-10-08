@@ -54,7 +54,7 @@ export default {
     onSubmit() {
       this.linkInfo.content = checkAddHttp(this.linkInfo.content)
       this.curComponent.hyperlinks = deepCopy(this.linkInfo)
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       this.onClose()
     },
     onClose() {
@@ -102,7 +102,7 @@ export default {
     height: 35px;
     border-radius: 3px;
   }
-  >>>.el-popover{
+  ::v-deep .el-popover{
     height: 200px;
     overflow: auto;
   }

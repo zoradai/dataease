@@ -43,6 +43,7 @@ export function listDriverByType(type) {
     method: 'get'
   })
 }
+
 export function addDs(data) {
   return request({
     url: 'datasource/add/',
@@ -147,4 +148,11 @@ export function updateDriver(data) {
   })
 }
 
-export default { dsGrid, addDs, editDs, delDs, validateDs, listDatasource, getSchema }
+export function getDatasourceDetail(id) {
+  return request({
+    url: `/datasource/get/${id}`,
+    loading: true,
+    method: 'post',
+  })
+}
+export default { getDatasourceDetail, dsGrid, addDs, editDs, delDs, validateDs, listDatasource, getSchema }

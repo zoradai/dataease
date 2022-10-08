@@ -35,7 +35,7 @@
 import { panelSave, panelUpdate } from '@/api/panel/panel'
 import { showTemplateList } from '@/api/system/template'
 import TemplateAllList from './TemplateAllList'
-import { deepCopy } from '@/components/canvas/utils/utils'
+import {deepCopy, imgUrlTrans} from '@/components/canvas/utils/utils'
 
 export default {
   components: { TemplateAllList },
@@ -68,7 +68,7 @@ export default {
     classBackground() {
       if (this.importTemplateInfo.snapshot) {
         return {
-          background: `url(${this.importTemplateInfo.snapshot}) no-repeat`
+          background: `url(${imgUrlTrans(this.importTemplateInfo.snapshot)}) no-repeat`
         }
       } else {
         return {}
@@ -208,16 +208,16 @@ export default {
 
 <style scoped>
 
-.my_table >>> .el-table__row>td{
+.my_table ::v-deep .el-table__row>td{
   /* 去除表格线 */
   border: none;
   padding: 0 0;
 }
-.my_table >>> .el-table th.is-leaf {
+.my_table ::v-deep .el-table th.is-leaf {
   /* 去除上边框 */
     border: none;
 }
-.my_table >>> .el-table::before{
+.my_table ::v-deep .el-table::before{
   /* 去除下边框 */
   height: 0;
 }

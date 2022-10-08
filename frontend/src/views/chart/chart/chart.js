@@ -18,12 +18,14 @@ export const DEFAULT_COLOR_CASE = {
   alpha: 100,
   tableHeaderBgColor: '#6D9A49',
   tableItemBgColor: '#FFFFFF',
+  tableHeaderFontColor: '#000000',
   tableFontColor: '#000000',
   tableStripe: true,
   dimensionColor: '#000000',
   quotaColor: '#4E81BB',
   tableBorderColor: '#E6E7E4',
-  seriesColors: [] // 格式：{"name":"s1","color":"","isCustom":false}
+  seriesColors: [], // 格式：{"name":"s1","color":"","isCustom":false}
+  areaBorderColor: '#303133'
 }
 
 export const DEFAULT_COLOR_CASE_DARK = {
@@ -37,7 +39,8 @@ export const DEFAULT_COLOR_CASE_DARK = {
   dimensionColor: '#ffffff',
   quotaColor: '#4E81BB',
   tableBorderColor: '#CCCCCC',
-  seriesColors: [] // 格式：{"name":"s1","color":"","isCustom":false}
+  seriesColors: [], // 格式：{"name":"s1","color":"","isCustom":false}
+  areaBorderColor: '#EBEEF5'
 }
 export const DEFAULT_SIZE = {
   barDefault: true,
@@ -65,7 +68,17 @@ export const DEFAULT_SIZE = {
   tableColumnWidth: 100,
   tableHeaderAlign: 'left',
   tableItemAlign: 'right',
+  gaugeMinType: 'fix', // fix or dynamic
+  gaugeMinField: {
+    id: '',
+    summary: ''
+  },
   gaugeMin: 0,
+  gaugeMaxType: 'fix', // fix or dynamic
+  gaugeMaxField: {
+    id: '',
+    summary: ''
+  },
   gaugeMax: 100,
   gaugeStartAngle: 225,
   gaugeEndAngle: -45,
@@ -116,7 +129,8 @@ export const DEFAULT_LABEL = {
     suffix: '', // 单位后缀
     decimalCount: 2, // 小数位数
     thousandSeparator: true// 千分符
-  }
+  },
+  reserveDecimalCount: 2 // 百分比堆叠柱状图保留小数位数
 }
 export const DEFAULT_TOOLTIP = {
   show: true,
@@ -204,6 +218,15 @@ export const DEFAULT_LEGEND_STYLE = {
     fontSize: '12'
   }
 }
+
+export const DEFAULT_MARGIN_STYLE = {
+  marginModel: 'auto',
+  marginTop: 40,
+  marginBottom: 44,
+  marginLeft: 15,
+  marginRight: 10
+}
+
 export const DEFAULT_XAXIS_STYLE = {
   show: true,
   position: 'bottom',
@@ -369,7 +392,10 @@ export const DEFAULT_SPLIT = {
 }
 export const DEFAULT_FUNCTION_CFG = {
   sliderShow: false,
-  sliderRange: [0, 10]
+  sliderRange: [0, 10],
+  sliderBg: '#FFFFFF',
+  sliderFillBg: '#BCD6F1',
+  sliderTextClolor: '#999999'
 }
 export const DEFAULT_THRESHOLD = {
   gaugeThreshold: '',
@@ -825,7 +851,15 @@ export const BASE_MAP = {
       type: 'map',
       map: 'MAP',
       roam: true,
-      data: []
+      data: [],
+      itemStyle: {
+        normal: {
+
+        },
+        emphasis: {
+
+        }
+      }
     }
   ]
 }

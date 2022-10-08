@@ -1,5 +1,5 @@
 <template>
-  <div ref="tableContainer" :style="bg_class" style="width: 100%;height: 100%;overflow: hidden;">
+  <div ref="tableContainer" :style="bg_class" style="padding: 8px;width: 100%;height: 100%;overflow: hidden;">
     <span v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
       <div>
         <p style="padding:6px 4px 0;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
@@ -243,6 +243,13 @@ export default {
                 this.label_content_class.color = t.color
                 flag = true
               }
+            } else if (t.term === 'between') {
+              const min = parseFloat(t.min)
+              const max = parseFloat(t.max)
+              if (min <= value && value <= max) {
+                this.label_content_class.color = t.color
+                flag = true
+              }
             }
             if (flag) {
               break
@@ -259,6 +266,10 @@ export default {
     resultFormat() {
       if (!this.chart.data) return
       const value = this.chart.data.series[0].data[0]
+      if (value === null || value === undefined) {
+        this.result = '-'
+        return
+      }
       let yAxis = []
       try {
         yAxis = JSON.parse(this.chart.yaxis)
@@ -282,7 +293,7 @@ export default {
 </script>
 
 <style scoped>
-.table-class>>>.body--wrapper{
+.table-class ::v-deep .body--wrapper{
   background: rgba(1,1,1,0);
 }
 </style>

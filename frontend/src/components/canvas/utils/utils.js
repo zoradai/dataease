@@ -122,6 +122,7 @@ export function panelDataPrepare(componentData, componentStyle, callback) {
     item.mobileStyle = (item.mobileStyle || deepCopy(BASE_MOBILE_STYLE))
     item.hyperlinks = (item.hyperlinks || deepCopy(HYPERLINKS))
     item.commonBackground = item.commonBackground || deepCopy(COMMON_BACKGROUND_NONE)
+    item.commonBackground['innerImageColor'] = item.commonBackground['innerImageColor'] || '#1094E5'
     // Multi choice of colors and pictures
     if (item.commonBackground.backgroundType === 'color') {
       item.commonBackground['backgroundColorSelect'] = item.commonBackground.enable
@@ -214,4 +215,13 @@ export function colorReverse(OldColorValue) {
   OldColorValue = '0x' + OldColorValue.replace(/#/g, '')
   const str = '000000' + (0xFFFFFF - OldColorValue).toString(16)
   return '#' + str.substring(str.length - 6, str.length)
+}
+
+export function imgUrlTrans(url) {
+  if(url && typeof url === 'string' && url.indexOf('static-resource') > -1){
+    return process.env.VUE_APP_BASE_API + url.replace('/static-resource','static-resource')
+  }else {
+    return url
+  }
+
 }

@@ -94,6 +94,9 @@
           <el-form-item v-show="showProperty('tableItemBgColor')" :label="$t('chart.table_item_bg')" class="form-item">
             <el-color-picker v-model="colorForm.tableItemBgColor" class="color-picker-style" :predefine="predefineColors" @change="changeColorCase('tableItemBgColor')" />
           </el-form-item>
+          <el-form-item v-show="showProperty('tableHeaderFontColor')" :label="$t('chart.table_header_font_color')" class="form-item">
+            <el-color-picker v-model="colorForm.tableHeaderFontColor" class="color-picker-style" :predefine="predefineColors" @change="changeColorCase('tableHeaderFontColor')" />
+          </el-form-item>
           <el-form-item v-show="showProperty('tableFontColor')" :label="$t('chart.table_item_font_color')" class="form-item">
             <el-color-picker v-model="colorForm.tableFontColor" class="color-picker-style" :predefine="predefineColors" @change="changeColorCase('tableFontColor')" />
           </el-form-item>
@@ -104,6 +107,10 @@
 
         <el-form-item v-show="showProperty('alpha')" :label="$t('chart.not_alpha')" class="form-item form-item-slider">
           <el-slider v-model="colorForm.alpha" show-input :show-input-controls="false" input-size="mini" @change="changeColorCase('alpha')" />
+        </el-form-item>
+
+        <el-form-item v-show="showProperty('area-border-color') " :label="$t('chart.area_border_color')" class="form-item">
+          <el-color-picker v-model="colorForm.areaBorderColor" class="color-picker-style" :predefine="predefineColors" @change="changeColorCase('areaBorderColor')" />
         </el-form-item>
       </el-form>
     </el-col>
@@ -296,6 +303,7 @@ export default {
           }
 
           this.colorForm.tableBorderColor = this.colorForm.tableBorderColor ? this.colorForm.tableBorderColor : DEFAULT_COLOR_CASE.tableBorderColor
+          this.colorForm.tableHeaderFontColor = this.colorForm.tableHeaderFontColor ? this.colorForm.tableHeaderFontColor : this.colorForm.tableFontColor
 
           this.initCustomColor()
         }
@@ -330,6 +338,7 @@ export default {
       if (!this.batchOptStatus && this.chart.render && this.chart.render === 'antv' &&
         (this.chart.type.includes('bar') ||
           this.chart.type.includes('line') ||
+          this.chart.type.includes('area') ||
           this.chart.type.includes('pie') ||
           this.chart.type === 'funnel' ||
           this.chart.type === 'radar' ||
@@ -353,11 +362,11 @@ export default {
   justify-content: space-between;
   align-items: center
 }
-.form-item-slider>>>.el-form-item__label{
+.form-item-slider ::v-deep .el-form-item__label{
   font-size: 12px;
   line-height: 38px;
 }
-.form-item>>>.el-form-item__label{
+.form-item ::v-deep .el-form-item__label{
   font-size: 12px;
 }
 .el-select-dropdown__item{
@@ -378,14 +387,14 @@ export default {
     width: 60px;
   }
 
-  .color-type>>>.el-radio__input{
+  .color-type ::v-deep .el-radio__input{
     display: none;
   }
   .el-radio{
     margin:0 2px 0 0!important;
     border: 1px solid transparent;
   }
-  .el-radio>>>.el-radio__label{
+  .el-radio ::v-deep .el-radio__label{
     padding-left: 0;
   }
 

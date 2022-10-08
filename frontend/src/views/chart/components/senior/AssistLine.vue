@@ -16,9 +16,13 @@
           </el-col>
           <el-col :span="8">
             <span v-if="item.field === '0'" :title="$t('chart.field_fixed')">{{ $t('chart.field_fixed') }}</span>
+            <span v-if="item.field === '1'" :title="$t('chart.field_dynamic')">{{ $t('chart.field_dynamic') }}</span>
           </el-col>
-          <el-col :span="8">
+          <el-col v-if="item.field === '0'" :span="8">
             <span :title="item.value">{{ item.value }}</span>
+          </el-col>
+          <el-col v-if="item.field === '1'" :span="8">
+            <span :title="item.curField.name + '(' + $t('chart.' + item.summary) + ')'">{{ item.curField.name + '(' + $t('chart.' + item.summary) + ')' }}</span>
           </el-col>
         </el-row>
       </el-col>
@@ -34,7 +38,7 @@
       width="70%"
       class="dialog-css"
     >
-      <assist-line-edit :line="assistLine" @onAssistLineChange="lineChange" />
+      <assist-line-edit :line="assistLine" :quota-fields="quotaData" @onAssistLineChange="lineChange" />
       <div slot="footer" class="dialog-footer">
         <el-button size="mini" @click="closeEditLine">{{ $t('chart.cancel') }}</el-button>
         <el-button type="primary" size="mini" @click="changeLine">{{ $t('chart.confirm') }}</el-button>
@@ -52,13 +56,18 @@ export default {
     chart: {
       type: Object,
       required: true
+    },
+    quotaData: {
+      type: Array,
+      required: true
     }
   },
   data() {
     return {
       assistLine: [],
       editLineDialog: false,
-      lineArr: []
+      lineArr: [],
+      quotaFields: []
     }
   },
   watch: {
@@ -114,21 +123,40 @@ export default {
           })
           return
         }
-        if (!ele.value) {
-          this.$message({
-            message: this.$t('chart.value_can_not_empty'),
-            type: 'error',
-            showClose: true
-          })
-          return
-        }
-        if (parseFloat(ele.value).toString() === 'NaN') {
-          this.$message({
-            message: this.$t('chart.value_error'),
-            type: 'error',
-            showClose: true
-          })
-          return
+        if (ele.field === '0') {
+          if (!ele.value) {
+            this.$message({
+              message: this.$t('chart.value_can_not_empty'),
+              type: 'error',
+              showClose: true
+            })
+            return
+          }
+          if (parseFloat(ele.value).toString() === 'NaN') {
+            this.$message({
+              message: this.$t('chart.value_error'),
+              type: 'error',
+              showClose: true
+            })
+            return
+          }
+        } else {
+          if (!ele.fieldId || ele.fieldId === '') {
+            this.$message({
+              message: this.$t('chart.field_not_empty'),
+              type: 'error',
+              showClose: true
+            })
+            return
+          }
+          if (!ele.summary || ele.summary === '') {
+            this.$message({
+              message: this.$t('chart.summary_not_empty'),
+              type: 'error',
+              showClose: true
+            })
+            return
+          }
         }
       }
       this.assistLine = JSON.parse(JSON.stringify(this.lineArr))
@@ -148,11 +176,11 @@ export default {
   justify-content: space-between;
   align-items: center;
 }
-.form-item-slider>>>.el-form-item__label{
+.form-item-slider ::v-deep .el-form-item__label{
   font-size: 12px;
   line-height: 38px;
 }
-.form-item>>>.el-form-item__label{
+.form-item ::v-deep .el-form-item__label{
   font-size: 12px;
 }
 .el-select-dropdown__item{
@@ -178,7 +206,7 @@ span{
 .line-style{
 
 }
-.line-style >>> span{
+.line-style ::v-deep span{
   display: inline-block;
   width: 100%;
   white-space: nowrap;
@@ -187,15 +215,15 @@ span{
   padding: 0 10px;
 }
 
-.dialog-css >>> .el-dialog__title {
+.dialog-css ::v-deep .el-dialog__title {
   font-size: 14px;
 }
 
-.dialog-css >>> .el-dialog__header {
+.dialog-css ::v-deep .el-dialog__header {
   padding: 20px 20px 0;
 }
 
-.dialog-css >>> .el-dialog__body {
+.dialog-css ::v-deep .el-dialog__body {
   padding: 10px 20px 20px;
 }
 </style>

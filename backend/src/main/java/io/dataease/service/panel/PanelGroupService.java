@@ -1,20 +1,24 @@
 package io.dataease.service.panel;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import io.dataease.auth.annotation.DeCleaner;
 import io.dataease.commons.constants.*;
 import io.dataease.commons.utils.*;
 import io.dataease.controller.request.authModel.VAuthModelRequest;
 import io.dataease.controller.request.dataset.DataSetTableRequest;
-import io.dataease.controller.request.panel.PanelGroupBaseInfoRequest;
-import io.dataease.controller.request.panel.PanelGroupRequest;
-import io.dataease.controller.request.panel.PanelTemplateRequest;
-import io.dataease.controller.request.panel.PanelViewDetailsRequest;
+import io.dataease.controller.request.panel.*;
+import io.dataease.dto.DatasourceDTO;
 import io.dataease.dto.PanelGroupExtendDataDTO;
 import io.dataease.dto.SysLogDTO;
 import io.dataease.dto.authModel.VAuthModelDTO;
 import io.dataease.dto.chart.ChartViewDTO;
+import io.dataease.dto.dataset.DataSetGroupDTO;
 import io.dataease.dto.dataset.DataSetTableDTO;
+import io.dataease.dto.dataset.DataSetTaskDTO;
+import io.dataease.dto.panel.PanelExport2App;
 import io.dataease.dto.panel.PanelGroupDTO;
 import io.dataease.dto.panel.PanelTemplateFileDTO;
 import io.dataease.dto.panel.po.PanelViewInsertDTO;
@@ -24,7 +28,10 @@ import io.dataease.i18n.Translator;
 import io.dataease.listener.util.CacheUtils;
 import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.*;
+import io.dataease.plugins.common.constants.DeTypeConstants;
+import io.dataease.service.chart.ChartGroupService;
 import io.dataease.service.chart.ChartViewService;
+import io.dataease.service.dataset.DataSetGroupService;
 import io.dataease.service.dataset.DataSetTableService;
 import io.dataease.service.staticResource.StaticResourceService;
 import io.dataease.service.sys.SysAuthService;
@@ -37,6 +44,7 @@ import org.pentaho.di.core.util.UUIDUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.Base64Utils;
 
@@ -104,6 +112,24 @@ public class PanelGroupService {
     private ExtPanelGroupExtendDataMapper extPanelGroupExtendDataMapper;
     @Resource
     private StaticResourceService staticResourceService;
+    @Resource
+    private ExtChartViewFieldMapper extChartViewFieldMapper;
+    @Resource
+    private ExtDataSetTableFieldMapper extDataSetTableFieldMapper;
+    @Resource
+    private ExtDataSetTaskMapper extDataSetTaskMapper;
+    @Resource
+    private ExtDataSourceMapper extDataSourceMapper;
+    @Resource
+    private PanelAppTemplateService panelAppTemplateService;
+    @Resource
+    private PanelAppTemplateMapper panelAppTemplateMapper;
+    @Resource
+    private PanelAppTemplateLogService appTemplateLogService;
+    @Resource
+    private ChartGroupService chartGroupService;
+    @Resource
+    private DataSetGroupService dataSetGroupService;
 
     public List<PanelGroupDTO> tree(PanelGroupRequest panelGroupRequest) {
         String userId = String.valueOf(AuthUtils.getUser().getUserId());
@@ -130,6 +156,7 @@ public class PanelGroupService {
         clearPermissionCache();
         sysAuthService.copyAuth(panelId, SysAuthConstants.AUTH_SOURCE_TYPE_PANEL);
         DeLogUtils.save(SysLogConstants.OPERATE_TYPE.CREATE, sourceType, panelId, request.getPid(), null, null);
+        this.removePanelAllCache(panelId);
         return panelId;
     }
 
@@ -201,11 +228,12 @@ public class PanelGroupService {
             }
             DeLogUtils.save(SysLogConstants.OPERATE_TYPE.MODIFY, sourceType, request.getId(), request.getPid(), null, sourceType);
         }
+        this.removePanelAllCache(panelId);
         return panelId;
     }
 
 
-    private void checkPanelName(String name, String pid, String optType, String id, String nodeType) {
+    public void checkPanelName(String name, String pid, String optType, String id, String nodeType) {
         PanelGroupExample groupExample = new PanelGroupExample();
         if (PanelConstants.OPT_TYPE_INSERT.equalsIgnoreCase(optType)) {
             groupExample.createCriteria().andPidEqualTo(pid).andNameEqualTo(name).andNodeTypeEqualTo(nodeType);
@@ -215,7 +243,7 @@ public class PanelGroupService {
 
         List<PanelGroup> checkResult = panelGroupMapper.selectByExample(groupExample);
         if (CollectionUtils.isNotEmpty(checkResult)) {
-            DataEaseException.throwException(Translator.get("i18n_same_folder_can_not_repeat"));
+            DataEaseException.throwException(Translator.get("I18N_PANEL_EXIST"));
         }
     }
 
@@ -344,30 +372,52 @@ public class PanelGroupService {
         newPanel.setId(newPanelId);
         newPanel.setCreateBy(AuthUtils.getUser().getUsername());
         newPanel.setCreateTime(System.currentTimeMillis());
-        //TODO copy panelView
+        // copy panelView
         extPanelViewMapper.copyFromPanel(newPanelId, sourcePanelId, copyId);
-        //TODO 复制视图 chart_view
+        // 复制视图 chart_view
         extChartViewMapper.chartCopyWithPanel(copyId);
-        //TODO 替换panel_data viewId 数据
+        // 复制视图字段 chart_view_field
+        extChartViewMapper.chartFiledCopyWithPanel(copyId);
+        // 替换panel_data viewId 数据
         List<PanelView> panelViewList = panelViewService.findPanelViews(copyId);
-        //TODO 复制模板缓存数据
+        // 复制模板缓存数据
         extPanelGroupExtendDataMapper.copyWithCopyId(copyId);
         if (CollectionUtils.isNotEmpty(panelViewList)) {
             String panelData = newPanel.getPanelData();
-            //TODO 替换panel_data viewId 数据  并保存
+            // 替换panel_data viewId 数据  并保存
             for (PanelView panelView : panelViewList) {
                 panelData = panelData.replaceAll(panelView.getCopyFromView(), panelView.getChartViewId());
             }
             newPanel.setPanelData(panelData);
-            //TODO 复制跳转信息 copy panel_link_jump panel_link_jump_info  panel_link_jump_target_view_info
+            // 复制跳转信息 copy panel_link_jump panel_link_jump_info  panel_link_jump_target_view_info
             extPanelLinkJumpMapper.copyLinkJump(copyId);
             extPanelLinkJumpMapper.copyLinkJumpInfo(copyId);
             extPanelLinkJumpMapper.copyLinkJumpTarget(copyId);
-            //TODO 复制联动信息 copy panel_view_linkage_field panel_view_linkage
+            // 复制联动信息 copy panel_view_linkage_field panel_view_linkage
             extPanelViewLinkageMapper.copyViewLinkage(copyId);
             extPanelViewLinkageMapper.copyViewLinkageField(copyId);
         }
         panelGroupMapper.insertSelective(newPanel);
+        return newPanelId;
+    }
+    @Transactional(rollbackFor = Exception.class)
+    public String newPanelFromApp(PanelGroupRequest request,Map<String,String> chartViewsRelaMap){
+        String newPanelId = request.getId();
+        String templateData = request.getPanelData();
+        String staticResource = request.getStaticResource();
+        Boolean mobileLayout = panelViewService.havaMobileLayout(templateData);
+        for(Map.Entry<String,String> entry:chartViewsRelaMap.entrySet()){
+            templateData =  templateData.replaceAll(entry.getKey(),entry.getValue());
+        }
+        request.setMobileLayout(mobileLayout);
+        request.setPanelData(templateData);
+        staticResourceService.saveFilesToServe(staticResource);
+        panelGroupMapper.insertSelective(request);
+        // 清理权限缓存
+        clearPermissionCache();
+        sysAuthService.copyAuth(newPanelId, SysAuthConstants.AUTH_SOURCE_TYPE_PANEL);
+        DeLogUtils.save(SysLogConstants.OPERATE_TYPE.CREATE, sourceType, newPanelId, request.getPid(), null, null);
+        this.removePanelAllCache(newPanelId);
         return newPanelId;
     }
 
@@ -396,9 +446,9 @@ public class PanelGroupService {
                 dynamicData = request.getDynamicData();
                 staticResource = request.getStaticResource();
                 mobileLayout = panelViewService.havaMobileLayout(templateData);
-            } else if (PanelConstants.NEW_PANEL_FROM.NEW_MARKET_TEMPLATE.equals(newFrom)){
-                PanelTemplateFileDTO templateFileInfo =  getTemplateFromMarket(request.getTemplateUrl());
-                if(templateFileInfo == null){
+            } else if (PanelConstants.NEW_PANEL_FROM.NEW_MARKET_TEMPLATE.equals(newFrom)) {
+                PanelTemplateFileDTO templateFileInfo = getTemplateFromMarket(request.getTemplateUrl());
+                if (templateFileInfo == null) {
                     DataEaseException.throwException("Can't find the template's info from market,please check");
                 }
                 templateStyle = templateFileInfo.getPanelStyle();
@@ -408,6 +458,9 @@ public class PanelGroupService {
                 mobileLayout = panelViewService.havaMobileLayout(templateData);
             }
             Map<String, String> dynamicDataMap = gson.fromJson(dynamicData, Map.class);
+            if (dynamicDataMap == null) {
+                DataEaseException.throwException("Please use the template after v1.9");
+            }
 
             List<PanelViewInsertDTO> panelViews = new ArrayList<>();
             List<PanelGroupExtendDataDTO> viewsData = new ArrayList<>();
@@ -421,7 +474,7 @@ public class PanelGroupService {
                 chartView.setId(newViewId);
                 chartView.setSceneId(newPanelId);
                 chartView.setDataFrom(CommonConstants.VIEW_DATA_FROM.TEMPLATE);
-                //TODO 数据处理 1.替换viewId 2.加入panelView 数据(数据来源为template) 3.加入模板view data数据
+                // 数据处理 1.替换viewId 2.加入panelView 数据(数据来源为template) 3.加入模板view data数据
                 templateData = templateData.replaceAll(originViewId, newViewId);
                 panelViews.add(new PanelViewInsertDTO(newViewId, newPanelId, position));
                 viewsData.add(new PanelGroupExtendDataDTO(newPanelId, newViewId, originViewData));
@@ -547,6 +600,7 @@ public class PanelGroupService {
         try {
             String snapshot = request.getSnapshot();
             List<String[]> details = request.getDetails();
+            Integer[] excelTypes = request.getExcelTypes();
             details.add(0, request.getHeader());
             HSSFWorkbook wb = new HSSFWorkbook();
             //明细sheet
@@ -573,11 +627,22 @@ public class PanelGroupService {
                     if (rowData != null) {
                         for (int j = 0; j < rowData.length; j++) {
                             HSSFCell cell = row.createCell(j);
-                            cell.setCellValue(rowData[j]);
                             if (i == 0) {// 头部
+                                cell.setCellValue(rowData[j]);
                                 cell.setCellStyle(cellStyle);
                                 //设置列的宽度
                                 detailsSheet.setColumnWidth(j, 255 * 20);
+                            } else {
+                                // with DataType
+                                if ((excelTypes[j] == DeTypeConstants.DE_INT || excelTypes[j] == DeTypeConstants.DE_FLOAT) && StringUtils.isNotEmpty(rowData[j])) {
+                                    try {
+                                        cell.setCellValue(Double.valueOf(rowData[j]));
+                                    } catch (Exception e) {
+                                        LogUtil.warn("export excel data transform error");
+                                    }
+                                } else {
+                                    cell.setCellValue(rowData[j]);
+                                }
                             }
                         }
                     }
@@ -606,6 +671,12 @@ public class PanelGroupService {
         } catch (Exception e) {
             DataEaseException.throwException(e);
         }
+        if (ObjectUtils.isNotEmpty(AuthUtils.getUser())) {
+            String viewId = request.getViewId();
+            ChartViewWithBLOBs chartViewWithBLOBs = chartViewService.get(viewId);
+            String pid = chartViewWithBLOBs.getSceneId();
+            DeLogUtils.save(SysLogConstants.OPERATE_TYPE.EXPORT, SysLogConstants.SOURCE_TYPE.VIEW, viewId, pid, null, null);
+        }
     }
 
     public void updatePanelStatus(String panelId, PanelGroupBaseInfoRequest request) {
@@ -618,13 +689,188 @@ public class PanelGroupService {
     }
 
 
-    public PanelTemplateFileDTO getTemplateFromMarket(String templateUrl){
-        if(StringUtils.isNotEmpty(templateUrl)){
+    public PanelTemplateFileDTO getTemplateFromMarket(String templateUrl) {
+        if (StringUtils.isNotEmpty(templateUrl)) {
             Gson gson = new Gson();
-            String templateInfo =  HttpClientUtil.get(templateUrl,null);
+            String templateInfo = HttpClientUtil.get(templateUrl, null);
             return gson.fromJson(templateInfo, PanelTemplateFileDTO.class);
-        }else{
+        } else {
             return null;
         }
+    }
+
+    /**
+     * @Description: Automatically save panel data to cache when editing
+     */
+    public void autoCache(PanelGroupRequest request) {
+        String cacheName = JdbcConstants.PANEL_CACHE_KEY + request.getId();
+        String cacheId = AuthUtils.getUser().getUserId() + "&" + request.getId();
+        CacheUtils.put(cacheName, cacheId, request, null, null);
+    }
+
+    /**
+     * @Description: Remove panel cache for specific user
+     */
+    public void removePanelCache(String panelId) {
+        String cacheName = JdbcConstants.PANEL_CACHE_KEY + panelId;
+        String cacheId = AuthUtils.getUser().getUserId() + "&" + panelId;
+        CacheUtils.remove(cacheName, cacheId);
+    }
+
+    public void removePanelAllCache(String panelId) {
+        String cacheName = JdbcConstants.PANEL_CACHE_KEY + panelId;
+        CacheUtils.removeAll(cacheName);
+    }
+
+    public PanelGroupDTO findUserPanelCache(String panelId) {
+        String cacheName = JdbcConstants.PANEL_CACHE_KEY + panelId;
+        String cacheId = AuthUtils.getUser().getUserId() + "&" + panelId;
+        Object cache = CacheUtils.get(cacheName, cacheId);
+        if (cache == null) {
+            return null;
+        } else {
+            return (PanelGroupRequest) cache;
+        }
+    }
+
+    public Boolean checkUserCache(String panelId) {
+        String cacheName = JdbcConstants.PANEL_CACHE_KEY + panelId;
+        String cacheId = AuthUtils.getUser().getUserId() + "&" + panelId;
+        Object cache = CacheUtils.get(cacheName, cacheId);
+        return cache != null;
+    }
+
+    public void viewLog(PanelViewLogRequest request) {
+        String panelId = request.getPanelId();
+        Boolean mobile = request.getMobile();
+        PanelGroupWithBLOBs panel = panelGroupMapper.selectByPrimaryKey(panelId);
+        SysLogConstants.OPERATE_TYPE operateType = SysLogConstants.OPERATE_TYPE.PC_VIEW;
+        if (mobile) {
+            operateType = SysLogConstants.OPERATE_TYPE.MB_VIEW;
+        }
+        DeLogUtils.save(operateType, sourceType, panelId, panel.getPid(), null, null);
+    }
+
+    public Object findPanelElementInfo(String viewId) {
+        PanelView panelView = panelViewService.findByViewId(viewId);
+        if (panelView != null) {
+            PanelGroupWithBLOBs panelGroupWithBLOBs = panelGroupMapper.selectByPrimaryKey(panelView.getPanelId());
+            if (panelGroupWithBLOBs != null) {
+                JSONArray panelData = JSONObject.parseArray(panelGroupWithBLOBs.getPanelData());
+                for (int i = 0; i < panelData.size(); i++) {
+                    JSONObject element = panelData.getJSONObject(i);
+                    if ("user-view".equals(element.getString("component"))) {
+                        return element;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public PanelExport2App panelExport2AppCheck(String panelId) {
+        //1.获取所有视图信息
+        List<ChartViewWithBLOBs> chartViewsInfo = panelViewService.findByPanelId(panelId);
+        //2.获取视图扩展字段信息
+        List<ChartViewField> chartViewFieldsInfo = extChartViewFieldMapper.findByPanelId(panelId);
+        //3.获取所有数据集信息
+        List<DatasetTable> datasetTablesInfo = extDataSetTableMapper.findByPanelId(panelId);
+        //4.获取所有数据集字段信息
+        List<DatasetTableField> datasetTableFieldsInfo = extDataSetTableFieldMapper.findByPanelId(panelId);
+        //5.获取所有任务信息
+        List<DataSetTaskDTO> dataSetTasksInfo = extDataSetTaskMapper.findByPanelId(panelId);
+        //6.获取所有数据源信息
+        List<DatasourceDTO> datasourceDTOS = extDataSourceMapper.findByPanelId(panelId);
+
+        List<PanelView> panelViews = panelViewService.findPanelViewsByPanelId(panelId);
+
+        //校验标准 1.存在视图且所有视图的数据来源必须是dataset 2.存在数据集且没有excel数据集 3.存在数据源且是单数据源
+        //1.view check
+        if (CollectionUtils.isEmpty(chartViewsInfo)) {
+            return new PanelExport2App("this panel don't have views");
+        } else if (chartViewsInfo.stream().filter(chartView -> chartView.getDataFrom().equals("template")).collect(Collectors.toList()).size() > 0) {
+            return new PanelExport2App("this panel have view from template");
+        }
+
+        // dataset check
+        if (CollectionUtils.isEmpty(datasetTablesInfo)) {
+            return new PanelExport2App("this panel don't have dataset");
+        } else if (datasetTablesInfo.stream().filter(datasetTable -> datasetTable.getType().equals("excel")).collect(Collectors.toList()).size() > 0) {
+            return new PanelExport2App("this panel have dataset witch type is excel");
+        }
+
+        //datasource check
+        if (CollectionUtils.isEmpty(datasourceDTOS)) {
+            return new PanelExport2App("this panel don't have datasource");
+        } else if (datasourceDTOS.size() > 1) {
+            return new PanelExport2App("this panel should hava only one dataset");
+        }
+        return new PanelExport2App(chartViewsInfo, chartViewFieldsInfo, datasetTablesInfo, datasetTableFieldsInfo, dataSetTasksInfo, datasourceDTOS,panelViews);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public String appApply(PanelAppTemplateApplyRequest request) throws Exception{
+        //仪表板名称校验，数据集分组名称校验，数据源名称校验
+        panelAppTemplateService.nameCheck(request);
+
+        String newPanelId = UUIDUtil.getUUIDAsString();
+        // 新建数据集分组
+        DatasetGroup newDatasetGroup = new DatasetGroup();
+        newDatasetGroup.setPid(request.getDatasetGroupId());
+        newDatasetGroup.setName(request.getDatasetGroupName());
+        newDatasetGroup.setType("group");
+        DataSetGroupDTO resultDatasetGroup = dataSetGroupService.save(newDatasetGroup);
+
+        String asideDatasetGroupId = resultDatasetGroup.getId();
+        //查询应用信息
+        PanelAppTemplateWithBLOBs appInfo = panelAppTemplateMapper.selectByPrimaryKey(request.getAppTemplateId());
+        //1.获取所有视图信息
+        List<ChartViewWithBLOBs> chartViewsInfo = gson.fromJson(appInfo.getChartViewsInfo(), new TypeToken<List<ChartViewWithBLOBs>>(){}.getType());
+        //2.获取视图扩展字段信息
+        List<ChartViewField> chartViewFieldsInfo = gson.fromJson(appInfo.getChartViewFieldsInfo(), new TypeToken<List<ChartViewField>>(){}.getType());
+        //3.获取所有数据集信息
+        List<DatasetTable> datasetTablesInfo  = gson.fromJson(appInfo.getDatasetTablesInfo(), new TypeToken<List<DatasetTable>>(){}.getType());
+        //4.获取所有数据集字段信息
+        List<DatasetTableField> datasetTableFieldsInfo = gson.fromJson(appInfo.getDatasetTableFieldsInfo(), new TypeToken<List<DatasetTableField>>(){}.getType());
+        //5.获取所有任务信息
+        List<DataSetTaskDTO> dataSetTasksInfo = gson.fromJson(appInfo.getDatasetTasksInfo(), new TypeToken<List<DataSetTaskDTO>>(){}.getType());
+        //6.获取所有数据源信息
+        List<Datasource> oldDatasourceInfo = gson.fromJson(appInfo.getDatasourceInfo(), new TypeToken<List<Datasource>>(){}.getType());
+        //获取仪表板信息
+        PanelGroupRequest  panelInfo = gson.fromJson(appInfo.getPanelInfo(),PanelGroupRequest.class);
+        //获取仪表板视图信息
+        List<PanelView> panelViewsInfo = gson.fromJson(appInfo.getPanelViewsInfo(), new TypeToken<List<PanelView>>(){}.getType());
+
+        Map<String,String> datasourceRelaMap = panelAppTemplateService.applyDatasource(oldDatasourceInfo,request.getDatasourceList());
+
+        Map<String,String> datasetsRelaMap = panelAppTemplateService.applyDataset(datasetTablesInfo,datasourceRelaMap,asideDatasetGroupId);
+
+        Map<String,String> datasetFieldsRelaMap = panelAppTemplateService.applyDatasetField(datasetTableFieldsInfo,datasetsRelaMap);
+
+        panelAppTemplateService.resetCustomAndUnionDataset(datasetTablesInfo,datasetsRelaMap,datasetFieldsRelaMap);
+
+        Map<String,String> chartViewsRelaMap = panelAppTemplateService.applyViews(chartViewsInfo,datasetsRelaMap,datasetFieldsRelaMap,newPanelId);
+
+        panelAppTemplateService.applyViewsField(chartViewFieldsInfo,chartViewsRelaMap,datasetsRelaMap,datasetFieldsRelaMap);
+
+        panelAppTemplateService.applyPanel(panelInfo,chartViewsRelaMap,newPanelId, request.getPanelName(), request.getPanelId());
+
+        panelAppTemplateService.applyPanelView(panelViewsInfo,chartViewsRelaMap,newPanelId);
+
+        String newDatasourceId =datasourceRelaMap.entrySet().stream().findFirst().get().getValue();
+
+        String newDatasourceName = request.getDatasourceList().get(0).getName();
+
+        PanelAppTemplateLog templateLog = new PanelAppTemplateLog();
+        templateLog.setPanelId(newPanelId);
+        templateLog.setSourcePanelName(request.getPanelName());
+        templateLog.setDatasourceId(newDatasourceId);
+        templateLog.setSourceDatasourceName(newDatasourceName);
+        templateLog.setDatasetGroupId(asideDatasetGroupId);
+        templateLog.setSourceDatasetGroupName(request.getDatasetGroupName());
+        templateLog.setAppTemplateId(appInfo.getId());
+        templateLog.setAppTemplateName(appInfo.getName());
+        appTemplateLogService.newAppApplyLog(templateLog);
+        return newPanelId;
     }
 }

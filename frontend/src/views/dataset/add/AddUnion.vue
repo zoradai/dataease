@@ -1,35 +1,11 @@
 <template>
-  <el-row>
-    <el-row style="height: 26px;" class="title-text">
-      <span style="line-height: 26px;font-size: 14px;">
-        {{ param.tableId?$t('dataset.edit_union'):$t('dataset.add_union_table') }}
-      </span>
-      <el-row style="float: right">
-        <el-button size="mini" @click="cancel">
-          {{ $t('dataset.cancel') }}
-        </el-button>
-        <el-button :disabled="!name || dataset.length === 0" size="mini" type="primary" @click="save">
-          {{ $t('dataset.confirm') }}
-        </el-button>
-      </el-row>
-    </el-row>
-    <el-divider />
-    <div>
-      <el-form :inline="true" style="display: flex;align-items: center;justify-content: space-between;">
-        <el-form-item class="form-item" :label="$t('commons.name')">
-          <el-input v-model="name" size="mini" :placeholder="$t('commons.name')" clearable />
-        </el-form-item>
-        <el-form-item class="form-item">
-          <el-button :disabled="dataset.length === 0" size="mini" @click="previewData">
-            {{ $t('dataset.preview_result') }}
-          </el-button>
-        </el-form-item>
-      </el-form>
+  <div v-loading="loading" class="dataset-union" @mouseup="mouseupDrag">
+    <div :style="{ height: unionHeight + 'px' }" class="unio-editer-container">
       <!--添加第一个数据集按钮-->
-      <div v-if="dataset.length === 0">
-        <el-button type="primary" size="mini" @click="selectDs">
+      <div v-if="dataset.length === 0" style="padding: 24px">
+        <deBtn type="primary" @click="selectDs">
           {{ $t('chart.select_dataset') }}
-        </el-button>
+        </deBtn>
       </div>
       <!--数据集关联树型结构-->
       <div v-else class="union-container">
@@ -44,7 +20,7 @@
         />
         <div v-if="dataset.length > 0">
           <union-node
-            v-for="(item,index) in dataset[0].childrenDs"
+            v-for="(item, index) in dataset[0].childrenDs"
             :key="index"
             :node-index="index"
             :children-node="item"
@@ -57,42 +33,103 @@
         </div>
       </div>
     </div>
-
-    <!--选择数据集-->
-    <el-dialog v-if="selectDsDialog" v-dialogDrag :title="$t('chart.select_dataset')" :visible="selectDsDialog" :show-close="false" width="400px" class="dialog-css">
-      <dataset-group-selector-tree :fix-height="true" show-mode="union" :custom-type="customType" clear-empty-dir="true" @getTable="firstDs" />
-      <div slot="footer" class="dialog-footer">
-        <el-button size="mini" @click="closeSelectDs()">{{ $t('dataset.cancel') }}</el-button>
-        <el-button :disabled="!tempDs.id" type="primary" size="mini" @click="confirmSelectDs()">{{ $t('dataset.confirm') }}</el-button>
+    <div class="preview-container">
+      <div class="sql-title">
+        {{ $t('deDataset.data_preview') }}
+        <span class="result-num">{{
+          `(${$t('dataset.preview_show')} 1000 ${$t('dataset.preview_item')})`
+        }}</span>
+        <span class="drag" @mousedown="mousedownDrag" />
+        <el-button
+          class="de-text-btn posi-right"
+          type="text"
+          size="small"
+          @click="previewData"
+        >
+          {{ $t('deDataset.data_preview') }}
+        </el-button>
       </div>
-    </el-dialog>
+      <union-preview
+        :union-height="unionHeight"
+        :table="previewTable"
+        :dataset="dataset"
+      />
+    </div>
+    <!--选择数据集-->
+    <el-drawer
+      v-if="selectDsDialog"
+      v-closePress
+      :title="$t('chart.select_dataset')"
+      :visible.sync="selectDsDialog"
+      custom-class="user-drawer sql-dataset-drawer"
+      size="600px"
+      direction="rtl"
+    >
+      <dataset-tree
+        :fix-height="true"
+        show-mode="union"
+        :custom-type="customType"
+        :clear-empty-dir="true"
+        @getTable="firstDs"
+      />
+      <div class="de-foot">
+        <deBtn secondary @click="closeSelectDs()">{{
+          $t('dataset.cancel')
+        }}</deBtn>
+        <deBtn
+          :disabled="!tempDs.id"
+          type="primary"
+          @click="confirmSelectDs()"
+        >{{ $t('dataset.confirm') }}</deBtn>
+      </div>
+    </el-drawer>
 
     <!--编辑关联关系-->
-    <el-dialog v-if="editUnion" v-dialogDrag top="5vh" :title="unionParam.type === 'add' ? $t('dataset.add_union_relation') : $t('dataset.edit_union_relation')" :visible="editUnion" :show-close="false" width="600px" class="dialog-css">
+    <el-drawer
+      v-if="editUnion"
+      v-closePress
+      :title="
+        unionParam.type === 'add'
+          ? $t('dataset.add_union_relation')
+          : $t('dataset.edit_union_relation')
+      "
+      :visible.sync="editUnion"
+      custom-class="user-drawer union-dataset-drawer"
+      size="840px"
+      direction="rtl"
+    >
       <union-edit :union-param="unionParam" />
-      <div slot="footer" class="dialog-footer">
-        <el-button size="mini" @click="closeEditUnion()">{{ $t('dataset.cancel') }}</el-button>
-        <el-button type="primary" size="mini" @click="confirmEditUnion()">{{ $t('dataset.confirm') }}</el-button>
+      <div class="de-foot">
+        <deBtn secondary @click="closeEditUnion()">{{
+          $t('dataset.cancel')
+        }}</deBtn>
+        <deBtn type="primary" @click="confirmEditUnion()">{{
+          $t('dataset.confirm')
+        }}</deBtn>
       </div>
-    </el-dialog>
-
-    <!--数据预览界面-->
-    <el-drawer v-if="showPreview" :title="$t('dataset.preview_result')" :visible.sync="showPreview" direction="btt" class="preview-style">
-      <union-preview :table="previewTable" :dataset="dataset" />
     </el-drawer>
-  </el-row>
+  </div>
 </template>
 
 <script>
 import UnionNode from '@/views/dataset/add/union/UnionNode'
 import NodeItem from '@/views/dataset/add/union/NodeItem'
-import DatasetGroupSelectorTree from '@/views/dataset/common/DatasetGroupSelectorTree'
+import datasetTree from '@/views/dataset/common/datasetTree'
 import UnionEdit from '@/views/dataset/add/union/UnionEdit'
 import { post } from '@/api/dataset/dataset'
 import UnionPreview from '@/views/dataset/add/union/UnionPreview'
+import cancelMix from './cancelMix'
+import msgCfm from '@/components/msgCfm/index'
 export default {
   name: 'AddUnion',
-  components: { UnionPreview, UnionEdit, DatasetGroupSelectorTree, NodeItem, UnionNode },
+  components: {
+    UnionPreview,
+    UnionEdit,
+    datasetTree,
+    NodeItem,
+    UnionNode
+  },
+  mixins: [cancelMix, msgCfm],
   props: {
     param: {
       type: Object,
@@ -101,32 +138,36 @@ export default {
   },
   data() {
     return {
+      loading: false,
       // mock data，结构比较复杂，需要这个结构多看看...
-      datasetMock: [{
-        currentDs: {},
-        currentDsField: [],
-        childrenDs: [
-          {
-            currentDs: {},
-            currentDsField: [],
-            childrenDs: [],
-            unionToParent: {
-              unionType: 'left', // left join,right join,inner join
-              unionFields: [
-                {
-                  parentField: {},
-                  currentField: {}
-                }
-              ]
-            },
-            allChildCount: 0
-          }
-        ],
-        unionToParent: {},
-        allChildCount: 0
-      }],
+      datasetMock: [
+        {
+          currentDs: {},
+          currentDsField: [],
+          childrenDs: [
+            {
+              currentDs: {},
+              currentDsField: [],
+              childrenDs: [],
+              unionToParent: {
+                unionType: 'left', // left join,right join,inner join
+                unionFields: [
+                  {
+                    parentField: {},
+                    currentField: {}
+                  }
+                ]
+              },
+              allChildCount: 0
+            }
+          ],
+          unionToParent: {},
+          allChildCount: 0
+        }
+      ],
       // union data
       dataset: [],
+      unionHeight: 298,
       // union item
       unionItem: {
         currentDs: {},
@@ -138,14 +179,12 @@ export default {
         },
         allChildCount: 0
       },
-      name: '关联数据集',
       customType: ['db', 'sql', 'excel', 'api'],
       selectDsDialog: false,
       // 弹框临时选中的数据集
       tempDs: {},
       editUnion: false,
       unionParam: {},
-      showPreview: false,
       previewTable: {}
     }
   },
@@ -159,43 +198,54 @@ export default {
     this.initTableData()
   },
   methods: {
+    mousedownDrag() {
+      document
+        .querySelector('.dataset-union')
+        .addEventListener('mousemove', this.caculateHeight)
+    },
+    mouseupDrag() {
+      document
+        .querySelector('.dataset-union')
+        .removeEventListener('mousemove', this.caculateHeight)
+    },
+    caculateHeight(e) {
+      if (e.pageY - 56 < 298) {
+        this.unionHeight = 298
+        return
+      }
+      if (e.pageY - 56 > document.documentElement.clientHeight - 100) {
+        this.unionHeight = document.documentElement.clientHeight - 100
+        return
+      }
+      this.unionHeight = e.pageY - 56
+    },
     save() {
-      if (!this.name || this.name === '') {
-        this.$message({
-          showClose: true,
-          message: this.$t('dataset.pls_input_name'),
-          type: 'error'
-        })
+      if (!this.param.name || this.param.name === '') {
+        this.openMessageSuccess('dataset.pls_input_name', 'error')
         return
       }
-      if (this.name.length > 50) {
-        this.$message({
-          showClose: true,
-          message: this.$t('dataset.char_can_not_more_50'),
-          type: 'error'
-        })
+      if (this.param.name.length > 50) {
+        this.openMessageSuccess('dataset.char_can_not_more_50', 'error')
         return
       }
+      this.loading = true
       const table = {
         id: this.param.tableId,
-        name: this.name,
+        name: this.param.name,
         sceneId: this.param.id,
         dataSourceId: this.dataset[0].currentDs.dataSourceId,
         type: 'union',
         mode: this.dataset[0].currentDs.mode,
         info: '{"union":' + JSON.stringify(this.dataset) + '}'
       }
-      post('/dataset/table/update', table).then(response => {
-        this.$emit('saveSuccess', table)
-        this.cancel()
-      })
-    },
-    cancel() {
-      if (this.param.tableId) {
-        this.$emit('switchComponent', { name: 'ViewTable', param: this.param.table })
-      } else {
-        this.$emit('switchComponent', { name: '' })
-      }
+      post('/dataset/table/update', table)
+        .then((response) => {
+          this.$emit('saveSuccess', table)
+          this.cancel(response.data)
+        })
+        .finally(() => {
+          this.loading = false
+        })
     },
     selectDs() {
       this.selectDsDialog = true
@@ -209,11 +259,7 @@ export default {
     },
     confirmSelectDs() {
       if (this.tempDs.mode === 0 && this.tempDs.modelInnerType === 'sql') {
-        this.$message({
-          showClose: true,
-          message: this.$t('dataset.sql_ds_union_error'),
-          type: 'error'
-        })
+        this.openMessageSuccess('dataset.sql_ds_union_error')
         return
       }
       const ds = JSON.parse(JSON.stringify(this.unionItem))
@@ -251,7 +297,12 @@ export default {
       // 添加关联的时候，如果关闭关联关系设置的界面，则删除子节点，同时向父级传递消息
       if (this.unionParam.type === 'add') {
         this.dataset[0].childrenDs.pop()
-        this.calc({ type: 'delete', grandParentAdd: true, grandParentSub: true, subCount: 0 })
+        this.calc({
+          type: 'delete',
+          grandParentAdd: true,
+          grandParentSub: true,
+          subCount: 0
+        })
       }
     },
     confirmEditUnion() {
@@ -259,11 +310,7 @@ export default {
       if (this.checkUnion()) {
         this.editUnion = false
       } else {
-        this.$message({
-          message: this.$t('dataset.union_error'),
-          type: 'error',
-          showClose: true
-        })
+        this.openMessageSuccess('dataset.union_error')
       }
     },
     cancelUnion(val) {
@@ -280,7 +327,12 @@ export default {
       }
       for (let i = 0; i < union.unionFields.length; i++) {
         const ele = union.unionFields[i]
-        if (!ele.parentField || !ele.parentField.id || !ele.currentField || !ele.currentField.id) {
+        if (
+          !ele.parentField ||
+          !ele.parentField.id ||
+          !ele.currentField ||
+          !ele.currentField.id
+        ) {
           return false
         }
       }
@@ -289,64 +341,100 @@ export default {
 
     initTableData() {
       if (this.param.tableId) {
-        post('/dataset/table/get/' + this.param.tableId, null).then(response => {
-          const table = JSON.parse(JSON.stringify(response.data))
-          this.name = table.name
-          this.dataset = JSON.parse(table.info).union
-        })
+        post('/dataset/table/get/' + this.param.tableId, null).then(
+          (response) => {
+            const table = JSON.parse(JSON.stringify(response.data))
+            this.dataset = JSON.parse(table.info).union
+            this.previewData()
+          }
+        )
       }
     },
 
     previewData() {
       this.previewTable = {
         id: this.param.tableId,
-        name: this.name,
+        name: this.param.name,
         sceneId: this.param.id,
         dataSourceId: this.dataset[0].currentDs.dataSourceId,
         type: 'union',
         mode: this.dataset[0].currentDs.mode,
         info: '{"union":' + JSON.stringify(this.dataset) + '}'
       }
-      this.showPreview = true
     },
 
     resetComponent() {
       this.dataset = []
-      this.name = '关联数据集'
+      this.param.name = '关联数据集'
     }
   }
 }
 </script>
 
-<style scoped>
-.el-divider--horizontal {
-  margin: 12px 0;
-}
-.union-container{
+<style lang="scss" scoped>
+.dataset-union {
+  height: 100%;
   display: flex;
+  flex-direction: column;
   width: 100%;
-  height: calc(100vh - 200px);
-  overflow: auto;
-}
-.form-item{
-  margin-bottom: 10px!important;
-}
-.dialog-css >>> .el-dialog__body {
-  padding: 0 20px;
-}
-.preview-style >>> .el-drawer{
-  height: 50%!important;
-}
-.preview-style >>> .el-drawer .el-drawer__header{
-  margin-bottom: 10px!important;
-  padding: 10px 16px 0!important;
-  font-size: 14px;
-}
-.preview-style >>> .el-drawer .el-drawer__body{
-  padding: 0 16px 10px!important;
-}
-.form-item >>> .el-form-item__label{
-  font-size: 12px!important;
-  font-weight: 400!important;
+
+  .unio-editer-container {
+    min-height: 298px;
+    width: 100%;
+    background: #f5f6f7;
+  }
+
+  .preview-container {
+    flex: 1;
+    font-family: PingFang SC;
+    font-size: 14px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    flex: 1;
+    .sql-title {
+      user-select: none;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      padding: 16px 24px;
+      font-weight: 500;
+      position: relative;
+      color: var(--deTextPrimary, #1f2329);
+      border-bottom: 1px solid rgba(31, 35, 41, 0.15);
+
+      .posi-right {
+        position: absolute;
+        right: 24px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .result-num {
+        font-weight: 400;
+        color: var(--deTextSecondary, #646a73);
+        margin-left: 12px;
+      }
+      .drag {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        height: 7px;
+        width: 100px;
+        border-radius: 3.5px;
+        background: rgba(31, 35, 41, 0.1);
+        cursor: row-resize;
+      }
+    }
+  }
+
+  .union-container {
+    display: flex;
+    padding: 24px;
+    width: 100%;
+    overflow: auto;
+    height: 100%;
+  }
 }
 </style>

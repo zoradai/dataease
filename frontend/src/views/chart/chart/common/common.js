@@ -186,12 +186,49 @@ export function componentStyle(chart_option, chart) {
       chart_option.radar.splitLine = customStyle.split.splitLine
       chart_option.radar.splitArea = customStyle.split.splitArea
     }
+    if (customStyle.margin && customStyle.margin.marginModel && customStyle.margin.marginModel !== 'auto') {
+      const unit = getMarginUnit(customStyle.margin)
+      const result = { containLabel: true }
+      const realUnit = (unit === '%' ? unit : '')
+      if (customStyle.margin.marginTop != null) {
+        result.top = customStyle.margin.marginTop + realUnit
+      }
+      if (customStyle.margin.marginBottom != null) {
+        result.bottom = customStyle.margin.marginBottom + realUnit
+      }
+      if (customStyle.margin.marginLeft != null) {
+        result.left = customStyle.margin.marginLeft + realUnit
+      }
+      if (customStyle.margin.marginRight != null) {
+        result.right = customStyle.margin.marginRight + realUnit
+      }
+      if (!chart_option.grid) {
+        chart_option.grid = {}
+      }
+      Object.assign(chart_option.grid, JSON.parse(JSON.stringify(result)))
+    }
     if (customStyle.background) {
       chart_option.backgroundColor = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
     }
   }
 }
+export const getMarginUnit = marginForm => {
+  if (!marginForm.marginModel || marginForm.marginModel === 'auto') return null
+  if (marginForm.marginModel === 'absolute') return 'px'
+  if (marginForm.marginModel === 'relative') return '%'
+  return null
+}
 
+const hexToRgba = (hex, opacity) => {
+  let rgbaColor = ''
+  const reg = /^#[\da-f]{6}$/i
+  if (reg.test(hex)) {
+    rgbaColor = `rgba(${parseInt('0x' + hex.slice(1, 3))},${parseInt(
+      '0x' + hex.slice(3, 5)
+    )},${parseInt('0x' + hex.slice(5, 7))},${opacity})`
+  }
+  return rgbaColor
+}
 export function seniorCfg(chart_option, chart) {
   if (chart.senior && chart.type && (chart.type.includes('bar') || chart.type.includes('line') || chart.type.includes('mix'))) {
     const senior = JSON.parse(chart.senior)
@@ -209,6 +246,28 @@ export function seniorCfg(chart_option, chart) {
             end: parseInt(senior.functionCfg.sliderRange[1])
           }
         ]
+        if (senior.functionCfg.sliderBg) {
+          chart_option.dataZoom[1].dataBackground = {
+            lineStyle: { color: hexToRgba(senior.functionCfg.sliderBg, 0.5) },
+            areaStyle: { color: hexToRgba(senior.functionCfg.sliderBg, 0.5) }
+          }
+          chart_option.dataZoom[1].borderColor = hexToRgba(senior.functionCfg.sliderBg, 0.3)
+        }
+        if (senior.functionCfg.sliderFillBg) {
+          chart_option.dataZoom[1].selectedDataBackground = {
+            lineStyle: { color: senior.functionCfg.sliderFillBg },
+            areaStyle: { color: senior.functionCfg.sliderFillBg }
+          }
+          const rgba = hexToRgba(senior.functionCfg.sliderFillBg, 0.2)
+          chart_option.dataZoom[1].fillerColor = rgba
+          
+        }
+        if (senior.functionCfg.sliderTextClolor) {
+          chart_option.dataZoom[1].textStyle = { color: senior.functionCfg.sliderTextClolor }
+          const rgba = hexToRgba(senior.functionCfg.sliderTextClolor, 0.5)
+          chart_option.dataZoom[1].handleStyle = { color: rgba }
+        }
+
         if (chart.type.includes('horizontal')) {
           chart_option.dataZoom[0].yAxisIndex = [0]
           chart_option.dataZoom[1].yAxisIndex = [0]
@@ -217,9 +276,11 @@ export function seniorCfg(chart_option, chart) {
       }
     }
     // begin mark line settings
-    chart_option.series[0].markLine = {
-      symbol: 'none',
-      data: []
+    if (chart_option.series && chart_option.series.length > 0) {
+      chart_option.series[0].markLine = {
+        symbol: 'none',
+        data: []
+      }
     }
     if (senior.assistLine && senior.assistLine.length > 0) {
       if (chart_option.series && chart_option.series.length > 0) {
@@ -231,7 +292,12 @@ export function seniorCfg(chart_option, chart) {
         if (customStyle.yAxis) {
           yAxis = JSON.parse(JSON.stringify(customStyle.yAxis))
         }
-        senior.assistLine.forEach(ele => {
+
+        const fixedLines = senior.assistLine.filter(ele => ele.field === '0')
+        const dynamicLines = chart.data.dynamicAssistLines
+        const lines = fixedLines.concat(dynamicLines)
+
+        lines.forEach(ele => {
           if (chart.type.includes('horizontal')) {
             chart_option.series[0].markLine.data.push({
               symbol: 'none',

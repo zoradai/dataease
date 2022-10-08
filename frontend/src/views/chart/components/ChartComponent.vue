@@ -10,15 +10,15 @@
     <div :id="chartId" style="width: 100%;height: 100%;overflow: hidden;" :style="{ borderRadius: borderRadius}" />
     <div v-if="chart.type === 'map'" class="map-zoom-box">
       <div style="margin-bottom: 0.5em;">
-        <el-button size="mini" icon="el-icon-plus" circle @click="roamMap(true)" />
+        <el-button :style="{'background': buttonTextColor ? 'none' : '', 'opacity': buttonTextColor ? '0.75': '', 'color': buttonTextColor, 'borderColor': buttonTextColor}" size="mini" icon="el-icon-plus" circle @click="roamMap(true)" />
       </div>
 
       <div style="margin-bottom: 0.5em;">
-        <el-button size="mini" icon="el-icon-refresh" circle @click="resetZoom()" />
+        <el-button :style="{'background': buttonTextColor ? 'none' : '', 'opacity': buttonTextColor ? '0.75': '', 'color': buttonTextColor, 'borderColor': buttonTextColor}" size="mini" icon="el-icon-refresh" circle @click="resetZoom()" />
       </div>
 
       <div>
-        <el-button size="mini" icon="el-icon-minus" circle @click="roamMap(false)" />
+        <el-button :style="{'background': buttonTextColor ? 'none' : '', 'opacity': buttonTextColor ? '0.75': '', 'color': buttonTextColor, 'borderColor': buttonTextColor}" size="mini" icon="el-icon-minus" circle @click="roamMap(false)" />
       </div>
 
     </div>
@@ -81,7 +81,8 @@ import {
   geoJson
 } from '@/api/map/map'
 import ViewTrackBar from '@/components/canvas/components/Editor/ViewTrackBar'
-
+import { reverseColor } from '../chart/common/common'
+import { mapState } from 'vuex'
 export default {
   name: 'ChartComponent',
   components: {
@@ -140,14 +141,18 @@ export default {
       dynamicAreaCode: null,
       borderRadius: '0px',
       mapCenter: null,
-      linkageActiveParam: null
+      linkageActiveParam: null,
+      buttonTextColor: null
     }
   },
 
   computed: {
     trackBarStyleTime() {
       return this.trackBarStyle
-    }
+    },
+    ...mapState([
+      'canvasStyleData'
+    ])
   },
   watch: {
     chart: {
@@ -158,6 +163,16 @@ export default {
     },
     resize() {
       this.drawEcharts()
+    },
+    'themeStyle.color'(value, old) {
+      if (value !== old) {
+        this.preDraw()
+      }
+    },
+    'themeStyle.backgroundColorSelect'(value, old) {
+      if (value !== old) {
+        this.preDraw()
+      }
     }
   },
   mounted() {
@@ -165,6 +180,9 @@ export default {
   },
   destroyed() {
     this.myChart.dispose()
+  },
+  created() {
+    this.loadThemeStyle()
   },
   methods: {
     reDrawView() {
@@ -211,6 +229,32 @@ export default {
           }
         })
       })
+    },
+    loadThemeStyle() {
+      let themeStyle = null
+      if (this.themeStyle) {
+        themeStyle = JSON.parse(JSON.stringify(this.themeStyle))
+        
+        if (themeStyle && themeStyle.backgroundColorSelect) {
+          const panelColor = themeStyle.color
+          if (panelColor !== '#FFFFFF') {
+            const reverseValue = reverseColor(panelColor)
+            this.buttonTextColor = reverseValue
+          } else {
+            this.buttonTextColor = null
+          }
+        } else if(this.canvasStyleData.openCommonStyle && this.canvasStyleData.panel.backgroundType === 'color') {
+          const panelColor = this.canvasStyleData.panel.color
+          if (panelColor !== '#FFFFFF') {
+            const reverseValue = reverseColor(panelColor)
+            this.buttonTextColor = reverseValue
+          } else {
+            this.buttonTextColor = null
+          }
+        } else {
+          this.buttonTextColor = null
+        }
+      }
     },
     drawEcharts(activeParam) {
       const chart = this.chart
@@ -291,8 +335,28 @@ export default {
       let themeStyle = null
       if (this.themeStyle) {
         themeStyle = JSON.parse(JSON.stringify(this.themeStyle))
+        
+        if (themeStyle && themeStyle.backgroundColorSelect) {
+          const panelColor = themeStyle.color
+          if (panelColor !== '#FFFFFF') {
+            const reverseValue = reverseColor(panelColor)
+            this.buttonTextColor = reverseValue
+          } else {
+            this.buttonTextColor = null
+          }
+        } else if(this.canvasStyleData.openCommonStyle && this.canvasStyleData.panel.backgroundType === 'color') {
+          const panelColor = this.canvasStyleData.panel.color
+          if (panelColor !== '#FFFFFF') {
+            const reverseValue = reverseColor(panelColor)
+            this.buttonTextColor = reverseValue
+          } else {
+            this.buttonTextColor = null
+          }
+        } else {
+          this.buttonTextColor = null
+        }
       }
-      const chart_option = baseMapOption(base_json, chart, themeStyle, curAreaCode)
+      const chart_option = baseMapOption(base_json, chart, this.buttonTextColor, curAreaCode)
       this.myEcharts(chart_option)
       const opt = this.myChart.getOption()
       if (opt && opt.series) {

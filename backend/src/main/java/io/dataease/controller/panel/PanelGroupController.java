@@ -6,15 +6,13 @@ import io.dataease.auth.annotation.DePermissionProxy;
 import io.dataease.auth.annotation.DePermissions;
 import io.dataease.auth.service.impl.ExtAuthServiceImpl;
 import io.dataease.commons.constants.PanelConstants;
-import io.dataease.controller.request.panel.PanelGroupBaseInfoRequest;
-import io.dataease.plugins.common.base.domain.PanelGroup;
+import io.dataease.controller.request.panel.*;
 import io.dataease.commons.constants.DePermissionType;
 import io.dataease.commons.constants.ResourceAuthLevel;
 import io.dataease.controller.handler.annotation.I18n;
-import io.dataease.controller.request.panel.PanelGroupRequest;
-import io.dataease.controller.request.panel.PanelViewDetailsRequest;
 import io.dataease.dto.PermissionProxy;
 import io.dataease.dto.authModel.VAuthModelDTO;
+import io.dataease.dto.panel.PanelExport2App;
 import io.dataease.dto.panel.PanelGroupDTO;
 import io.dataease.service.panel.PanelGroupService;
 import io.swagger.annotations.Api;
@@ -131,10 +129,17 @@ public class PanelGroupController {
         return panelGroupService.queryPanelComponents(id);
     }
 
-    @ApiOperation("导出仪表板视图明细")
+    @ApiOperation("公共连接导出仪表板视图明细")
     @PostMapping("/exportDetails")
     @I18n
     public void exportDetails(@RequestBody PanelViewDetailsRequest request, HttpServletResponse response) throws IOException {
+        panelGroupService.exportPanelViewDetails(request, response);
+    }
+
+    @ApiOperation("站内导出仪表板视图明细")
+    @PostMapping("/innerExportDetails")
+    @I18n
+    public void innerExportDetails(@RequestBody PanelViewDetailsRequest request, HttpServletResponse response) throws IOException {
         panelGroupService.exportPanelViewDetails(request, response);
     }
 
@@ -145,5 +150,57 @@ public class PanelGroupController {
     public void updatePanelStatus(@PathVariable String panelId, @RequestBody PanelGroupBaseInfoRequest request) {
         panelGroupService.updatePanelStatus(panelId, request);
     }
+    @ApiOperation("自动缓存")
+    @PostMapping("/autoCache")
+    @DePermissions(value = {
+            @DePermission(type = DePermissionType.PANEL, value = "id"),
+            @DePermission(type = DePermissionType.PANEL, value = "pid", level = ResourceAuthLevel.PANNEL_LEVEL_MANAGE)
+    }, logical = Logical.AND)
+    public void autoCache(@RequestBody PanelGroupRequest request){
+        panelGroupService.autoCache(request);
 
+    }
+
+    @ApiOperation("查找缓存")
+    @GetMapping("/findUserCache/{panelId}")
+    public PanelGroupDTO findUserCache(@PathVariable String panelId){
+        return panelGroupService.findUserPanelCache(panelId);
+    }
+    @ApiOperation("检查缓存")
+    @GetMapping("/checkUserCache/{panelId}")
+    public Boolean checkUserCache(@PathVariable String panelId){
+        return panelGroupService.checkUserCache(panelId);
+    }
+
+    @ApiOperation("删除缓存")
+    @DeleteMapping("/removePanelCache/{panelId}")
+    public void removePanelCache(@PathVariable String panelId){
+        panelGroupService.removePanelCache(panelId);
+    }
+
+    @ApiIgnore
+    @PostMapping("/viewLog")
+    public void viewLog(@RequestBody PanelViewLogRequest request) {
+        panelGroupService.viewLog(request);
+    }
+    @ApiOperation("获取仪表板中视图Element信息")
+    @GetMapping("/findPanelElementInfo/{viewId}")
+    @I18n
+    public Object findPanelElementInfo(@PathVariable String viewId){
+       return panelGroupService.findPanelElementInfo(viewId);
+    }
+    @GetMapping("/export2AppCheck/{panelId}")
+    public PanelExport2App export2AppCheck(@PathVariable String panelId){
+       return  panelGroupService.panelExport2AppCheck(panelId);
+    }
+
+    @PostMapping("/appApply")
+    public PanelGroupDTO appApply(@RequestBody PanelAppTemplateApplyRequest request) throws Exception{
+        String panelId = panelGroupService.appApply(request);
+        PanelGroupDTO result = findOne(panelId);
+        result.setParents(authService.parentResource(panelId,"panel"));
+        result.setRequestId(UUIDUtil.getUUIDAsString());
+        result.setResponseSource("appApply");
+        return result;
+    }
 }

@@ -16,9 +16,6 @@
     <!-- 网格线 -->
     <Grid v-if="showGrid" :matrix-style="matrixStyle" />
     <PGrid v-if="psDebug" :position-box="positionBoxInfoArray" :matrix-style="matrixStyle" />
-
-    <!-- 仪表板联动清除按钮-->
-    <canvas-opt-bar />
     <!--页面组件列表展示-->
     <de-drag
       v-for="(item, index) in componentData"
@@ -156,6 +153,7 @@
         ref="userViewDialog"
         :chart="showChartInfo"
         :chart-table="showChartTableInfo"
+        :canvas-style-data="canvasStyleData"
         :open-type="showChartInfoType"
       />
     </el-dialog>
@@ -192,7 +190,7 @@ import DeDrag from '@/components/DeDrag'
 
 // eslint-disable-next-line no-unused-vars
 import { getStyle, getComponentRotatedStyle } from '@/components/canvas/utils/style'
-import { _$ } from '@/components/canvas/utils/utils'
+import { _$, imgUrlTrans } from '@/components/canvas/utils/utils'
 import ContextMenu from './ContextMenu'
 import MarkLine from './MarkLine'
 import Area from './Area'
@@ -203,7 +201,6 @@ import { changeStyleWithScale } from '@/components/canvas/utils/translate'
 import { deepCopy } from '@/components/canvas/utils/utils'
 import UserViewDialog from '@/components/canvas/custom-component/UserViewDialog'
 import DeOutWidget from '@/components/dataease/DeOutWidget'
-import CanvasOptBar from '@/components/canvas/components/Editor/CanvasOptBar'
 import DragShadow from '@/components/DeDrag/shadow'
 import bus from '@/utils/bus'
 import LinkJumpSet from '@/views/panel/LinkJumpSet'
@@ -793,7 +790,6 @@ export default {
     DeDrag,
     UserViewDialog,
     DeOutWidget,
-    CanvasOptBar,
     DragShadow,
     LinkJumpSet
   },
@@ -973,7 +969,7 @@ export default {
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && this.canvasStyleData.panel.imageUrl) {
           style = {
-            background: `url(${this.canvasStyleData.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.canvasStyleData.panel.imageUrl)}) no-repeat`,
             ...style
           }
         } else if (this.canvasStyleData.panel.backgroundType === 'color') {
@@ -1097,6 +1093,7 @@ export default {
     eventBus.$on('openChartDetailsDialog', this.openChartDetailsDialog)
     bus.$on('onRemoveLastItem', this.removeLastItem)
     bus.$on('trigger-search-button', this.triggerSearchButton)
+    bus.$on('trigger-reset-button', this.triggerResetButton)
     bus.$on('refresh-button-info', this.refreshButtonInfo)
 
     // 矩阵定位调试模式
@@ -1113,31 +1110,40 @@ export default {
     bus.$off('onRemoveLastItem', this.removeLastItem)
     bus.$off('trigger-search-button', this.triggerSearchButton)
     bus.$off('refresh-button-info', this.refreshButtonInfo)
+    bus.$off('trigger-reset-button', this.triggerResetButton)
   },
   created() {
   },
   methods: {
-    refreshButtonInfo() {
-      const result = this.buildButtonFilterMap(this.componentData)
+    triggerResetButton() {
+      this.triggerSearchButton(true)
+    },
+    refreshButtonInfo(isClear = false) {
+      const result = this.buildButtonFilterMap(this.componentData, isClear)
       this.searchButtonInfo.buttonExist = result.buttonExist
       this.searchButtonInfo.relationFilterIds = result.relationFilterIds
       this.searchButtonInfo.filterMap = result.filterMap
       this.searchButtonInfo.autoTrigger = result.autoTrigger
       this.buttonFilterMap = this.searchButtonInfo.filterMap
     },
-    triggerSearchButton() {
-      this.refreshButtonInfo()
+    triggerSearchButton(isClear = false) {
+      this.refreshButtonInfo(isClear)
       this.buttonFilterMap = this.searchButtonInfo.filterMap
 
       this.componentData.forEach(component => {
         if (component.type === 'view' && this.buttonFilterMap[component.propValue.viewId]) {
           component.filters = this.buttonFilterMap[component.propValue.viewId]
         }
+        if (component.type === 'de-tabs') {
+          for (let idx = 0; idx < component.options.tabList.length; idx++) {
+            const ele = component.options.tabList[idx].content
+            if (!ele.type || ele.type !== 'view') continue
+            ele.filters = this.buttonFilterMap[ele.propValue.viewId]
+          }
+        }
       })
-
-      // this.$store.commit('addViewFilter', param)
     },
-    buildButtonFilterMap(panelItems) {
+    buildButtonFilterMap(panelItems, isClear = false) {
       const result = {
         buttonExist: false,
         relationFilterIds: [],
@@ -1166,11 +1172,11 @@ export default {
       result.relationFilterIds = matchFilters.map(item => item.id)
 
       let viewKeyMap = buildViewKeyMap(panelItems)
-      viewKeyMap = this.buildViewKeyFilters(matchFilters, viewKeyMap)
+      viewKeyMap = this.buildViewKeyFilters(matchFilters, viewKeyMap, isClear)
       result.filterMap = viewKeyMap
       return result
     },
-    buildViewKeyFilters(panelItems, result) {
+    buildViewKeyFilters(panelItems, result, isClear = false) {
       const refs = this.$refs
       if (!this.$refs['wrapperChild'] || !this.$refs['wrapperChild'].length) return result
       const len = this.$refs['wrapperChild'].length
@@ -1186,6 +1192,9 @@ export default {
         }
         const wrapperChild = refs['wrapperChild'][index]
         if (!wrapperChild || !wrapperChild.getCondition) return true
+        if (isClear) {
+          wrapperChild.clearHandler && wrapperChild.clearHandler()
+        }
         param = wrapperChild.getCondition && wrapperChild.getCondition()
         const condition = formatCondition(param)
         const vValid = valueValid(condition)

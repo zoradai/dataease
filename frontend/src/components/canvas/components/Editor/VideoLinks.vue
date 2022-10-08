@@ -101,7 +101,7 @@ export default {
         this.curActiveTabInner.videoLinks = this.linkInfoTemp
       }
       this.curComponent.videoLinks = this.linkInfoTemp
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       bus.$emit('videoLinksChange-' + this.curComponent.id)
       this.popoverClose()
     },
@@ -154,7 +154,7 @@ export default {
     height: 35px;
     border-radius: 3px;
   }
-  >>>.el-popover{
+  ::v-deep .el-popover{
     height: 200px;
     overflow: auto;
   }

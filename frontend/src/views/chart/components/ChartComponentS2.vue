@@ -2,8 +2,8 @@
   <div ref="chartContainer" style="padding: 0;width: 100%;height: 100%;overflow: hidden;" :style="bg_class">
     <view-track-bar ref="viewTrack" :track-menu="trackMenu" class="track-bar" :style="trackBarStyleTime" @trackClick="trackClick" />
     <span v-if="chart.type" v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
-      <div>
-        <p style="padding:6px 4px 0;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
+      <div style="padding:6px 4px 0;margin: 0;">
+        <p style="overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
         <title-remark v-if="remarkCfg.show" style="text-shadow: none!important;" :remark-cfg="remarkCfg" />
       </div>
     </span>
@@ -234,16 +234,29 @@ export default {
         pre[next['dataeaseName']] = next['id']
         return pre
       }, {})
-      const rowData = this.chart.data.tableRow[meta.rowIndex]
+
+      let rowData
+      if (this.chart.type === 'table-pivot') {
+        rowData = { ...meta.rowQuery, ...meta.colQuery }
+        rowData[meta.valueField] = meta.fieldValue
+      } else if (this.showPage) {
+        const rowIndex = (this.currentPage.page - 1) * this.currentPage.pageSize + meta.rowIndex
+        rowData = this.chart.data.tableRow[rowIndex]
+      } else {
+        rowData = this.chart.data.tableRow[meta.rowIndex]
+      }
       const dimensionList = []
       for (const key in rowData) {
-        dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+        if(meta.fieldValue === rowData[key]){
+          dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+        }
       }
+
       this.pointParam = {
         data: {
           dimensionList: dimensionList,
           quotaList: [],
-          name: meta.fieldValue
+          name: meta.fieldValue||'null'
         }
       }
 
@@ -447,13 +460,13 @@ export default {
   color: #606266;
   white-space:nowrap;
 }
-.page-style >>> .el-input__inner{
+.page-style ::v-deep .el-input__inner{
   height: 24px;
 }
-.page-style >>> button{
+.page-style ::v-deep button{
   background: transparent!important;
 }
-.page-style >>> li{
+.page-style ::v-deep li{
   background: transparent!important;
 }
 </style>

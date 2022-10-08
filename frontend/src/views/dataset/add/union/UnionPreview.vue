@@ -1,34 +1,28 @@
 <template>
-  <div>
-    <div class="text item">
-      <ux-grid
-        ref="plxTable"
-        size="mini"
-        style="width: 100%;"
-        :height="height"
-        :checkbox-config="{highlight: true}"
-        :width-resize="true"
-      >
-        <ux-table-column
-          v-for="field in fields"
-          :key="field.fieldName"
-          min-width="200px"
-          :field="field.fieldName"
-          :title="field.remarks"
-          :resizable="true"
-        />
-      </ux-grid>
-    </div>
-    <span class="table-count">
-      {{ $t('dataset.preview_show') }}
-      <span class="span-number">1000</span>
-      {{ $t('dataset.preview_item') }}
-    </span>
+  <div class="table-preview">
+    <ux-grid
+      ref="plxTable"
+      size="mini"
+      style="width: 100%"
+      :height="height"
+      :checkbox-config="{ highlight: true }"
+      :width-resize="true"
+    >
+      <ux-table-column
+        v-for="field in fields"
+        :key="field.fieldName"
+        min-width="200px"
+        :field="field.fieldName"
+        :title="field.remarks"
+        :resizable="true"
+      />
+    </ux-grid>
   </div>
 </template>
 
 <script>
 import { post } from '@/api/dataset/dataset'
+import _ from 'lodash'
 
 export default {
   name: 'UnionPreview',
@@ -40,31 +34,45 @@ export default {
     dataset: {
       type: Array,
       required: true
-    }
+    },
+    unionHeight: {
+      type: Number,
+      default: 298
+    },
   },
   data() {
     return {
-      height: 'auto',
+      height: 200,
       fields: [],
       data: []
     }
   },
   watch: {
-    'table': function() {
+    table: function () {
       this.initPreview()
+    },
+    unionHeight: {
+      handler: function () {
+        this.calHeight()
+      }
     }
   },
   mounted() {
-    this.initHeight()
     this.initPreview()
+    this.calHeight()
+    window.onresize = () => {
+      this.calHeight()
+    }
   },
   methods: {
-    initHeight() {
-      this.height = (document.getElementsByClassName('el-drawer__body')[0].clientHeight - 40) + 'px'
-    },
+    calHeight: _.debounce(function() {
+      const unionHeight = Math.max(this.unionHeight, 298)
+      const currentHeight = document.documentElement.clientHeight
+      this.height = currentHeight - unionHeight - 56 - 54 - 36
+    }, 200),
     initPreview() {
       if (this.dataset && this.dataset.length > 0) {
-        post('/dataset/table/unionPreview', this.table).then(response => {
+        post('/dataset/table/unionPreview', this.table).then((response) => {
           this.fields = response.data.fields
           this.data = response.data.data
           const datas = this.data
@@ -82,13 +90,10 @@ export default {
 </script>
 
 <style scoped>
-.span-number{
-  color: #0a7be0;
-}
-.table-count{
-  color: #606266;
-}
-span{
-  font-size: 12px;
+.table-preview {
+  height: calc(100% - 64px);
+  padding: 18px 25px;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 </style>

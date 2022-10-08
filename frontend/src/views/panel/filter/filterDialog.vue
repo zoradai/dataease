@@ -181,7 +181,7 @@
 
     <de-main-container class="ms-main-container">
       <div v-if="currentElement.options && currentElement.options.attrs">
-        <filter-head :element="currentElement" :table-fields-map="tableFieldsMap" :widget="widget" />
+        <filter-head :element="currentElement" :widget="widget" />
 
         <filter-control :element="currentElement" :widget="widget" :control-attrs="myAttrs" :child-views="childViews" />
 
@@ -297,7 +297,6 @@ export default {
         datasetParams: []
       },
       currentElement: null,
-      tableFieldsMap: {},
       tempTreeDatas: null,
       showTips: false
     }
@@ -481,7 +480,14 @@ export default {
         this.viewInfos = datas
         this.childViews.viewInfos = datas
       })
-      viewIds && viewIds.length > 0 && paramsWithIds(viewIds).then(res => {
+      var type = 'TEXT'
+      if(this.widgetInfo.name.indexOf('time') !== -1){
+        type = 'DATE'
+      }
+      if(this.widgetInfo.name === 'numberSelectWidget'){
+        type = 'NUM'
+      }
+      viewIds && viewIds.length > 0 && paramsWithIds(type, viewIds).then(res => {
         const datas = res.data
 
         this.childViews.datasetParams = datas
@@ -632,7 +638,6 @@ export default {
     loadField(tableId) {
       fieldListWithPermission(tableId).then(res => {
         let datas = res.data
-        this.$set(this.tableFieldsMap, tableId, JSON.parse(JSON.stringify(datas)))
         if (this.widget && this.widget.filterFieldMethod) {
           datas = this.widget.filterFieldMethod(datas)
         }
@@ -643,7 +648,6 @@ export default {
     comLoadField(tableId) {
       fieldListWithPermission(tableId).then(res => {
         let datas = res.data
-        this.$set(this.tableFieldsMap, tableId, JSON.parse(JSON.stringify(datas)))
         if (this.widget && this.widget.filterFieldMethod) {
           datas = this.widget.filterFieldMethod(datas)
         }
@@ -787,7 +791,7 @@ export default {
     padding: 10px;
     height: 100%;
 
-    >>>div.el-tabs__content {
+    ::v-deep div.el-tabs__content {
       height: calc(100% - 55px);
     }
   }

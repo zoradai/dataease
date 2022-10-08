@@ -31,6 +31,7 @@ import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.*;
 import io.dataease.plugins.common.constants.DatasetType;
 import io.dataease.plugins.common.constants.DatasourceTypes;
+import io.dataease.plugins.common.dto.dataset.SqlVariableDetails;
 import io.dataease.plugins.common.dto.datasource.DataSourceType;
 import io.dataease.plugins.common.dto.datasource.TableField;
 import io.dataease.plugins.common.request.datasource.DatasourceRequest;
@@ -44,6 +45,7 @@ import io.dataease.provider.datasource.JdbcProvider;
 import io.dataease.service.datasource.DatasourceService;
 import io.dataease.service.engine.EngineService;
 import io.dataease.service.sys.SysAuthService;
+import net.sf.jsqlparser.expression.Alias;
 import net.sf.jsqlparser.expression.BinaryExpression;
 import net.sf.jsqlparser.expression.Expression;
 import net.sf.jsqlparser.expression.Parenthesis;
@@ -52,23 +54,14 @@ import net.sf.jsqlparser.expression.operators.conditional.OrExpression;
 import net.sf.jsqlparser.expression.operators.relational.*;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import net.sf.jsqlparser.statement.Statement;
-import net.sf.jsqlparser.statement.select.PlainSelect;
-import net.sf.jsqlparser.statement.select.Select;
-import net.sf.jsqlparser.statement.select.SubSelect;
-import net.sf.jsqlparser.statement.select.WithItem;
+import net.sf.jsqlparser.statement.select.*;
 import net.sf.jsqlparser.util.deparser.ExpressionDeParser;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
-import org.apache.poi.hssf.usermodel.HSSFRow;
-import org.apache.poi.hssf.usermodel.HSSFSheet;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -78,10 +71,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
@@ -153,14 +145,18 @@ public class DataSetTableService {
     private static Logger logger = LoggerFactory.getLogger(ClassloaderResponsity.class);
 
     @DeCleaner(value = DePermissionType.DATASET, key = "sceneId")
-    public void batchInsert(List<DataSetTableRequest> datasetTable) throws Exception {
+    public List<DatasetTable> batchInsert(List<DataSetTableRequest> datasetTable) throws Exception {
+        // 保存之前校验table名称
+        checkNames(datasetTable);
+        List<DatasetTable> list = new ArrayList<>();
         for (DataSetTableRequest table : datasetTable) {
-            save(table);
+            list.add(save(table));
             // 清理权限缓存
             CacheUtils.removeAll(AuthConstants.USER_DATASET_NAME);
             CacheUtils.removeAll(AuthConstants.ROLE_DATASET_NAME);
             CacheUtils.removeAll(AuthConstants.DEPT_DATASET_NAME);
         }
+        return list;
     }
 
     private void extractData(DataSetTableRequest datasetTable) throws Exception {
@@ -182,10 +178,11 @@ public class DataSetTableService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     @DeCleaner(value = DePermissionType.DATASET, key = "sceneId")
-    public void saveExcel(DataSetTableRequest datasetTable) throws Exception {
+    public List<DatasetTable> saveExcel(DataSetTableRequest datasetTable) throws Exception {
         List<String> datasetIdList = new ArrayList<>();
 
         if (StringUtils.isEmpty(datasetTable.getId())) {
+            List<DatasetTable> list = new ArrayList<>();
             if (datasetTable.isMergeSheet()) {
                 Map<String, List<ExcelSheetData>> map = datasetTable.getSheets().stream()
                         .collect(Collectors.groupingBy(ExcelSheetData::getFieldsMd5));
@@ -207,6 +204,19 @@ public class DataSetTableService {
                         excelSheetData.setData(null);
                         excelSheetData.setJsonArray(null);
                     });
+                }
+                for (String s : map.keySet()) {
+                    DataSetTableRequest sheetTable = new DataSetTableRequest();
+                    BeanUtils.copyBean(sheetTable, datasetTable);
+                    sheetTable.setId(UUID.randomUUID().toString());
+                    sheetTable.setCreateBy(AuthUtils.getUser().getUsername());
+                    sheetTable.setCreateTime(System.currentTimeMillis());
+                    List<ExcelSheetData> excelSheetDataList = map.get(s);
+                    sheetTable.setName(excelSheetDataList.get(0).getDatasetName());
+                    excelSheetDataList.forEach(excelSheetData -> {
+                        excelSheetData.setData(null);
+                        excelSheetData.setJsonArray(null);
+                    });
                     DataTableInfoDTO info = new DataTableInfoDTO();
                     info.setExcelSheetDataList(excelSheetDataList);
                     sheetTable.setInfo(new Gson().toJson(info));
@@ -214,6 +224,7 @@ public class DataSetTableService {
                     sysAuthService.copyAuth(sheetTable.getId(), SysAuthConstants.AUTH_SOURCE_TYPE_DATASET);
                     saveExcelTableField(sheetTable.getId(), excelSheetDataList.get(0).getFields(), true);
                     datasetIdList.add(sheetTable.getId());
+                    list.add(sheetTable);
                     DeLogUtils.save(SysLogConstants.OPERATE_TYPE.CREATE, SysLogConstants.SOURCE_TYPE.DATASET, datasetTable.getId(), datasetTable.getSceneId(), null, null);
                 }
                 datasetIdList.forEach(datasetId -> {
@@ -227,6 +238,9 @@ public class DataSetTableService {
                     if (checkIsRepeat(fieldArray)) {
                         DataEaseException.throwException(Translator.get("i18n_excel_field_repeat"));
                     }
+                }
+
+                for (ExcelSheetData sheet : datasetTable.getSheets()) {
                     DataSetTableRequest sheetTable = new DataSetTableRequest();
                     BeanUtils.copyBean(sheetTable, datasetTable);
                     sheetTable.setId(UUID.randomUUID().toString());
@@ -245,16 +259,16 @@ public class DataSetTableService {
                     sysAuthService.copyAuth(sheetTable.getId(), SysAuthConstants.AUTH_SOURCE_TYPE_DATASET);
                     saveExcelTableField(sheetTable.getId(), sheet.getFields(), true);
                     datasetIdList.add(sheetTable.getId());
+                    list.add(sheetTable);
                     DeLogUtils.save(SysLogConstants.OPERATE_TYPE.MODIFY, SysLogConstants.SOURCE_TYPE.DATASET, datasetTable.getId(), datasetTable.getSceneId(), null, null);
                 }
                 datasetIdList.forEach(datasetId -> {
                     commonThreadPool.addTask(() -> extractDataService.extractExcelData(datasetId, "all_scope", "初始导入",
                             null, datasetIdList));
                 });
-
-
             }
-            return;
+
+            return list;
         }
 
         List<ExcelSheetData> excelSheetDataList = new ArrayList<>();
@@ -293,12 +307,13 @@ public class DataSetTableService {
                     null, Arrays.asList(datasetTable.getId())));
         }
         DeLogUtils.save(SysLogConstants.OPERATE_TYPE.MODIFY, SysLogConstants.SOURCE_TYPE.DATASET, datasetTable.getId(), datasetTable.getSceneId(), null, null);
+        return Collections.singletonList(datasetTable);
     }
 
     @DeCleaner(value = DePermissionType.DATASET, key = "sceneId")
     public DatasetTable save(DataSetTableRequest datasetTable) throws Exception {
         checkName(datasetTable);
-        if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.name())) {
+        if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.name()) && !"appApply".equalsIgnoreCase(datasetTable.getOptFrom())) {
             DataSetTableRequest dataSetTableRequest = new DataSetTableRequest();
             BeanUtils.copyBean(dataSetTableRequest, datasetTable);
             getSQLPreview(dataSetTableRequest);
@@ -316,7 +331,9 @@ public class DataSetTableService {
 
             // 添加表成功后，获取当前表字段和类型，抽象到dataease数据库
             if (insert == 1) {
-                saveTableField(datasetTable);
+                if (datasetTable.getOptFrom() == null || !"appApply".equalsIgnoreCase(datasetTable.getOptFrom())) {
+                    saveTableField(datasetTable);
+                }
                 extractData(datasetTable);
                 DeLogUtils.save(SysLogConstants.OPERATE_TYPE.CREATE, SysLogConstants.SOURCE_TYPE.DATASET, datasetTable.getId(), datasetTable.getSceneId(), null, null);
             }
@@ -381,6 +398,13 @@ public class DataSetTableService {
             datasourceRequest.setQuery(ddlProvider.dropTable(TableUtils.tmpName(dorisTableName)));
             jdbcProvider.exec(datasourceRequest);
         }
+    }
+
+    public List<String> getDatasetNameFromGroup(String sceneId) {
+        DatasetTableExample example = new DatasetTableExample();
+        example.createCriteria().andSceneIdEqualTo(sceneId);
+        List<DatasetTable> datasetTables = datasetTableMapper.selectByExample(example);
+        return datasetTables.stream().map(DatasetTable::getName).collect(Collectors.toList());
     }
 
     public List<DataSetTableDTO> list(DataSetTableRequest dataSetTableRequest) {
@@ -591,7 +615,7 @@ public class DataSetTableService {
                 datasourceRequest.setQuery(
                         qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
 
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
                 datasourceRequest.setPageSize(pageSize);
@@ -618,6 +642,9 @@ public class DataSetTableService {
                 // check doris table
                 if (!checkEngineTableIsExists(dataSetTableRequest.getId())) {
                     if (dataSetTableRequest.isPreviewForTask()) {
+                        map.put("fields", fields);
+                        map.put("data", new ArrayList<>());
+                        map.put("page", new DataSetPreviewPage());
                         return map;
                     } else {
                         throw new RuntimeException(Translator.get("i18n_data_not_sync"));
@@ -631,7 +658,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
                 } catch (Exception e) {
@@ -660,13 +687,13 @@ public class DataSetTableService {
                 Provider datasourceProvider = ProviderFactory.getProvider(ds.getType());
                 DatasourceRequest datasourceRequest = new DatasourceRequest();
                 datasourceRequest.setDatasource(ds);
-
-                String sql = handleVariableDefaultValue(new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class).getSql(), null);
-
+                DataTableInfoDTO dataTableInfo = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
+                String sql = dataTableInfo.isBase64Encryption() ? new String(java.util.Base64.getDecoder().decode(dataTableInfo.getSql())) : dataTableInfo.getSql();
+                sql = handleVariableDefaultValue(sql, null, ds.getType());
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
                 datasourceRequest.setPageSize(pageSize);
@@ -701,7 +728,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
                 } catch (Exception e) {
@@ -730,7 +757,7 @@ public class DataSetTableService {
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
             datasourceRequest.setQuery(
                     qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
-            map.put("sql", datasourceRequest.getQuery());
+            map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
             try {
                 data.addAll(jdbcProvider.getData(datasourceRequest));
             } catch (Exception e) {
@@ -783,7 +810,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
                 datasourceRequest.setPageSize(pageSize);
@@ -814,7 +841,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
                 } catch (Exception e) {
@@ -853,7 +880,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQuerySQLWithPage(sql, fields, page, pageSize, realSize, false, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 datasourceRequest.setPage(page);
                 datasourceRequest.setFetchSize(Integer.parseInt(dataSetTableRequest.getRow()));
                 datasourceRequest.setPageSize(pageSize);
@@ -884,7 +911,7 @@ public class DataSetTableService {
                 QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
                 datasourceRequest.setQuery(
                         qp.createQueryTableWithPage(table, fields, page, pageSize, realSize, false, ds, null, rowPermissionsTree));
-                map.put("sql", datasourceRequest.getQuery());
+                map.put("sql", java.util.Base64.getEncoder().encodeToString(datasourceRequest.getQuery().getBytes()));
                 try {
                     data.addAll(jdbcProvider.getData(datasourceRequest));
                 } catch (Exception e) {
@@ -929,8 +956,12 @@ public class DataSetTableService {
         return map;
     }
 
-    public List<SqlVariableDetails> paramsWithIds(List<String> viewIds) {
+    public List<SqlVariableDetails> paramsWithIds(String type, List<String> viewIds) {
         if (CollectionUtils.isEmpty(viewIds)) {
+            return new ArrayList<>();
+        }
+
+        if (!Arrays.asList("DATE", "TEXT", "NUM").contains(type)) {
             return new ArrayList<>();
         }
         ChartViewExample chartViewExample = new ChartViewExample();
@@ -946,25 +977,53 @@ public class DataSetTableService {
             return new ArrayList<>();
         }
         List<SqlVariableDetails> sqlVariableDetails = new ArrayList<>();
-        datasetTables.forEach(datasetTable -> {
+        for (DatasetTable datasetTable : datasetTables) {
             if (StringUtils.isNotEmpty(datasetTable.getSqlVariableDetails())) {
-                sqlVariableDetails.addAll(new Gson().fromJson(datasetTable.getSqlVariableDetails(), new TypeToken<List<SqlVariableDetails>>() {
-                }.getType()));
+                List<SqlVariableDetails> sqlVariables = new Gson().fromJson(datasetTable.getSqlVariableDetails(), new TypeToken<List<SqlVariableDetails>>() {
+                }.getType());
+                for (SqlVariableDetails sqlVariable : sqlVariables) {
+                    sqlVariable.setId(datasetTable.getId() + "|DE|" + sqlVariable.getVariableName());
+                    sqlVariable.setVariableName("[" + datasetTable.getName() + "]-" + sqlVariable.getVariableName());
+                    sqlVariableDetails.add(sqlVariable);
+                }
             }
-
-        });
+        }
+        switch (type) {
+            case "DATE":
+                sqlVariableDetails = sqlVariableDetails.stream().filter(item -> item.getType().get(0).contains("DATETIME")).collect(Collectors.toList());
+                sqlVariableDetails.forEach(item -> {
+                    if (item.getType().size() > 1) {
+                        item.setAlias(item.getVariableName() + "[" + item.getType().get(1) + "]");
+                    } else {
+                        item.setAlias(item.getVariableName());
+                    }
+                });
+                break;
+            case "TEXT":
+                sqlVariableDetails = sqlVariableDetails.stream().filter(item -> item.getType().get(0).contains("TEXT")).collect(Collectors.toList());
+                sqlVariableDetails.forEach(item -> {
+                    item.setAlias(item.getVariableName());
+                });
+                break;
+            case "NUM":
+                sqlVariableDetails = sqlVariableDetails.stream().filter(item -> item.getType().get(0).contains("LONG") || item.getType().get(0).contains("DOUBLE")).collect(Collectors.toList());
+                sqlVariableDetails.forEach(item -> {
+                    item.setAlias(item.getVariableName());
+                });
+                break;
+        }
         return sqlVariableDetails;
     }
 
 
-    public void checkVariable(final String sql) throws Exception {
-        String tmpSql = removeVariables(sql);
+    public void checkVariable(final String sql, String dsType) throws Exception {
+        String tmpSql = removeVariables(sql, dsType);
         if (tmpSql.contains(SubstitutedParams)) {
             throw new Exception(Translator.get("I18N_SQL_variable_limit"));
         }
     }
 
-    public String handleVariableDefaultValue(String sql, String sqlVariableDetails) {
+    public String handleVariableDefaultValue(String sql, String sqlVariableDetails, String dsType) {
         if (StringUtils.isEmpty(sql)) {
             DataEaseException.throwException(Translator.get("i18n_sql_not_empty"));
         }
@@ -988,14 +1047,14 @@ public class DataSetTableService {
         }
 
         try {
-            sql = removeVariables(sql);
+            sql = removeVariables(sql, dsType);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return sql;
     }
 
-    public String removeVariables(String sql) throws Exception {
+    public String removeVariables(String sql, String dsType) throws Exception {
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(sql);
         boolean hasVariables = false;
@@ -1003,16 +1062,31 @@ public class DataSetTableService {
             hasVariables = true;
             sql = sql.replace(matcher.group(), SubstitutedParams);
         }
-        if (!hasVariables) {
+        if (!hasVariables && !sql.contains(SubstitutedParams)) {
             return sql;
         }
         CCJSqlParserUtil.parse(sql, parser -> parser.withSquareBracketQuotation(true));
         Statement statement = CCJSqlParserUtil.parse(sql);
         Select select = (Select) statement;
         PlainSelect plainSelect = ((PlainSelect) select.getSelectBody());
+        // 访问from
+        FromItem fromItem = plainSelect.getFromItem();
+        if (fromItem instanceof SubSelect) {
+            SelectBody selectBody = ((SubSelect) fromItem).getSelectBody();
+            SubSelect subSelect = new SubSelect();
+            Select subSelectTmp = (Select) CCJSqlParserUtil.parse(removeVariables(selectBody.toString(), dsType));
+            PlainSelect subPlainSelect = ((PlainSelect) subSelectTmp.getSelectBody());
+            subSelect.setSelectBody(subPlainSelect);
+            if (dsType.equals(DatasourceTypes.oracle.getType())) {
+                subSelect.setAlias(new Alias(fromItem.getAlias().toString(), false));
+            } else {
+                subSelect.setAlias(new Alias(fromItem.getAlias().toString()));
+            }
+            plainSelect.setFromItem(subSelect);
+        }
         Expression expr = plainSelect.getWhere();
         if (expr == null) {
-            return sql;
+            return handleWith(plainSelect, select, dsType);
         }
         StringBuilder stringBuilder = new StringBuilder();
         BinaryExpression binaryExpression = null;
@@ -1026,22 +1100,63 @@ public class DataSetTableService {
             expr.accept(getExpressionDeParser(stringBuilder));
         }
         plainSelect.setWhere(CCJSqlParserUtil.parseCondExpression(stringBuilder.toString()));
+        return handleWith(plainSelect, select, dsType);
+    }
 
+    private String handleWith(PlainSelect plainSelect, Select select, String dsType) throws Exception {
         StringBuilder builder = new StringBuilder();
         if (CollectionUtils.isNotEmpty(select.getWithItemsList())) {
             builder.append("WITH");
             builder.append(" ");
-            for (Iterator<WithItem> iter = select.getWithItemsList().iterator(); iter.hasNext();) {
+            for (Iterator<WithItem> iter = select.getWithItemsList().iterator(); iter.hasNext(); ) {
                 WithItem withItem = iter.next();
-                builder.append(withItem.toString());
+                builder.append(withItem.getName() + " AS ( " + removeVariables(withItem.getSubSelect().toString(), dsType) + " ) ");
                 if (iter.hasNext()) {
                     builder.append(",");
                 }
             }
         }
 
-        builder.append( " " + plainSelect);
+        builder.append(" " + plainSelect);
         return builder.toString();
+    }
+
+    public Map<String, Object> getDBPreview(DataSetTableRequest dataSetTableRequest) throws Exception {
+        Datasource ds = datasourceMapper.selectByPrimaryKey(dataSetTableRequest.getDataSourceId());
+        if (ds == null) {
+            throw new Exception(Translator.get("i18n_invalid_ds"));
+        }
+        Provider datasourceProvider = ProviderFactory.getProvider(ds.getType());
+        DatasourceRequest datasourceRequest = new DatasourceRequest();
+        datasourceRequest.setDatasource(ds);
+        DataTableInfoDTO dataTableInfo = new Gson().fromJson(dataSetTableRequest.getInfo(), DataTableInfoDTO.class);
+        QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
+        String sqlAsTable = qp.createSQLPreview(qp.sqlForPreview(dataTableInfo.getTable(), ds), null);
+        datasourceRequest.setQuery(sqlAsTable);
+        datasourceRequest.setTable(dataTableInfo.getTable());
+        Map<String, List> result = datasourceProvider.fetchResultAndField(datasourceRequest);
+        List<String[]> data = result.get("dataList");
+        List<TableField> fields = result.get("fieldList");
+        String[] fieldArray = fields.stream().map(TableField::getFieldName).toArray(String[]::new);
+        if (checkIsRepeat(fieldArray)) {
+            DataEaseException.throwException(Translator.get("i18n_excel_field_repeat"));
+        }
+        List<Map<String, Object>> jsonArray = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(data)) {
+            jsonArray = data.stream().map(ele -> {
+                Map<String, Object> map = new HashMap<>();
+                for (int i = 0; i < ele.length; i++) {
+                    map.put(fieldArray[i], ele[i]);
+                }
+                return map;
+            }).collect(Collectors.toList());
+        }
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("fields", fields);
+        map.put("data", jsonArray);
+
+        return map;
     }
 
     public Map<String, Object> getSQLPreview(DataSetTableRequest dataSetTableRequest) throws Exception {
@@ -1052,11 +1167,13 @@ public class DataSetTableService {
         Provider datasourceProvider = ProviderFactory.getProvider(ds.getType());
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         datasourceRequest.setDatasource(ds);
-        String sql = handleVariableDefaultValue(new Gson().fromJson(dataSetTableRequest.getInfo(), DataTableInfoDTO.class).getSql(), dataSetTableRequest.getSqlVariableDetails());
+        DataTableInfoDTO dataTableInfo = new Gson().fromJson(dataSetTableRequest.getInfo(), DataTableInfoDTO.class);
+        String sql = dataTableInfo.isBase64Encryption() ? new String(java.util.Base64.getDecoder().decode(dataTableInfo.getSql())) : dataTableInfo.getSql();
+        sql = handleVariableDefaultValue(sql, dataSetTableRequest.getSqlVariableDetails(), ds.getType());
         if (StringUtils.isEmpty(sql)) {
             DataEaseException.throwException(Translator.get("i18n_sql_not_empty"));
         }
-        checkVariable(sql);
+        checkVariable(sql, ds.getType());
         QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
         String sqlAsTable = qp.createSQLPreview(sql, null);
         datasourceRequest.setQuery(sqlAsTable);
@@ -1668,16 +1785,16 @@ public class DataSetTableService {
         List<DatasetTableField> datasetTableFields = new ArrayList<>();
         if (CollectionUtils.isNotEmpty(fields)) {
             for (int i = 0; i < fields.size(); i++) {
-                TableField filed = fields.get(i);
+                TableField field = fields.get(i);
                 DatasetTableField datasetTableField = DatasetTableField.builder().build();
                 datasetTableField.setTableId(datasetTableId);
-                datasetTableField.setOriginName(filed.getFieldName());
-                datasetTableField.setName(filed.getRemarks());
-                datasetTableField.setDataeaseName(TableUtils.columnName(filed.getFieldName()));
-                datasetTableField.setType(filed.getFieldType());
-                datasetTableField.setDeType(transFieldType(filed.getFieldType()));
-                datasetTableField.setDeExtractType(transFieldType(filed.getFieldType()));
-                datasetTableField.setSize(filed.getFieldSize());
+                datasetTableField.setOriginName(field.getFieldName());
+                datasetTableField.setName(field.getRemarks());
+                datasetTableField.setDataeaseName(TableUtils.columnName(field.getFieldName()));
+                datasetTableField.setType(field.getFieldType());
+                datasetTableField.setDeType(transFieldType(field.getFieldType()));
+                datasetTableField.setDeExtractType(transFieldType(field.getFieldType()));
+                datasetTableField.setSize(field.getFieldSize());
                 datasetTableField.setChecked(true);
                 datasetTableField.setColumnIndex(i);
                 datasetTableField.setLastSyncTime(System.currentTimeMillis());
@@ -1709,7 +1826,9 @@ public class DataSetTableService {
             DatasourceRequest datasourceRequest = new DatasourceRequest();
             datasourceRequest.setDatasource(ds);
             QueryProvider qp = ProviderFactory.getQueryProvider(ds.getType());
-            String sql = handleVariableDefaultValue(new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class).getSql(), null);
+            DataTableInfoDTO dataTableInfo = new Gson().fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
+            String sql = dataTableInfo.isBase64Encryption() ? new String(java.util.Base64.getDecoder().decode(dataTableInfo.getSql())) : dataTableInfo.getSql();
+            sql = handleVariableDefaultValue(sql, null, ds.getType());
             String sqlAsTable = qp.createSQLPreview(sql, null);
             datasourceRequest.setQuery(sqlAsTable);
             fields = datasourceProvider.fetchResultField(datasourceRequest);
@@ -1837,44 +1956,46 @@ public class DataSetTableService {
         if (CollectionUtils.isNotEmpty(fields)) {
             List<String> originNameList = new ArrayList<>();
             for (int i = 0; i < fields.size(); i++) {
-                TableField filed = fields.get(i);
-                originNameList.add(filed.getFieldName());
+                TableField field = fields.get(i);
+                originNameList.add(field.getFieldName());
                 DatasetTableField datasetTableField = DatasetTableField.builder().build();
                 // 物理字段名设定为唯一，查询当前数据集下是否已存在该字段，存在则update，不存在则insert
                 DatasetTableFieldExample datasetTableFieldExample = new DatasetTableFieldExample();
                 // 字段名一致，认为字段没有改变
-                datasetTableFieldExample.createCriteria().andTableIdEqualTo(datasetTable.getId()).andOriginNameEqualTo(filed.getFieldName());
+                datasetTableFieldExample.createCriteria().andTableIdEqualTo(datasetTable.getId()).andOriginNameEqualTo(field.getFieldName());
                 List<DatasetTableField> datasetTableFields = datasetTableFieldMapper.selectByExample(datasetTableFieldExample);
                 if (CollectionUtils.isNotEmpty(datasetTableFields)) {
                     datasetTableField.setId(datasetTableFields.get(0).getId());
-                    datasetTableField.setOriginName(filed.getFieldName());
-                    datasetTableField.setType(filed.getFieldType());
-                    datasetTableField.setSize(filed.getFieldSize());
+                    datasetTableField.setOriginName(field.getFieldName());
+                    datasetTableField.setType(field.getFieldType());
+                    datasetTableField.setSize(field.getFieldSize());
+                    datasetTableField.setAccuracy(field.getAccuracy());
                     if (ObjectUtils.isEmpty(ds)) {
-                        datasetTableField.setDeExtractType(transFieldType(filed.getFieldType()));
+                        datasetTableField.setDeExtractType(transFieldType(field.getFieldType()));
                     } else {
-                        Integer fieldType = qp.transFieldType(filed.getFieldType());
+                        Integer fieldType = qp.transFieldType(field.getFieldType());
                         datasetTableField.setDeExtractType(fieldType);
                     }
                 } else {
                     datasetTableField.setTableId(datasetTable.getId());
-                    datasetTableField.setOriginName(filed.getFieldName());
-                    datasetTableField.setName(filed.getRemarks());
+                    datasetTableField.setOriginName(field.getFieldName());
+                    datasetTableField.setName(field.getRemarks());
                     if (datasetTable.getMode() == 1 && StringUtils.equalsIgnoreCase("union", datasetTable.getType())) {
-                        datasetTableField.setDataeaseName(filed.getFieldName());
+                        datasetTableField.setDataeaseName(field.getFieldName());
                     } else {
-                        datasetTableField.setDataeaseName(TableUtils.columnName(filed.getFieldName()));
+                        datasetTableField.setDataeaseName(TableUtils.columnName(field.getFieldName()));
                     }
-                    datasetTableField.setType(filed.getFieldType());
+                    datasetTableField.setType(field.getFieldType());
                     if (ObjectUtils.isEmpty(ds)) {
-                        datasetTableField.setDeType(transFieldType(filed.getFieldType()));
-                        datasetTableField.setDeExtractType(transFieldType(filed.getFieldType()));
+                        datasetTableField.setDeType(transFieldType(field.getFieldType()));
+                        datasetTableField.setDeExtractType(transFieldType(field.getFieldType()));
                     } else {
-                        Integer fieldType = qp.transFieldType(filed.getFieldType());
+                        Integer fieldType = qp.transFieldType(field.getFieldType());
                         datasetTableField.setDeType(fieldType == 4 ? 2 : (fieldType == 6 ? 0 : fieldType));
                         datasetTableField.setDeExtractType(fieldType);
                     }
-                    datasetTableField.setSize(filed.getFieldSize());
+                    datasetTableField.setSize(field.getFieldSize());
+                    datasetTableField.setAccuracy(field.getAccuracy());
                     datasetTableField.setChecked(true);
                     datasetTableField.setLastSyncTime(syncTime);
                     datasetTableField.setExtField(0);
@@ -1992,8 +2113,8 @@ public class DataSetTableService {
             List<String> sqlFileds = new ArrayList<>();
             try {
                 datasourceProvider.fetchResultField(datasourceRequest).stream().map(TableField::getFieldName)
-                        .forEach(filed -> {
-                            sqlFileds.add(filed);
+                        .forEach(field -> {
+                            sqlFileds.add(field);
                         });
             } catch (Exception e) {
                 DataEaseException.throwException(Translator.get("i18n_check_sql_error") + e.getMessage());
@@ -2012,7 +2133,7 @@ public class DataSetTableService {
             List<String> sqlFileds = new ArrayList<>();
             try {
                 datasourceProvider.fetchResultField(datasourceRequest).stream().map(TableField::getFieldName)
-                        .forEach(filed -> sqlFileds.add(filed));
+                        .forEach(field -> sqlFileds.add(field));
             } catch (Exception e) {
                 DataEaseException.throwException(Translator.get("i18n_check_sql_error") + e.getMessage());
             }
@@ -2041,9 +2162,34 @@ public class DataSetTableService {
         }
     }
 
+    private void checkNames(List<DataSetTableRequest> datasetTable) {
+        if (CollectionUtils.isEmpty(datasetTable)) {
+            return;
+        }
+        Set<String> nameSet = new HashSet<>();
+        for (DataSetTableRequest table : datasetTable) {
+            nameSet.add(table.getName());
+        }
+        if (nameSet.size() != datasetTable.size()) {
+            throw new RuntimeException(Translator.get("i18n_name_cant_repeat_same_group"));
+        }
+        DatasetTableExample datasetTableExample = new DatasetTableExample();
+        DatasetTableExample.Criteria criteria = datasetTableExample.createCriteria();
+        if (StringUtils.isNotEmpty(datasetTable.get(0).getSceneId())) {
+            criteria.andSceneIdEqualTo(datasetTable.get(0).getSceneId());
+        }
+        if (CollectionUtils.isNotEmpty(nameSet)) {
+            criteria.andNameIn(new ArrayList<>(nameSet));
+        }
+        List<DatasetTable> list = datasetTableMapper.selectByExample(datasetTableExample);
+        if (list.size() > 0) {
+            throw new RuntimeException(Translator.get("i18n_name_cant_repeat_same_group"));
+        }
+    }
+
     public DataSetDetail getDatasetDetail(String id) {
         DataSetDetail dataSetDetail = new DataSetDetail();
-        DatasetTable table = datasetTableMapper.selectByPrimaryKey(id);
+        DataSetTableDTO table = extDataSetTableMapper.findOneDetails(id);
         dataSetDetail.setTable(table);
         if (ObjectUtils.isNotEmpty(table)) {
             Datasource datasource = datasourceMapper.selectByPrimaryKey(table.getDataSourceId());
@@ -2056,7 +2202,7 @@ public class DataSetTableService {
     public ExcelFileData excelSaveAndParse(MultipartFile file, String tableId, Integer editType) throws Exception {
         String filename = file.getOriginalFilename();
         // parse file
-        List<ExcelSheetData> excelSheetDataList = parseExcel2(filename, file.getInputStream(), true);
+        List<ExcelSheetData> excelSheetDataList = parseExcel(filename, file.getInputStream(), true);
         List<ExcelSheetData> retrunSheetDataList = new ArrayList<>();
 
         if (StringUtils.isNotEmpty(tableId)) {
@@ -2155,7 +2301,7 @@ public class DataSetTableService {
         return excelFileData;
     }
 
-    private List<ExcelSheetData> parseExcel2(String filename, InputStream inputStream, boolean isPreview)
+    private List<ExcelSheetData> parseExcel(String filename, InputStream inputStream, boolean isPreview)
             throws Exception {
         List<ExcelSheetData> excelSheetDataList = new ArrayList<>();
         String suffix = filename.substring(filename.lastIndexOf(".") + 1);
@@ -2171,6 +2317,38 @@ public class DataSetTableService {
             excelXlsxReader.process(inputStream);
             excelSheetDataList = excelXlsxReader.totalSheets;
         }
+
+        if (StringUtils.equalsIgnoreCase(suffix, "csv")) {
+            List<TableField> fields = new ArrayList<>();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+            String s = reader.readLine();// first line
+            String[] split = s.split(",");
+            for (String s1 : split) {
+                TableField tableFiled = new TableField();
+                tableFiled.setFieldName(s1);
+                tableFiled.setRemarks(s1);
+                tableFiled.setFieldType("TEXT");
+                fields.add(tableFiled);
+            }
+            List<List<String>> data = new ArrayList<>();
+            int num = 1;
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                if (num > 100) {
+                    break;
+                }
+                data.add(Arrays.asList(line.split(",")));
+                num++;
+            }
+            ExcelSheetData excelSheetData = new ExcelSheetData();
+            String[] fieldArray = fields.stream().map(TableField::getFieldName).toArray(String[]::new);
+            excelSheetData.setFields(fields);
+            excelSheetData.setData(data);
+            excelSheetData.setExcelLable(filename);
+            excelSheetData.setFieldsMd5(Md5Utils.md5(StringUtils.join(fieldArray, ",")));
+            excelSheetDataList.add(excelSheetData);
+        }
+
         inputStream.close();
         excelSheetDataList.forEach(excelSheetData -> {
             List<List<String>> data = excelSheetData.getData();
@@ -2190,137 +2368,6 @@ public class DataSetTableService {
         });
 
         return excelSheetDataList;
-    }
-
-    private Map<String, Object> parseExcel(String filename, InputStream inputStream, boolean isPreview)
-            throws Exception {
-        String suffix = filename.substring(filename.lastIndexOf(".") + 1);
-        List<TableField> fields = new ArrayList<>();
-        List<String[]> data = new ArrayList<>();
-        List<Map<String, Object>> jsonArray = new ArrayList<>();
-        List<String> sheets = new ArrayList<>();
-
-        if (StringUtils.equalsIgnoreCase(suffix, "xls")) {
-            HSSFWorkbook workbook = new HSSFWorkbook(inputStream);
-            HSSFSheet sheet0 = workbook.getSheetAt(0);
-            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                sheets.add(workbook.getSheetAt(i).getSheetName());
-            }
-            if (sheet0.getNumMergedRegions() > 0) {
-                throw new RuntimeException(Translator.get("i18n_excel_have_merge_region"));
-            }
-            int rows;
-            if (isPreview) {
-                rows = Math.min(sheet0.getPhysicalNumberOfRows(), 100);
-            } else {
-                rows = sheet0.getPhysicalNumberOfRows();
-            }
-            int columnNum = 0;
-            for (int i = 0; i < rows; i++) {
-                HSSFRow row = sheet0.getRow(i);
-                if (i == 0) {
-                    if (row == null) {
-                        throw new RuntimeException(Translator.get("i18n_excel_header_empty"));
-                    }
-                    columnNum = row.getPhysicalNumberOfCells();
-                }
-                String[] r = new String[columnNum];
-                for (int j = 0; j < columnNum; j++) {
-                    if (i == 0) {
-                        TableField tableField = new TableField();
-                        tableField.setFieldType("TEXT");
-                        tableField.setFieldSize(1024);
-                        String columnName = readCell(row.getCell(j), false, null);
-                        if (StringUtils.isEmpty(columnName)) {
-                            columnName = "NONE_" + String.valueOf(j);
-                        }
-                        tableField.setFieldName(columnName);
-                        tableField.setRemarks(columnName);
-                        fields.add(tableField);
-                    } else {
-                        if (row == null) {
-                            break;
-                        }
-                        r[j] = readCell(row.getCell(j), true, fields.get(j));
-                    }
-                }
-                if (i > 0) {
-                    data.add(r);
-                }
-            }
-        } else if (StringUtils.equalsIgnoreCase(suffix, "xlsx")) {
-            XSSFWorkbook xssfWorkbook = new XSSFWorkbook(inputStream);
-            XSSFSheet sheet0 = xssfWorkbook.getSheetAt(0);
-            for (int i = 0; i < xssfWorkbook.getNumberOfSheets(); i++) {
-                sheets.add(xssfWorkbook.getSheetAt(i).getSheetName());
-            }
-            if (sheet0.getNumMergedRegions() > 0) {
-                throw new RuntimeException(Translator.get("i18n_excel_have_merge_region"));
-            }
-            int rows;
-            if (isPreview) {
-                rows = Math.min(sheet0.getPhysicalNumberOfRows(), 100);
-            } else {
-                rows = sheet0.getPhysicalNumberOfRows();
-            }
-            int columnNum = 0;
-            for (int i = 0; i < rows; i++) {
-                XSSFRow row = sheet0.getRow(i);
-                if (i == 0) {
-                    if (row == null) {
-                        throw new RuntimeException(Translator.get("i18n_excel_header_empty"));
-                    }
-                    columnNum = row.getLastCellNum();
-                }
-                String[] r = new String[columnNum];
-                for (int j = 0; j < columnNum; j++) {
-                    if (i == 0) {
-                        TableField tableField = new TableField();
-                        tableField.setFieldType("TEXT");
-                        tableField.setFieldSize(1024);
-                        String columnName = readCell(row.getCell(j), false, null);
-                        if (StringUtils.isEmpty(columnName)) {
-                            columnName = "NONE_" + String.valueOf(j);
-                        }
-
-                        tableField.setFieldName(columnName);
-                        tableField.setRemarks(columnName);
-                        fields.add(tableField);
-                    } else {
-                        if (row == null) {
-                            break;
-                        }
-                        r[j] = readCell(row.getCell(j), true, fields.get(j));
-                    }
-                }
-                if (i > 0) {
-                    data.add(r);
-                }
-            }
-        }
-        String[] fieldArray = fields.stream().map(TableField::getFieldName).toArray(String[]::new);
-
-        // 校验excel字段是否重名
-        if (checkIsRepeat(fieldArray)) {
-            DataEaseException.throwException(Translator.get("i18n_excel_field_repeat"));
-        }
-
-        if (CollectionUtils.isNotEmpty(data)) {
-            jsonArray = data.stream().map(ele -> {
-                Map<String, Object> map = new HashMap<>();
-                for (int i = 0; i < ele.length; i++) {
-                    map.put(fieldArray[i], ele[i]);
-                }
-                return map;
-            }).collect(Collectors.toList());
-        }
-        inputStream.close();
-
-        Map<String, Object> map = new HashMap<>();
-        map.put("fields", fields);
-        map.put("data", jsonArray);
-        map.put("sheets", sheets);
-        return map;
     }
 
     private String readCell(Cell cell, boolean cellType, TableField tableField) {
@@ -2476,7 +2523,7 @@ public class DataSetTableService {
         datasetTables.forEach(datasetTable -> {
             if (StringUtils.isNotEmpty(datasetTable.getQrtzInstance()) && !activeQrtzInstances.contains(datasetTable.getQrtzInstance().substring(0, datasetTable.getQrtzInstance().length() - 13))) {
                 jobStoppeddDatasetTables.add(datasetTable);
-            }else {
+            } else {
                 syncDatasetTables.add(datasetTable);
             }
         });
@@ -2485,7 +2532,7 @@ public class DataSetTableService {
             DatasetTableTaskExample datasetTableTaskExample = new DatasetTableTaskExample();
             DatasetTableTaskExample.Criteria criteria = datasetTableTaskExample.createCriteria();
             criteria.andTableIdEqualTo(datasetTable.getId()).andLastExecStatusEqualTo(JobStatus.Underway.name());
-            if(CollectionUtils.isEmpty(dataSetTableTaskService.list(datasetTableTaskExample))){
+            if (CollectionUtils.isEmpty(dataSetTableTaskService.list(datasetTableTaskExample))) {
                 DatasetTable record = new DatasetTable();
                 record.setSyncStatus(JobStatus.Error.name());
                 example.clear();
@@ -2580,52 +2627,67 @@ public class DataSetTableService {
                 visitBinaryExpr(andExpression, "AND");
             }
 
+            @Override
+            public void visit(Between between) {
+                if (hasVarible(between.getBetweenExpressionStart().toString()) || hasVarible(between.getBetweenExpressionEnd().toString())) {
+                    getBuffer().append(SubstitutedSql);
+                } else {
+                    getBuffer().append(between.getLeftExpression()).append(" BETWEEN ").append(between.getBetweenExpressionStart()).append(" AND ").append(between.getBetweenExpressionEnd());
+                }
+            }
 
             @Override
             public void visit(MinorThan minorThan) {
+                if (hasVarible(minorThan.getLeftExpression().toString()) || hasVarible(minorThan.getRightExpression().toString())) {
+                    getBuffer().append(SubstitutedSql);
+                    return;
+                }
                 getBuffer().append(minorThan.getLeftExpression());
                 getBuffer().append(" < ");
-                getBuffer().append( minorThan.getRightExpression());
+                getBuffer().append(minorThan.getRightExpression());
             }
 
             @Override
             public void visit(MinorThanEquals minorThan) {
+                if (hasVarible(minorThan.getLeftExpression().toString()) || hasVarible(minorThan.getRightExpression().toString())) {
+                    getBuffer().append(SubstitutedSql);
+                    return;
+                }
                 getBuffer().append(minorThan.getLeftExpression());
                 getBuffer().append(" <= ");
-                getBuffer().append( minorThan.getRightExpression());
+                getBuffer().append(minorThan.getRightExpression());
             }
 
             @Override
             public void visit(GreaterThanEquals minorThan) {
+                if (hasVarible(minorThan.getLeftExpression().toString()) || hasVarible(minorThan.getRightExpression().toString())) {
+                    getBuffer().append(SubstitutedSql);
+                    return;
+                }
                 getBuffer().append(minorThan.getLeftExpression());
                 getBuffer().append(" >= ");
-                getBuffer().append( minorThan.getRightExpression());
+                getBuffer().append(minorThan.getRightExpression());
             }
 
             @Override
-            public void visit(GreaterThan minorThan) {
-                getBuffer().append(minorThan.getLeftExpression());
+            public void visit(GreaterThan greaterThan) {
+                if (hasVarible(greaterThan.getLeftExpression().toString()) || hasVarible(greaterThan.getRightExpression().toString())) {
+                    getBuffer().append(SubstitutedSql);
+                    return;
+                }
+                getBuffer().append(greaterThan.getLeftExpression());
                 getBuffer().append(" > ");
-                getBuffer().append( minorThan.getRightExpression());
+                getBuffer().append(greaterThan.getRightExpression());
             }
 
             @Override
             public void visit(ExpressionList expressionList) {
-                for (Iterator<Expression> iter = expressionList.getExpressions().iterator(); iter.hasNext();) {
+                for (Iterator<Expression> iter = expressionList.getExpressions().iterator(); iter.hasNext(); ) {
                     Expression expression = iter.next();
                     expression.accept(this);
                     if (iter.hasNext()) {
                         buffer.append(", ");
                     }
-                }
-            }
-
-            @Override
-            public void visit(Between between) {
-                if(hasVarible(between.getBetweenExpressionStart().toString()) || hasVarible(between.getBetweenExpressionEnd().toString())){
-                    getBuffer().append(SubstitutedSql);
-                }else {
-                    getBuffer().append(between.getLeftExpression()).append(" BETWEEN ").append(between.getBetweenExpressionStart()).append(" AND ").append(between.getBetweenExpressionEnd());
                 }
             }
 
@@ -2692,31 +2754,29 @@ public class DataSetTableService {
 
 
             private void visitBinaryExpr(BinaryExpression expr, String operator) {
-                boolean hasBinaryExpression = false;
+                boolean hasSubBinaryExpression = false;
                 try {
                     BinaryExpression leftBinaryExpression = (BinaryExpression) expr.getLeftExpression();
-                    hasBinaryExpression = leftBinaryExpression.getLeftExpression() instanceof BinaryExpression;
+                    hasSubBinaryExpression = leftBinaryExpression.getLeftExpression() instanceof BinaryExpression;
                 } catch (Exception e) {
+                    e.printStackTrace();
                 }
 
-                if (expr.getLeftExpression() instanceof BinaryExpression && !hasBinaryExpression && hasVarible(expr.getLeftExpression().toString())) {
+                if (expr.getLeftExpression() instanceof BinaryExpression && !hasSubBinaryExpression && hasVarible(expr.getLeftExpression().toString())) {
                     getBuffer().append(SubstitutedSql);
                 } else {
                     expr.getLeftExpression().accept(this);
                 }
 
                 getBuffer().append(" " + operator + " ");
-
-                hasBinaryExpression = false;
+                hasSubBinaryExpression = false;
                 try {
                     BinaryExpression rightBinaryExpression = (BinaryExpression) expr.getRightExpression();
-                    hasBinaryExpression = rightBinaryExpression.getRightExpression() instanceof BinaryExpression;
+                    hasSubBinaryExpression = rightBinaryExpression.getRightExpression() instanceof BinaryExpression;
+
                 } catch (Exception e) {
                 }
-
-                if (expr.getRightExpression() instanceof BinaryExpression && !hasBinaryExpression && hasVarible(expr.getRightExpression().toString())) {
-                    getBuffer().append(SubstitutedSql);
-                } else if (expr.getRightExpression() instanceof InExpression && !hasBinaryExpression && hasVarible(expr.getRightExpression().toString())) {
+                if (expr.getRightExpression() instanceof BinaryExpression && !hasSubBinaryExpression && hasVarible(expr.getRightExpression().toString())) {
                     getBuffer().append(SubstitutedSql);
                 } else {
                     expr.getRightExpression().accept(this);
@@ -2728,5 +2788,20 @@ public class DataSetTableService {
 
     static private boolean hasVarible(String sql) {
         return sql.contains(SubstitutedParams);
+    }
+
+    public void createAppCustomDorisView(String datasetInfo, String tableId) throws Exception {
+        DataTableInfoDTO dataTableInfoDTO = new Gson().fromJson(datasetInfo, DataTableInfoDTO.class);
+        createDorisView(TableUtils.tableName(tableId), getCustomViewSQL(dataTableInfoDTO,
+                dataSetTableUnionService.listByTableId(dataTableInfoDTO.getList().get(0).getTableId())));
+    }
+
+    public void createAppUnionDorisView(String datasetInfo, String tableId) throws Exception {
+        // save field
+        DataTableInfoDTO dataTableInfoDTO = new Gson().fromJson(datasetInfo, DataTableInfoDTO.class);
+        Map<String, Object> sqlMap = getUnionSQLDoris(dataTableInfoDTO);
+        String sql = (String) sqlMap.get("sql");
+        // custom 创建doris视图
+        createDorisView(TableUtils.tableName(tableId), sql);
     }
 }

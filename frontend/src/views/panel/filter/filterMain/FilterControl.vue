@@ -50,7 +50,13 @@
           </el-checkbox>
           <el-popover v-model="titlePopovervisible" placement="bottom-end" :disabled="!attrs.showTitle" width="200">
             <div style="width: 100%;overflow-y: auto;overflow-x: hidden;word-break: break-all;position: relative;">
-              <el-input v-model="attrs.title" :placeholder="$t('panel.input_title')" type="textarea" maxlength="15" show-word-limit />
+              <el-input
+                v-model="attrs.title"
+                :placeholder="$t('panel.input_title')"
+                type="textarea"
+                maxlength="15"
+                show-word-limit
+              />
             </div>
 
             <i
@@ -92,7 +98,7 @@
             />
           </el-popover>
         </span>
-        <span v-if="element.component === 'de-select'" style="padding-left: 10px;">
+        <span v-if="showParams" style="padding-left: 10px;">
           <el-checkbox v-model="attrs.enableParameters" @change="enableParametersChange"><span>
             {{ $t('panel.binding_parameters') }} </span> </el-checkbox>
 
@@ -101,14 +107,17 @@
               <el-checkbox-group v-model="attrs.parameters">
                 <el-checkbox
                   v-for="(item ) in childViews.datasetParams"
-                  :key="item.variableName"
-                  :label="item.variableName"
+                  :key="item.id"
+                  :label="item.id"
                   class="de-checkbox"
                 >
                   <div class="span-div">
-                    <span v-if="item.variableName && item.variableName.length <= 7" style="margin-left: 6px">{{ item.variableName }}</span>
-                    <el-tooltip v-else class="item" effect="dark" :content="item.variableName" placement="left">
-                      <span style="margin-left: 6px">{{ item.variableName }}</span>
+                    <span
+                      v-if="item.alias && item.alias.length <= 7"
+                      style="margin-left: 6px"
+                    >{{ item.alias }}</span>
+                    <el-tooltip v-else class="item" effect="dark" :content="item.alias" placement="left">
+                      <span style="margin-left: 6px">{{ item.alias }}</span>
                     </el-tooltip>
                   </div>
 
@@ -145,7 +154,8 @@ export default {
 
     childViews: {
       type: Object,
-      default: () => {}
+      default: () => {
+      }
     },
     element: {
       type: Object,
@@ -154,6 +164,7 @@ export default {
   },
   data() {
     return {
+      showParams: false,
       attrs: null,
       titlePopovervisible: false,
       popovervisible: false,
@@ -163,17 +174,37 @@ export default {
         { id: 'HH', name: 'HH' },
         { id: 'HH:mm', name: 'HH:mm' },
         { id: 'HH:mm:ss', name: 'HH:mm:ss' }
-
       ]
-
     }
   },
-  computed: {
-
+  computed: {},
+  watch: {
+    'childViews.datasetParams': {
+      handler(newName, oldName) {
+        if (this.attrs.parameters.length > 0 && this.attrs.parameters[0].indexOf('|DE|') === -1) {
+          const parameters = []
+          for (var i = 0; i < this.attrs.parameters.length; i++) {
+            if (this.attrs.parameters[i].indexOf('|DE|') === -1) {
+              for (var j = 0; j < this.childViews.datasetParams.length; j++) {
+                if (this.childViews.datasetParams[j].id.split('|DE|')[1] === this.attrs.parameters[i]) {
+                  parameters.push(this.childViews.datasetParams[j].id)
+                }
+              }
+            } else {
+              parameters.push(this.attrs.parameters[i])
+            }
+          }
+          this.attrs.parameters = parameters
+        }
+      }
+    }
   },
 
   created() {
     this.attrs = this.controlAttrs
+    if ('timeYearWidget,timeMonthWidget,timeDateWidget,textSelectWidget,numberSelectWidget'.indexOf(this.widget.name) !== -1) {
+      this.showParams = true
+    }
   },
   methods: {
     multipleChange(value) {
@@ -201,7 +232,6 @@ export default {
     },
     showTitleChange(value) {
       if (!value) {
-        this.attrs.title = ''
         this.element.style.backgroundColor = ''
       }
       this.fillAttrs2Filter()
@@ -210,64 +240,65 @@ export default {
       this.fillAttrs2Filter()
     },
 
-    fillAttrs2Filter() {}
+    fillAttrs2Filter() {
+    }
   }
 }
 
 </script>
 
 <style lang="scss" scoped>
-  .filter-options-left {
-    align-items: center;
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    height: 50px;
-  }
+.filter-options-left {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  height: 50px;
+}
 
-  .filter-options-right {
-    align-items: center;
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-    height: 50px;
-  }
+.filter-options-right {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  height: 50px;
+}
 
-  .i-filter {
-    text-align: center;
-    margin-left: 5px;
-    margin-top: 1px;
-  }
+.i-filter {
+  text-align: center;
+  margin-left: 5px;
+  margin-top: 1px;
+}
 
-  .i-filter-inactive {
-    color: #9ea6b2 !important;
-    cursor: not-allowed !important;
-  }
+.i-filter-inactive {
+  color: #9ea6b2 !important;
+  cursor: not-allowed !important;
+}
 
-  .i-filter-active {
-    cursor: pointer !important;
-  }
+.i-filter-active {
+  cursor: pointer !important;
+}
 
-  .view-container-class {
+.view-container-class {
 
-    min-height: 150px;
-    max-height: 200px;
-    width: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-break: break-all;
-    position: relative;
+  min-height: 150px;
+  max-height: 200px;
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  word-break: break-all;
+  position: relative;
 
-  }
+}
 
-  .span-div {
-    width: 135px;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
+.span-div {
+  width: 135px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
 
 .de-ul li {
   margin: 5px 2px;

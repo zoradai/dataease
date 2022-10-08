@@ -34,7 +34,7 @@ export default {
       return backPath || backName || backTo
     },
     needInnerPadding() {
-      return ['system-dept', 'system-dept-form', 'system-auth'].includes(this.$route.name)
+      return ['sys-identification', 'sys-abutment', 'sys-task-email', 'system-dept', 'system-dept-form', 'system-auth', 'sys-appearance', 'system-param', 'system-template', "sys-task-dataset", "sys-msg-web-all", "system-plugin"].includes(this.$route.name)
     }
   }
 }
@@ -55,6 +55,7 @@ export default {
   height: 100%;
   display: flex;
   flex-direction: column;
+  position: relative;
   .route-title {
     font-family: PingFang SC;
     font-size: 20px;
@@ -77,6 +78,7 @@ export default {
   .layout-inner-padding {
     padding: 0;
     margin-top: 16px;
+    overflow: hidden;
   }
 }
 </style>

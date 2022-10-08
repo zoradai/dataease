@@ -51,7 +51,7 @@
               <el-form-item  :label="$t('chart.axis_value_split')" class="form-item">
                 <span slot="label">
                   <span class="span-box">
-                    <span>{{ $t('chart.axis_value_split_count') }}</span>
+                    <span>{{ $t('chart.axis_value_split_space') }}</span>
                     <el-tooltip class="item" effect="dark" placement="bottom">
                       <div slot="content">
                         间隔表示两个刻度之间的单位长度。
@@ -126,10 +126,6 @@
               </el-form-item>
             </span>
           </span>
-          <el-divider v-if="showProperty('axisLabel')" />
-          <el-form-item v-show="showProperty('axisLabel')"  :label="$t('chart.content_formatter')" class="form-item">
-            <el-input v-model="axisForm.axisLabel.formatter" type="textarea" :autosize="{ minRows: 4, maxRows: 4}" @blur="changeYAxisStyle('axisLabel')" />
-          </el-form-item>
         </div>
       </el-form>
     </el-col>
@@ -246,11 +242,11 @@ export default {
   justify-content: space-between;
   align-items: center;
 }
-.form-item-slider>>>.el-form-item__label{
+.form-item-slider ::v-deep .el-form-item__label{
   font-size: 12px;
   line-height: 38px;
 }
-.form-item>>>.el-form-item__label{
+.form-item ::v-deep .el-form-item__label{
   font-size: 12px;
 }
 .el-select-dropdown__item{

@@ -1,7 +1,7 @@
 <template>
   <div ref="myContainer" class="my-container">
     <div ref="conditionMain" :style="outsideStyle" class="condition-main">
-      <div v-if="element.options.attrs.title" ref="deTitleContainer" :style="titleStyle" class="condition-title">
+      <div v-if="element.options.attrs.showTitle && element.options.attrs.title" ref="deTitleContainer" :style="titleStyle" class="condition-title">
         <div class="condition-title-absolute">
           <div class="first-title">
             <div class="span-container">
@@ -13,7 +13,7 @@
       <div
         ref="deContentContainer"
         class="condition-content"
-        :class="element.options.attrs.title ? '' : 'condition-content-default'"
+        :class="(element.options.attrs.showTitle && element.options.attrs.title) ? '' : 'condition-content-default'"
       >
         <div class="condition-content-container">
           <div class="first-element">
@@ -157,12 +157,24 @@ export default {
           alignItems: 'center'
         }
       }
+
+      if (vertical !== 'top' && this.element.component === 'de-number-range') {
+        if (!this.titleStyle) {
+          this.titleStyle = {}
+        }
+        this.titleStyle.marginTop = '-20px'
+      }
     },
     getCondition() {
       if (this.$refs && this.$refs['deOutWidget'] && this.$refs['deOutWidget'].getCondition) {
         return this.$refs['deOutWidget'].getCondition()
       }
       return null
+    },
+    clearHandler() {
+      if (this.$refs && this.$refs['deOutWidget'] && this.$refs['deOutWidget'].clearHandler) {
+        this.$refs['deOutWidget'].clearHandler()
+      }
     }
   }
 }

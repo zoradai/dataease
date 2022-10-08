@@ -1,6 +1,7 @@
 import { sin, cos } from '@/components/canvas/utils/translate'
 import store from '@/store'
 import Vue from 'vue'
+
 export const LIGHT_THEME_COLOR_MAIN = '#000000'
 export const LIGHT_THEME_COLOR_SLAVE1 = '#CCCCCC'
 export const LIGHT_THEME_PANEL_BACKGROUND = '#F1F3F5'
@@ -34,6 +35,9 @@ export function getStyle(style, filter = []) {
         if (key) {
           if (key === 'backgroundColor') {
             result[key] = colorRgb(style[key], style.opacity)
+          }
+          if (key === 'fontSize' && result[key] < 12) {
+            result[key] = 12
           }
           if (needUnit.includes(key)) {
             result[key] += 'px'
@@ -137,6 +141,13 @@ export const customStyleTrans = {
     }
   },
   'yAxis': {
+    'nameTextStyle': ['fontSize'],
+    'axisLabel': ['fontSize'],
+    'splitLine': {
+      'lineStyle': ['width']
+    }
+  },
+  'yAxisExt': {
     'nameTextStyle': ['fontSize'],
     'axisLabel': ['fontSize'],
     'splitLine': {
@@ -369,7 +380,11 @@ export function adaptCurThemeCommonStyle(component) {
   } else if (isTabComponent(component.component)) {
     const tabStyle = store.state.canvasStyleData.chartInfo.tabStyle
     for (const styleKey in tabStyle) {
-      Vue.set(component.style, styleKey, tabStyle[styleKey])
+      if(typeof tabStyle[styleKey] === 'string'){
+        Vue.set(component.style, styleKey, tabStyle[styleKey])
+      }else{
+        Vue.set(component.style, styleKey, null)
+      }
     }
   } else {
     if (component.style.color) {
@@ -387,6 +402,9 @@ export function adaptCurThemeCommonStyleAll() {
   const componentData = store.state.componentData
   componentData.forEach((item) => {
     adaptCurThemeCommonStyle(item)
+    if (item.style.backgroundColor) {
+      delete item.style.backgroundColor
+    }
   })
 }
 

@@ -2,8 +2,8 @@
   <el-row>
     <el-form ref="form" :model="fieldForm" size="mini" class="row-style">
       <el-form-item>
-        <span style="width: 80px;font-size: 12px">{{ $t('dataset.field_name') }}</span>
-        <el-input v-model="fieldForm.name" style="width: 80%;" size="mini" :placeholder="$t('dataset.input_name')" />
+        <span style="width: 80px;font-size: 12px">{{ $t('dataset.field_edit_name') }}</span>
+        <el-input v-model="fieldForm.name" style="width: 80%;" size="mini" :placeholder="$t('dataset.input_edit_name')" />
       </el-form-item>
     </el-form>
 
@@ -94,13 +94,14 @@
           <el-input
             v-model="searchField"
             size="mini"
-            :placeholder="$t('dataset.search')"
+            :placeholder="$t('dataset.edit_search')"
             prefix-icon="el-icon-search"
             clearable
           />
           <div class="field-height">
             <span>{{ $t('chart.dimension') }}</span>
             <draggable
+              v-if="dimensionData && dimensionData.length > 0"
               v-model="dimensionData"
               :options="{group:{name: 'drag',pull:'clone'},sort: true}"
               animation="300"
@@ -127,10 +128,12 @@
                 </span>
               </transition-group>
             </draggable>
+            <div v-else class="class-na">{{ $t('dataset.na') }}</div>
           </div>
           <div class="field-height">
             <span>{{ $t('chart.quota') }}</span>
             <draggable
+              v-if="quotaData && quotaData.length > 0"
               v-model="quotaData"
               :options="{group:{name: 'drag',pull:'clone'},sort: true}"
               animation="300"
@@ -157,6 +160,7 @@
                 </span>
               </transition-group>
             </draggable>
+            <div v-else class="class-na">{{ $t('dataset.na') }}</div>
           </div>
         </el-col>
         <el-col :span="12" style="height: 100%" class="padding-lr">
@@ -176,7 +180,7 @@
           <el-input
             v-model="searchFunction"
             size="mini"
-            :placeholder="$t('dataset.search')"
+            :placeholder="$t('dataset.edit_search')"
             prefix-icon="el-icon-search"
             clearable
           />
@@ -209,6 +213,7 @@
           :disabled="!fieldForm.name || !fieldForm.originName"
           type="primary"
           size="mini"
+          :loading="loading"
           @click="saveCalcField"
         >{{ $t('dataset.confirm') }}
         </el-button>
@@ -302,7 +307,8 @@ export default {
       quotaData: [],
       functionData: [],
       tableFields: {},
-      name2Auto: []
+      name2Auto: [],
+      loading: false
     }
   },
   computed: {
@@ -348,6 +354,7 @@ export default {
     }
   },
   mounted() {
+    this.loading = false
     this.$refs.myCm.codemirror.on('keypress', () => {
       this.$refs.myCm.codemirror.showHint()
     })
@@ -446,8 +453,12 @@ export default {
         this.fieldForm.columnIndex = 0
         this.fieldForm.chartId = this.param.id
       }
+      this.loading = true
       post('/chart/field/save/' + this.panelInfo.id, { ...this.fieldForm, originName: this.setNameIdTrans('name', 'id', originName) }).then(response => {
         this.closeCalcField()
+        this.loading = false
+      }).catch(res => {
+        this.loading = false
       })
     },
 
@@ -488,15 +499,15 @@ export default {
 </script>
 
 <style scoped>
-.row-style >>> .el-form-item__label {
+.row-style ::v-deep .el-form-item__label {
   font-size: 12px;
 }
 
-.row-style >>> .el-form-item--mini.el-form-item {
+.row-style ::v-deep .el-form-item--mini.el-form-item {
   margin-bottom: 10px;
 }
 
-.row-style >>> .el-form-item__content {
+.row-style ::v-deep .el-form-item__content {
   display: flex;
   flex-direction: row;
   width: 100%;
@@ -508,7 +519,7 @@ export default {
   font-size: 12px;
 }
 
-.codemirror >>> .CodeMirror-scroll {
+.codemirror ::v-deep .CodeMirror-scroll {
   height: 300px;
   overflow-y: auto;
   font-size: 12px;
@@ -644,7 +655,7 @@ span {
   margin-top: 4px;
 }
 
-.function-pop >>> .el-popover {
+.function-pop ::v-deep .el-popover {
   padding: 6px !important;
 }
 
@@ -662,5 +673,12 @@ span {
 .dialog-button {
   float: right;
   margin-top: 10px;
+}
+
+.class-na {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--deTextDisable);
 }
 </style>

@@ -1,7 +1,8 @@
 <template>
   <div class="component-item">
-    <div :style="commonStyle">
-      <mobile-check-bar v-if="mobileCheckBarShow" :element="config" />
+    <mobile-check-bar v-if="mobileCheckBarShow" :element="config" />
+    <div :style="commonStyle" class="inner-item">
+      <svg-icon v-if="svgInnerEnable" :style="{'color':this.config.commonBackground.innerImageColor}" class="svg-background" :icon-class="mainSlotSvgInner" />
       <de-out-widget
         v-if="config.type==='custom'"
         :id="'component' + config.id"
@@ -35,6 +36,7 @@ import MobileCheckBar from '@/components/canvas/components/Editor/MobileCheckBar
 import { getStyle } from '@/components/canvas/utils/style'
 import DeOutWidget from '@/components/dataease/DeOutWidget'
 import { hexColorToRGBA } from '@/views/chart/chart/util'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   name: 'ComponentWaitItem',
@@ -56,6 +58,17 @@ export default {
     }
   },
   computed: {
+    svgInnerEnable() {
+      return this.config.commonBackground.enable && this.config.commonBackground.backgroundType === 'innerImage' && typeof this.config.commonBackground.innerImage === 'string'
+    },
+    mainSlotSvgInner() {
+      if (this.svgInnerEnable) {
+        return this.config.commonBackground.innerImage.replace('board/', '').replace('.svg', '')
+      } else {
+        return null
+      }
+    },
+
     commonStyle() {
       const style = {
         width: '100%',
@@ -69,14 +82,8 @@ export default {
           colorRGBA = hexColorToRGBA(this.config.commonBackground.color, this.config.commonBackground.alpha)
         }
         if (this.config.commonBackground.enable) {
-          if (this.config.commonBackground.backgroundType === 'innerImage' && typeof this.config.commonBackground.innerImage === 'string') {
-            let innerImage = this.config.commonBackground.innerImage
-            if (this.screenShot) {
-              innerImage = innerImage.replace('svg', 'png')
-            }
-            style['background'] = `url(${innerImage}) no-repeat ${colorRGBA}`
-          } else if (this.config.commonBackground.backgroundType === 'outerImage' && typeof this.config.commonBackground.outerImage === 'string') {
-            style['background'] = `url(${this.config.commonBackground.outerImage}) no-repeat ${colorRGBA}`
+          if (this.config.commonBackground.backgroundType === 'outerImage' && typeof this.config.commonBackground.outerImage === 'string') {
+            style['background'] = `url(${imgUrlTrans(this.config.commonBackground.outerImage)}) no-repeat ${colorRGBA}`
           } else {
             style['background-color'] = colorRGBA
           }
@@ -134,5 +141,16 @@ export default {
     padding: 5px;
     height: 200px!important;
     position: relative;
+  }
+
+  .inner-item {
+    position: relative;
+  }
+  .svg-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
   }
 </style>

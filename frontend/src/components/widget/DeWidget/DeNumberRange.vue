@@ -116,6 +116,10 @@ export default {
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    clearHandler() {
+      this.form.min = null
+      this.form.max = null
+    },
     resetDefaultValue(id) {
       if (this.inDraw && this.manualModify && this.element.id === id) {
         const values = this.element.options.value
@@ -266,7 +270,7 @@ export default {
 .de-number-range-container {
   display: inline;
   max-height: 40px;
-  >>>div.el-form-item {
+  ::v-deep div.el-form-item {
     width: calc(50% - 10px) !important;
     display: inline-block;
     padding: 0 5px;

@@ -11,6 +11,7 @@ import io.dataease.dto.panel.PanelViewDto;
 import io.dataease.dto.panel.PanelViewTableDTO;
 import io.dataease.dto.panel.po.PanelViewInsertDTO;
 import io.dataease.dto.panel.po.PanelViewPo;
+import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
 import io.dataease.plugins.common.base.domain.PanelGroupWithBLOBs;
 import io.dataease.plugins.common.base.domain.PanelView;
 import io.dataease.plugins.common.base.domain.PanelViewExample;
@@ -18,6 +19,7 @@ import io.dataease.plugins.common.base.mapper.PanelViewMapper;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.pentaho.di.core.util.UUIDUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -42,8 +44,6 @@ public class PanelViewService {
 
     @Resource
     private ExtChartViewMapper extChartViewMapper;
-
-    private ExtPanelGroupMapper extPanelGroupMapper;
 
     private final static String SCENE_TYPE = "scene";
 
@@ -167,5 +167,19 @@ public class PanelViewService {
         } else {
             return null;
         }
+    }
+
+    public List<ChartViewWithBLOBs> findByPanelId(String panelId) {
+        return extChartViewMapper.findByPanelId(panelId);
+    }
+
+    public List<PanelView>  findPanelViewsByPanelId(String panelId){
+        PanelViewExample example = new PanelViewExample();
+        example.createCriteria().andPanelIdEqualTo(panelId);
+        return panelViewMapper.selectByExample(example);
+    }
+
+    public void save(PanelView panelView){
+        panelViewMapper.insertSelective(panelView);
     }
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="bar-main" :class="showEditPosition">
+  <div class="bar-main" :class="showEditPosition" @mousedown="showLabelInfo">
     <input id="input" ref="files" type="file" accept="image/*" hidden @click="e => {e.target.value = '';}" @change="handleFileChange">
     <div v-if="linkageAreaShow" style="margin-right: -1px;width: 20px">
       <el-checkbox v-model="linkageInfo.linkageActive" size="medium" />
@@ -22,10 +22,10 @@
         <i v-if="activeModel==='edit'&&!curComponent.auxiliaryMatrix" class="icon iconfont icon-xuanfuanniu" @click.stop="auxiliaryMatrixChange" />
       </span>
       <span :title="$t('panel.enlarge')">
-        <i v-if="curComponent.type==='view'" class="icon iconfont icon-fangda" @click.stop="showViewDetails('enlarge')" />
+        <i v-if="enlargeShow" class="icon iconfont icon-fangda" @click.stop="showViewDetails('enlarge')" />
       </span>
       <span :title="$t('panel.details')">
-        <i v-if="curComponent.type==='view' && terminal==='pc'" class="icon iconfont icon-chakan" @click.stop="showViewDetails('details')" />
+        <i v-if="detailsShow" class="icon iconfont icon-chakan" @click.stop="showViewDetails('details')" />
       </span>
       <setting-menu v-if="activeModel==='edit'" style="float: right;height: 24px!important;" @amRemoveItem="amRemoveItem" @linkJumpSet="linkJumpSet" @boardSet="boardSet">
         <span slot="icon" :title="$t('panel.setting')">
@@ -38,6 +38,15 @@
       <span :title="$t('panel.switch_picture')">
         <i v-if="activeModel==='edit'&&curComponent&&curComponent.type==='picture-add'" class="icon iconfont icon-genghuan" @click.stop="goFile" />
       </span>
+      <el-popover
+        v-if="selectFieldShow"
+        width="200"
+        trigger="click"
+        @mousedown="fieldsAreaDown"
+      >
+        <fields-list :fields="curFields" :element="element" />
+        <i slot="reference" :disabled="element.editing" :title="$t('panel.select_field')" class="icon iconfont icon-datasource-select" style="margin-left: 4px;cursor: pointer;font-size: 14px;" />
+      </el-popover>
       <span :title="$t('panel.jump')">
         <a v-if="showJumpFlag" :title="curComponent.hyperlinks.content " :target="curComponent.hyperlinks.openMode " :href="curComponent.hyperlinks.content ">
           <i class="icon iconfont icon-com-jump" />
@@ -53,9 +62,10 @@ import bus from '@/utils/bus'
 import SettingMenu from '@/components/canvas/components/Editor/SettingMenu'
 import LinkageField from '@/components/canvas/components/Editor/LinkageField'
 import toast from '@/components/canvas/utils/toast'
+import FieldsList from '@/components/canvas/components/Editor/fieldsList'
 
 export default {
-  components: { SettingMenu, LinkageField },
+  components: { FieldsList, SettingMenu, LinkageField },
 
   props: {
     terminal: {
@@ -93,6 +103,7 @@ export default {
   },
   data() {
     return {
+      curFields: [],
       multiplexingCheckModel: false,
       barWidth: 24,
       componentType: null,
@@ -102,12 +113,26 @@ export default {
         'custom',
         'custom-button'
       ],
-      timer: null
+      timer: null,
+      viewXArray: []
     }
   },
   mounted() {
+    this.initCurFields()
+    if (this.element.type === 'view') {
+      bus.$on('initCurFields-' + this.element.id, this.initCurFields)
+    }
   },
   computed: {
+    detailsShow() {
+      return this.curComponent.type === 'view' && this.terminal === 'pc' && this.curComponent.propValue.innerType !== 'richTextView'
+    },
+    enlargeShow() {
+      return this.curComponent.type === 'view' && this.curComponent.propValue.innerType !== 'richTextView'
+    },
+    selectFieldShow() {
+      return this.activeModel === 'edit' && this.curComponent.type === 'view' && this.curComponent.propValue.innerType === 'richTextView' && this.curComponent.editing
+    },
     curComponentTypes() {
       const types = []
       this.componentData.forEach(component => {
@@ -183,12 +208,29 @@ export default {
       'curCanvasScale',
       'batchOptStatus',
       'mobileLayoutStatus',
-      'curBatchOptComponents'
+      'curBatchOptComponents',
+      'panelViewDetailsInfo'
     ])
   },
   beforeDestroy() {
   },
   methods: {
+    fieldsAreaDown(e) {
+      // ignore
+      e.preventDefault()
+    },
+    initCurFields() {
+      if (this.element.type === 'view') {
+        const chartInfo = this.panelViewDetailsInfo[this.element.propValue.viewId]
+        if (chartInfo) {
+          this.curFields = []
+          const chartDetails = JSON.parse(chartInfo)
+          if (chartDetails.type === 'richTextView' && chartDetails.data) {
+            this.curFields = chartDetails.data.fields
+          }
+        }
+      }
+    },
     positionCheck(position) {
       return this.showPosition.includes(position)
     },
@@ -230,7 +272,7 @@ export default {
       setTimeout(() => {
         this.recordMatrixCurShadowStyle()
       }, 50)
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       bus.$emit('auxiliaryMatrixChange')
     },
     // 记录当前样式 跟随阴影位置 矩阵处理
@@ -286,6 +328,10 @@ export default {
     goFile() {
       this.$refs.files.click()
     },
+    showLabelInfo(e) {
+      // ignore
+      e.preventDefault()
+    },
     handleFileChange(e) {
       const file = e.target.files[0]
       if (!file.type.includes('image')) {
@@ -326,7 +372,7 @@ export default {
     padding-left: 3px;
     padding-right: 0px;
     cursor:pointer!important;
-    background-color: #3370ff;
+    background-color: var(--primary,#3370ff);
   }
   .bar-main i{
     color: white;

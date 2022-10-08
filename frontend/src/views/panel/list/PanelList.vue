@@ -228,7 +228,7 @@ import LinkGenerate from '@/views/link/generate'
 import { uuid } from 'vue-uuid'
 import bus from '@/utils/bus'
 import EditPanel from './EditPanel'
-import { addGroup, delGroup, groupTree, defaultTree, initPanelData, panelUpdate } from '@/api/panel/panel'
+import { addGroup, delGroup, groupTree, defaultTree, initPanelData, panelUpdate, viewPanelLog } from '@/api/panel/panel'
 import { mapState } from 'vuex'
 import {
   DEFAULT_COMMON_CANVAS_STYLE_STRING
@@ -241,6 +241,11 @@ export default {
   components: { GrantAuth, LinkGenerate, EditPanel, TreeSelector },
   data() {
     return {
+      responseSource:'panelQuery',
+      clearLocalStorage: [
+        'chart-tree',
+        'dataset-tree'
+      ],
       historyRequestId: null,
       lastActiveNode: null, // 激活的节点 在这个节点下面动态放置子节点
       lastActiveNodeData: null,
@@ -378,7 +383,11 @@ export default {
     this.defaultTree(true)
     this.initCache()
     const routerParam = this.$router.currentRoute.params
-    if (routerParam && routerParam.nodeType === 'panel' && this.historyRequestId !== routerParam.requestId) {
+    if(routerParam && 'appApply'===routerParam.responseSource ){
+      this.responseSource = routerParam.responseSource
+      this.lastActiveNode = routerParam
+      this.tree()
+    }else if (routerParam && routerParam.nodeType === 'panel' && this.historyRequestId !== routerParam.requestId) {
       this.historyRequestId = routerParam.requestId
       this.tree()
       this.edit(routerParam, null)
@@ -387,6 +396,13 @@ export default {
     }
   },
   methods: {
+    fromAppActive(){
+      this.activeNodeAndClickOnly(this.lastActiveNode)
+      this.clearLocalStorage.forEach(item => {
+        localStorage.removeItem(item)
+      })
+      this.responseSource='panelQuery'
+    },
     newPanelFromMarket(panelInfo) {
       if (panelInfo) {
         this.tree()
@@ -637,6 +653,9 @@ export default {
         if (!userCache) {
           this.tData = res.data
         }
+        if(this.responseSource==='appApply'){
+          this.fromAppActive()
+        }
         if (this.filterText) {
           this.$nextTick(() => {
             this.$refs.panel_list_tree.filter(this.filterText)
@@ -674,9 +693,11 @@ export default {
       if (data.nodeType === 'panel') {
         // 清理pc布局缓存
         this.$store.commit('setComponentDataCache', null)
-        initPanelData(data.id, function(response) {
-          bus.$emit('set-panel-show-type', 0)
-          data.mobileLayout = response.data.mobileLayout
+        initPanelData(data.id, false, function(response) {
+          viewPanelLog({ panelId: data.id }).then(res => {
+            bus.$emit('set-panel-show-type', 0)
+            data.mobileLayout = response.data.mobileLayout
+          })
         })
       }
     },
@@ -886,10 +907,10 @@ export default {
     padding:0 8px;
   }
 
-  .dialog-css>>>.el-dialog__body {
+  .dialog-css ::v-deep .el-dialog__body {
     padding: 15px 20px;
   }
-  .dialog-css >>>.el-dialog__body {
+  .dialog-css ::v-deep .el-dialog__body {
     padding: 10px 20px 20px;
   }
 

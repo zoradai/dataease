@@ -56,6 +56,9 @@
               />
             </el-select>
           </el-form-item>
+
+          <plugin-com v-if="isPluginLoaded" ref="AuthenticationBind" :user-id="form.userId" :form-type="formType" component-name="AuthenticationBind" />
+
           <!--提供修改个人电话，邮箱和昵称的功能-->
           <el-form-item v-if="formType!=='modify'">
             <el-button @click="formType = 'modify'">修改个人信息</el-button>
@@ -86,9 +89,12 @@ import { LOAD_CHILDREN_OPTIONS, LOAD_ROOT_OPTIONS } from '@riophae/vue-treeselec
 import { getDeptTree, treeByDeptId } from '@/api/system/dept'
 import { allRoles } from '@/api/system/user'
 import { updatePerson, personInfo } from '@/api/system/user'
+import { pluginLoaded } from '@/api/user'
+import PluginCom from '@/views/system/plugin/PluginCom'
+import Cookies from 'js-cookie'
 export default {
 
-  components: { LayoutContent, Treeselect },
+  components: { LayoutContent, Treeselect, PluginCom },
   data() {
     return {
       form: {
@@ -149,8 +155,7 @@ export default {
             message: this.$t('member.password_format_is_incorrect'),
             trigger: 'blur'
           }
-        ],
-        roleIds: [{ required: true, message: this.$t('user.input_roles'), trigger: 'change' }]
+        ]
 
       },
       defaultForm: { id: null, username: null, nickName: null, gender: '男', email: null, enabled: 1, deptId: null, phone: null, roleIds: [] },
@@ -158,7 +163,8 @@ export default {
       roles: [],
       roleDatas: [],
       userRoles: [],
-      formType: 'add'
+      formType: 'add',
+      isPluginLoaded: false
     }
   },
   mounted() {
@@ -168,11 +174,27 @@ export default {
   },
   created() {
     this.$store.dispatch('app/toggleSideBarHide', true)
+    this.showError()
     this.queryPerson()
     this.initRoles()
   },
+  beforeCreate() {
+    pluginLoaded().then(res => {
+      this.isPluginLoaded = res.success && res.data
+    }).catch(() => {
+    })
+  },
   methods: {
-
+    showError() {
+      const errKeys = ['WecomError', 'DingtalkError', 'LarkError']
+      errKeys.forEach(key => {
+        const msg = Cookies.get(key)
+        if (msg) {
+          this.$error(msg)
+          Cookies.remove(key)
+        }
+      })
+    },
     queryPerson() {
       personInfo().then(res => {
         const info = res.data
@@ -286,7 +308,7 @@ export default {
   min-width: 640px;
   height: auto;
   position: relative;
-  >>>div.el-card__header {
+  ::v-deep div.el-card__header {
     padding: 0;
   }
 }

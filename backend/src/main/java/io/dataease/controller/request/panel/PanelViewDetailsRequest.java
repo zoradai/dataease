@@ -12,9 +12,13 @@ import java.util.List;
 @Data
 public class PanelViewDetailsRequest {
 
+    private String viewId;
+
     private String viewName;
 
     private String[] header;
+
+    private Integer[] excelTypes;
 
     private List<String[]> details;
 
@@ -23,6 +27,7 @@ public class PanelViewDetailsRequest {
     private int snapshotWidth;
 
     private int snapshotHeight;
+
 
 
 }

@@ -24,6 +24,7 @@ import org.quartz.CronExpression;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -149,6 +150,19 @@ public class DataSetTableTaskService {
         dataSetTableTaskLogService.deleteByTaskId(id);
     }
 
+    @Transactional
+    public void batchDelete(List<String> ids) {
+        if (CollectionUtils.isNotEmpty(ids)){
+            for (int i = 0; i < ids.size(); i++) {
+                String id = ids.get(i);
+                DatasetTableTask datasetTableTask = datasetTableTaskMapper.selectByPrimaryKey(id);
+                datasetTableTaskMapper.deleteByPrimaryKey(id);
+                scheduleService.deleteSchedule(datasetTableTask);
+                dataSetTableTaskLogService.deleteByTaskId(id);
+            }
+        }
+    }
+
     public void delete(DatasetTableTask task) {
         datasetTableTaskMapper.deleteByPrimaryKey(task.getId());
         scheduleService.deleteSchedule(task);
@@ -249,14 +263,19 @@ public class DataSetTableTaskService {
         datasetTableTaskMapper.updateByExampleSelective(datasetTableTask, datasetTableTaskExample);
     }
 
-    public List<DatasetTableTask> list(DatasetTableTask datasetTableTask) {
-        DatasetTableTaskExample datasetTableTaskExample = new DatasetTableTaskExample();
-        DatasetTableTaskExample.Criteria criteria = datasetTableTaskExample.createCriteria();
-        if (datasetTableTask != null && StringUtils.isNotEmpty(datasetTableTask.getTableId())) {
-            criteria.andTableIdEqualTo(datasetTableTask.getTableId());
+    public List<DataSetTaskDTO> list(DatasetTableTask datasetTableTask) {
+        BaseGridRequest request = new BaseGridRequest();
+        List<ConditionEntity> conditionEntities = new ArrayList<>();
+        if(datasetTableTask != null && StringUtils.isNotEmpty(datasetTableTask.getTableId())){
+            ConditionEntity entity = new ConditionEntity();
+            entity.setField("table_id");
+            entity.setOperator("eq");
+            entity.setValue(datasetTableTask.getTableId());
+            conditionEntities.add(entity);
         }
-        datasetTableTaskExample.setOrderByClause("create_time desc,name asc");
-        return datasetTableTaskMapper.selectByExample(datasetTableTaskExample);
+        request.setConditions(conditionEntities);
+        GridExample gridExample = request.convertExample();
+        return extDataSetTaskMapper.taskList(gridExample);
     }
 
     public List<DataSetTaskDTO> taskList4User(BaseGridRequest request) {
@@ -319,5 +338,22 @@ public class DataSetTableTaskService {
         if (!datasetTableTask.getRate().equalsIgnoreCase(ScheduleType.SIMPLE.toString())) {
             scheduleService.fireNow(datasetTableTask);
         }
+    }
+
+    public DataSetTaskDTO detail(String id) {
+        BaseGridRequest request = new BaseGridRequest();
+        List<ConditionEntity> conditionEntities = request.getConditions() == null ? new ArrayList<>() : new ArrayList(request.getConditions());
+        ConditionEntity entity = new ConditionEntity();
+        entity.setField("dataset_table_task.id");
+        entity.setOperator("eq");
+        entity.setValue(id);
+        conditionEntities.add(entity);
+        request.setConditions(conditionEntities);
+        GridExample gridExample = request.convertExample();
+        List<DataSetTaskDTO> dataSetTaskDTOS = extDataSetTaskMapper.taskList(gridExample);
+        if (CollectionUtils.isNotEmpty(dataSetTaskDTOS)) {
+            return dataSetTaskDTOS.get(0);
+        }
+        return null;
     }
 }

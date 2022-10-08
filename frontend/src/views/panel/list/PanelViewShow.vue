@@ -4,7 +4,7 @@
     style="height: 100%;width: 100%;"
     :element-loading-text="$t('panel.data_loading')"
     element-loading-spinner="el-icon-loading"
-    element-loading-background="rgba(220,220,220, 1)"
+    element-loading-background="rgba(220,220,220,1)"
   >
     <el-col v-if="panelInfo.name.length>0" class="panel-design">
 
@@ -25,7 +25,7 @@
               width="400"
               trigger="click"
             >
-              <panel-detail-info></panel-detail-info>
+              <panel-detail-info />
               <i
                 slot="reference"
                 class="el-icon-warning icon-class"
@@ -164,15 +164,15 @@ import { starStatus, saveEnshrine, deleteEnshrine } from '@/api/panel/enshrine'
 import bus from '@/utils/bus'
 import { queryAll } from '@/api/panel/pdfTemplate'
 import ShareHead from '@/views/panel/GrantAuth/ShareHead'
-import { initPanelData, updatePanelStatus } from '@/api/panel/panel'
+import { export2AppCheck, initPanelData, updatePanelStatus } from '@/api/panel/panel'
 import { proxyInitPanelData } from '@/api/panel/shareProxy'
 import { dataURLToBlob } from '@/components/canvas/utils/utils'
 import { findResourceAsBase64 } from '@/api/staticResource/staticResource'
-import PanelDetailInfo from "@/views/panel/list/common/PanelDetailInfo";
+import PanelDetailInfo from '@/views/panel/list/common/PanelDetailInfo'
 
 export default {
   name: 'PanelViewShow',
-  components: {PanelDetailInfo, Preview, SaveToTemplate, PDFPreExport, ShareHead },
+  components: { PanelDetailInfo, Preview, SaveToTemplate, PDFPreExport, ShareHead },
   props: {
     activeTab: {
       type: String,
@@ -326,6 +326,48 @@ export default {
         _this.dataLoading = false
       }
     },
+    saveAppFile(appAttachInfo) {
+      const _this = this
+      _this.dataLoading = true
+      try {
+        _this.findStaticSource(function(staticResource) {
+          html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+            _this.dataLoading = false
+            const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.1是图片质量
+            if (snapshot !== '') {
+              const panelInfo = {
+                name: _this.$store.state.panel.panelInfo.name,
+                id: _this.$store.state.panel.panelInfo.id,
+                snapshot: snapshot,
+                panelStyle: JSON.stringify(_this.canvasStyleData),
+                panelData: JSON.stringify(_this.componentData),
+                staticResource: JSON.stringify(staticResource || {})
+              }
+              appAttachInfo['panelInfo'] = JSON.stringify(panelInfo)
+              const blob = new Blob([JSON.stringify(appAttachInfo)], { type: '' })
+              FileSaver.saveAs(blob, _this.$store.state.panel.panelInfo.name + '-APP.DEAPP')
+            }
+          })
+        })
+      } catch (e) {
+        console.error(e)
+        _this.dataLoading = false
+      }
+    },
+    downLoadToApp() {
+      this.dataLoading = true
+      export2AppCheck(this.$store.state.panel.panelInfo.id).then(rsp => {
+        if (rsp.data.checkStatus) {
+          this.saveAppFile(rsp.data)
+        } else {
+          this.dataLoading = false
+          this.$message({
+            message: rsp.data.checkMes,
+            type: 'error'
+          })
+        }
+      })
+    },
     // 解析静态文件
     findStaticSource(callBack) {
       const staticResource = []
@@ -454,7 +496,7 @@ export default {
       if (this.showType === 1 && this.shareUserId !== null) {
         const param = { userId: this.shareUserId }
         proxyInitPanelData(this.panelInfo.id, param, null)
-      } else { initPanelData(this.panelInfo.id) }
+      } else { initPanelData(this.panelInfo.id, false) }
     },
     changePublishState() {
       if (this.panelInfo.status === 'publish') {

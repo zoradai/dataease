@@ -2,7 +2,7 @@
   <el-row>
     <el-col class="info-item">
       <p class="info-title">{{ $t('panel.create_by') }}</p>
-      <p class="info-content">{{ panelInfo.createBy }}</p>
+      <p class="info-content">{{ panelInfo.creatorName }}</p>
     </el-col>
     <el-col class="info-item">
       <p class="info-title">{{ $t('panel.create_time') }}</p>
@@ -10,7 +10,7 @@
     </el-col>
     <el-col class="info-item">
       <p class="info-title">{{ $t('panel.update_by') }}</p>
-      <p class="info-content">{{ panelInfo.updateBy || 'N/A' }}</p>
+      <p class="info-content">{{ panelInfo.updateName || 'N/A' }}</p>
     </el-col>
     <el-col class="info-item">
       <p class="info-title">{{ $t('panel.update_time') }}</p>
@@ -65,7 +65,7 @@ export default {
 </script>
 
 <style scoped>
-  .info-tab>>>.el-tabs__item{
+  .info-tab ::v-deep .el-tabs__item{
     font-weight: 400;
     font-size: 12px;
   }

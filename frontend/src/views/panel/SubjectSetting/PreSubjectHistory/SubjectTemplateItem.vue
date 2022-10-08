@@ -75,6 +75,7 @@ import { mapState } from 'vuex'
 import bus from '@/utils/bus'
 import { saveOrUpdateSubject } from '@/api/panel/panel'
 import { resetViewCacheCallBack } from '@/api/chart/chart'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   name: 'StyleTemplateItem',
@@ -103,7 +104,7 @@ export default {
           style = {
             width: '100%',
             height: '100%',
-            background: `url(${this.subjectItemDetails.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.subjectItemDetails.panel.imageUrl)}) no-repeat`,
             'background-size': '100% 100% !important'
           }
         } else {
@@ -324,7 +325,7 @@ export default {
     z-index: 10;
     display:block;
   }
-  .vertical-layout>>>.el-icon-error {
+  .vertical-layout ::v-deep .el-icon-error {
     display:none
   }
   .theme-selected-icon {

@@ -5,7 +5,7 @@
       <el-row style="margin-bottom: 10px">
         <el-input
           v-model="filterText"
-          size="mini"
+          size="small"
           :placeholder="$t('commons.search')"
           prefix-icon="el-icon-search"
           clearable
@@ -69,6 +69,7 @@
 
 <script>
 import { removeMap } from '@/api/map/map'
+import msgCfm from '@/components/msgCfm'
 export default {
   name: 'MapSettingLeft',
   props: {
@@ -77,6 +78,7 @@ export default {
       default: () => []
     }
   },
+  mixins: [msgCfm],
   data() {
     return {
       filterText: '',
@@ -154,7 +156,7 @@ export default {
             value: null
           }).then(() => {
             this.$emit('refresh-tree')
-            this.$success(this.$t('commons.delete_success'))
+            this.openMessageSuccess("commons.delete_success");
           })
         })
       }).catch(() => {
@@ -193,7 +195,7 @@ export default {
     margin-top: 10px;
   }
 
-  .tree-list>>>.el-tree-node__expand-icon.is-leaf{
+  .tree-list ::v-deep .el-tree-node__expand-icon.is-leaf{
     display: none;
   }
 
@@ -253,7 +255,7 @@ export default {
     visibility: visible;
   }
 
-  .dialog-css >>> .el-dialog__body {
+  .dialog-css ::v-deep .el-dialog__body {
     padding: 10px 20px 20px;
   }
 

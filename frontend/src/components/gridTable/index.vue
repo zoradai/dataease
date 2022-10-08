@@ -111,6 +111,9 @@ export default {
     },
   },
   methods: {
+    toggleRowSelection(row) {
+      this.$refs.table.toggleRowSelection(row, true);
+    },
     handlerSelected(multipleSelection) {
       this.multipleSelectionCach = [
         ...this.multipleSelectionCach,
@@ -158,6 +161,10 @@ export default {
   height: 100%;
   flex-direction: column;
   justify-content: space-between;
+
+  ::v-deep.el-table-column--selection .cell {
+    padding: 0 14px;
+  }
 
   .el-table::before {
     content: '';

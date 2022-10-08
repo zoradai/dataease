@@ -94,6 +94,12 @@ public class ViewPluginBaseServiceImpl implements ViewPluginBaseService {
         return null;
     }
 
+    private String sqlFix(String sql) {
+        if (sql.lastIndexOf(";") == (sql.length() - 1)) {
+            sql = sql.substring(0, sql.length() - 1);
+        }
+        return sql;
+    }
     @Override
     public PluginViewSQL getTableObj(PluginViewSet pluginViewSet) {
         String tableName = null;
@@ -106,8 +112,10 @@ public class ViewPluginBaseServiceImpl implements ViewPluginBaseService {
                     tableName = dataTableInfoDTO.getTable();
                     break;
                 case SQL:
-                    tableName = dataSetTableService.handleVariableDefaultValue(dataTableInfoDTO.getSql(), null);
-                    tableName = "(" + tableName + ")";
+                    String sql = dataTableInfoDTO.isBase64Encryption()? new String(java.util.Base64.getDecoder().decode(dataTableInfoDTO.getSql())): dataTableInfoDTO.getSql();
+                    tableName = dataSetTableService.handleVariableDefaultValue(sql, null, pluginViewSet.getDsType());
+
+                    tableName = "(" + sqlFix(tableName) + ")";
                     break;
                 case CUSTOM:
                     List<DataSetTableUnionDTO> list = dataSetTableUnionService.listByTableId(dataTableInfoDTO.getList().get(0).getTableId());
@@ -116,10 +124,9 @@ public class ViewPluginBaseServiceImpl implements ViewPluginBaseService {
                     tableName = dataSetTableService.getCustomSQLDatasource(dataTableInfoDTO, list, ds);
                     break;
                 case UNION:
-                    Datasource datasource = new Datasource();
-                    datasource.setType(pluginViewSet.getDsType());
+                    Datasource datasource = ((PluginViewSetImpl) pluginViewSet).getDs();
                     Map<String, Object> sqlMap = dataSetTableService.getUnionSQLDatasource(dataTableInfoDTO, datasource);
-                    tableName = (String) sqlMap.get("sql");
+                    tableName = "(" + ((String) sqlMap.get("sql")) + ")";
                     break;
                 default:
                     tableName = dataTableInfoDTO.getTable();

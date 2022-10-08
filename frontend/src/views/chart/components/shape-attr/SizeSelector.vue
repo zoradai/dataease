@@ -145,7 +145,7 @@
         </el-form-item>
         <el-form-item v-show="showProperty('quotaFontStyle')" :label="$t('chart.quota_text_style')" class="form-item">
           <el-checkbox v-model="sizeForm.quotaFontIsItalic" @change="changeBarSizeCase('quotaFontIsItalic')">{{ $t('chart.italic') }}</el-checkbox>
-          <el-checkbox v-model="sizeForm.quotaFontIsBolder" @change="changeBarSizeCase('quotaFontIsItalic')">{{ $t('chart.bolder') }}</el-checkbox>
+          <el-checkbox v-model="sizeForm.quotaFontIsBolder" @change="changeBarSizeCase('quotaFontIsBolder')">{{ $t('chart.bolder') }}</el-checkbox>
         </el-form-item>
         <el-form-item v-show="showProperty('quotaLetterSpace')" :label="$t('chart.quota_letter_space')" class="form-item">
           <el-select v-model="sizeForm.quotaLetterSpace" :placeholder="$t('chart.quota_letter_space')" @change="changeBarSizeCase('quotaLetterSpace')">
@@ -171,7 +171,7 @@
         </el-form-item>
         <el-form-item v-show="showProperty('dimensionFontStyle')" :label="$t('chart.dimension_text_style')" class="form-item">
           <el-checkbox v-model="sizeForm.dimensionFontIsItalic" @change="changeBarSizeCase('dimensionFontIsItalic')">{{ $t('chart.italic') }}</el-checkbox>
-          <el-checkbox v-model="sizeForm.dimensionFontIsBolder" @change="changeBarSizeCase('dimensionFontIsItalic')">{{ $t('chart.bolder') }}</el-checkbox>
+          <el-checkbox v-model="sizeForm.dimensionFontIsBolder" @change="changeBarSizeCase('dimensionFontIsBolder')">{{ $t('chart.bolder') }}</el-checkbox>
         </el-form-item>
         <el-form-item v-show="showProperty('dimensionLetterSpace')" :label="$t('chart.dimension_letter_space')" class="form-item">
           <el-select v-model="sizeForm.dimensionLetterSpace" :placeholder="$t('chart.dimension_letter_space')" @change="changeBarSizeCase('dimensionLetterSpace')">
@@ -438,11 +438,11 @@ export default {
   justify-content: space-between;
   align-items: center;
 }
-.form-item-slider>>>.el-form-item__label{
+.form-item-slider ::v-deep .el-form-item__label{
   font-size: 12px;
   line-height: 38px;
 }
-.form-item>>>.el-form-item__label{
+.form-item ::v-deep .el-form-item__label{
   font-size: 12px;
 }
 .el-select-dropdown__item{
@@ -456,7 +456,7 @@ export default {
 .el-divider--horizontal {
   margin: 10px 0
 }
-.divider-style>>>.el-divider__text{
+.divider-style ::v-deep .el-divider__text{
   color: #606266;
   font-size: 12px;
   font-weight: 400;

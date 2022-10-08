@@ -7,15 +7,17 @@
         },
         'template-img'
       ]"
-      :style="classBackground"
       @click.stop="setBoard"
-    />
+    >
+      <svg-icon :style="{'color':this.curComponent.commonBackground.innerImageColor}" class="svg-background" :icon-class="mainIconClass" />
+    </div>
     <span class="demonstration">{{ template.name }}</span>
   </div>
 </template>
 
 <script>
 import { mapState } from 'vuex'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   name: 'BackgroundItem',
@@ -28,13 +30,16 @@ export default {
     }
   },
   computed: {
+    mainIconClass() {
+      return this.template.url.replace('board/', '').replace('.svg', '')
+    },
     itemActive() {
       return this.curComponent && this.curComponent.commonBackground && this.curComponent.commonBackground.innerImage === this.template.url
     },
     classBackground() {
       if (this.template.url) {
         return {
-          background: `url(${this.template.url}) no-repeat`,
+          background: `url(${imgUrlTrans(this.template.url)}) no-repeat`,
           'background-size': `100% 100%`
         }
       } else {
@@ -74,6 +79,7 @@ export default {
   }
 
   .template-img {
+    position: relative;
     height: 80px;
     width: 130px;
     margin: 0 auto;
@@ -113,6 +119,13 @@ export default {
     border: solid 1px red;
     border-radius: 3px;
     color: deepskyblue;
+  }
+  .svg-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
   }
 
 </style>

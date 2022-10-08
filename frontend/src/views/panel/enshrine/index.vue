@@ -31,7 +31,7 @@
 <script>
 import { deleteEnshrine, enshrineList } from '@/api/panel/enshrine'
 import { uuid } from 'vue-uuid'
-import { initPanelData } from '@/api/panel/panel'
+import { initPanelData, viewPanelLog } from '@/api/panel/panel'
 import bus from '@/utils/bus'
 
 export default {
@@ -55,8 +55,10 @@ export default {
   },
   methods: {
     showPanel(row) {
-      initPanelData(row.panelGroupId, function() {
-        bus.$emit('set-panel-show-type', 0)
+      initPanelData(row.panelGroupId, false, function() {
+        viewPanelLog({ panelId: row.panelGroupId }).then(res => {
+          bus.$emit('set-panel-show-type', 0)
+        })
       })
     },
     resetID(data) {

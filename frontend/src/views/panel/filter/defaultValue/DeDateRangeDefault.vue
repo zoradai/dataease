@@ -1,11 +1,11 @@
 <template>
   <div v-if="element">
-    <el-form ref="form" :model="element.options.attrs.default" label-width="100px">
+    <el-form ref="form" :model="element.options.attrs.default" label-width="100px" size="mini">
 
       <el-form-item :label="$t('dynamic_time.set_default')">
         <el-radio-group v-model="element.options.attrs.default.isDynamic" @change="dynamicChange">
           <el-radio :label="false">{{ $t('dynamic_time.fix') }}</el-radio>
-          <el-radio :label="true">{{ $t('dynamic_time.dynamic') }}</el-radio>
+          <el-radio :label="true" :disabled="isTimeWidget && element.options.attrs.showTime">{{ $t('dynamic_time.dynamic') }}</el-radio>
         </el-radio-group>
       </el-form-item>
 
@@ -15,12 +15,18 @@
           v-model="element.options.attrs.default.dkey"
           placeholder=""
           class="relative-time"
+          popper-class="date-filter-poper"
           @change="dkeyChange"
         >
           <el-option :label="$t('dynamic_time.cweek')" :value="0" />
           <el-option :label="$t('dynamic_time.cmonth')" :value="1" />
           <el-option :label="$t('dynamic_time.cquarter')" :value="2" />
           <el-option :label="$t('dynamic_time.cyear')" :value="3" />
+
+          <el-option :label="$t('dynamic_time.lweek')" :value="5" />
+          <el-option :label="$t('dynamic_month.last')" :value="6" />
+          <el-option :label="$t('dynamic_time.lquarter')" :value="7" />
+          <el-option :label="$t('dynamic_year.last')" :value="8" />
 
           <el-option :label="$t('dynamic_time.custom')" :value="4" />
         </el-select>
@@ -136,7 +142,8 @@
       <el-form-item v-if="element.options.attrs.default.isDynamic" :label="$t('dynamic_time.preview')">
         <el-date-picker
           v-model="dval"
-          :type="element.options.attrs.type"
+          :type="componentType"
+          :format="labelFormat"
           disabled
           class="relative-time"
           placeholder=""
@@ -177,6 +184,38 @@ export default {
       dval: null
     }
   },
+  computed: {
+    isOneDay() {
+      const isDynamicDay = this.element.options.attrs.default.isDynamic &&
+        this.element.options.attrs.default.dkey === 4 &&
+        this.element.options.attrs.default.eDynamicInfill &&
+        this.element.options.attrs.default.eDynamicInfill === 'day'
+      if (isDynamicDay) {
+        const widget = ApplicationContext.getService(this.element.serviceName)
+        const time = widget.dynamicDateFormNow(this.element)
+        return isDynamicDay && time[1] === time[0]
+      }
+      return false
+    },
+    isTimeWidget() {
+      const widget = ApplicationContext.getService(this.element.serviceName)
+      return widget.isTimeWidget && widget.isTimeWidget()
+    },
+    componentType() {
+      let result = 'daterange'
+      if (this.isTimeWidget && this.element.options.attrs.showTime) {
+        result = 'datetimerange'
+      }
+      return result
+    },
+    labelFormat() {
+      const result = 'yyyy-MM-dd'
+      if (this.isTimeWidget && this.element.options.attrs.showTime && this.element.options.attrs.accuracy) {
+        return result + ' ' + this.element.options.attrs.accuracy
+      }
+      return result
+    }
+  },
   created() {
     this.setDval()
   },
@@ -212,7 +251,7 @@ export default {
       const widget = ApplicationContext.getService(this.element.serviceName)
       const time = widget.dynamicDateFormNow(this.element)
       this.dval = time
-      bus.$emit('valid-values-change', (!time || time.length === 0 || time[1] > time[0]))
+      bus.$emit('valid-values-change', (!time || time.length === 0 || time[1] > time[0] || this.isOneDay))
       this.element.options.manualModify = false
     }
   }

@@ -8,7 +8,7 @@
     :collapse-tags="showNumber"
     :clearable="!element.options.attrs.multiple"
     :multiple="element.options.attrs.multiple"
-    :placeholder="$t(element.options.attrs.placeholder)"
+    :placeholder="$t(element.options.attrs.placeholder) + placeholderSuffix"
     :popper-append-to-body="inScreen"
     :size="size"
     :filterable="true"
@@ -110,6 +110,11 @@ export default {
     customStyle() {
       const { brColor, wordColor, innerBgColor } = this.element.style
       return { brColor, wordColor, innerBgColor }
+    },
+    placeholderSuffix() {
+      const i18nKey = this.element.options.attrs.multiple ? 'panel.multiple_choice' : 'panel.single_choice'
+      const i18nValue = this.$t(i18nKey)
+      return '(' + i18nValue + ')'
     }
   },
 
@@ -212,6 +217,10 @@ export default {
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    clearHandler() {
+      this.value = this.element.options.attrs.multiple ? [] : null
+      this.$refs.deSelect && this.$refs.deSelect.resetSelectAll && this.$refs.deSelect.resetSelectAll()
+    },
     filterMethod(key) {
       this.keyWord = key
     },
@@ -231,7 +240,7 @@ export default {
     },
     handleElTagStyle() {
       setTimeout(() => {
-        textSelectWidget(this.$refs['deSelect'].$el, this.element.style)
+        this.$refs['deSelect'] && this.$refs['deSelect'].$el && textSelectWidget(this.$refs['deSelect'].$el, this.element.style)
       }, 50)
     },
     initLoad() {
@@ -281,9 +290,10 @@ export default {
     },
     handleShowNumber() {
       this.showNumber = false
-      const tags = this.$refs.deSelect.$refs.visualSelect.$refs.tags
 
       this.$nextTick(() => {
+        if (!this.$refs.deSelect || !this.$refs.deSelect.$refs.visualSelect || !this.$refs.deSelect.$refs.visualSelect.$refs.tags) return
+        const tags = this.$refs.deSelect.$refs.visualSelect.$refs.tags
         if (!this.element.options.attrs.multiple || !this.$refs.deSelect || !tags) {
           return
         }

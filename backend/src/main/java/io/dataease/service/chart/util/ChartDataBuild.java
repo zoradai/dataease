@@ -103,6 +103,69 @@ public class ChartDataBuild {
         return map;
     }
 
+    public static Map<String, Object> transBaseGroupDataAntV(List<ChartViewFieldDTO> xAxisBase, List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> xAxisExt, List<ChartViewFieldDTO> yAxis, ChartViewWithBLOBs view, List<String[]> data, boolean isDrill) {
+        Map<String, Object> map = new HashMap<>();
+
+        List<AxisChartDataAntVDTO> datas = new ArrayList<>();
+        for (int i1 = 0; i1 < data.size(); i1++) {
+            String[] row = data.get(i1);
+
+            StringBuilder a = new StringBuilder();
+            if (isDrill) {
+                a.append(row[xAxis.size() - 1]);
+            } else {
+                for (int i = 0; i < xAxisBase.size(); i++) {
+                    if (i == xAxisBase.size() - 1) {
+                        a.append(row[i]);
+                    } else {
+                        a.append(row[i]).append("\n");
+                    }
+                }
+            }
+
+            StringBuilder b = new StringBuilder();
+            for (int i = xAxisBase.size(); i < xAxisBase.size() + xAxisExt.size(); i++) {
+                if (i == xAxisBase.size() + xAxisExt.size() - 1) {
+                    b.append(row[i]);
+                } else {
+                    b.append(row[i]).append("\n");
+                }
+            }
+
+            for (int i = xAxis.size(); i < xAxis.size() + yAxis.size(); i++) {
+                AxisChartDataAntVDTO axisChartDataDTO = new AxisChartDataAntVDTO();
+                axisChartDataDTO.setField(a.toString());
+                axisChartDataDTO.setName(a.toString());
+
+                List<ChartDimensionDTO> dimensionList = new ArrayList<>();
+                List<ChartQuotaDTO> quotaList = new ArrayList<>();
+
+                for (int j = 0; j < xAxis.size(); j++) {
+                    ChartDimensionDTO chartDimensionDTO = new ChartDimensionDTO();
+                    chartDimensionDTO.setId(xAxis.get(j).getId());
+                    chartDimensionDTO.setValue(row[j]);
+                    dimensionList.add(chartDimensionDTO);
+                }
+                axisChartDataDTO.setDimensionList(dimensionList);
+
+                int j = i - xAxis.size();
+                ChartQuotaDTO chartQuotaDTO = new ChartQuotaDTO();
+                chartQuotaDTO.setId(yAxis.get(j).getId());
+                quotaList.add(chartQuotaDTO);
+                axisChartDataDTO.setQuotaList(quotaList);
+                try {
+                    axisChartDataDTO.setValue(StringUtils.isEmpty(row[i]) ? null : new BigDecimal(row[i]));
+                } catch (Exception e) {
+                    axisChartDataDTO.setValue(new BigDecimal(0));
+                }
+                axisChartDataDTO.setCategory(b.toString());
+                datas.add(axisChartDataDTO);
+            }
+        }
+        map.put("datas", datas);
+        return map;
+    }
+
     // AntV柱状堆叠图
     public static Map<String, Object> transStackChartDataAntV(List<ChartViewFieldDTO> xAxis, List<ChartViewFieldDTO> yAxis, ChartViewWithBLOBs view, List<String[]> data, List<ChartViewFieldDTO> extStack, boolean isDrill) {
         Map<String, Object> map = new HashMap<>();
@@ -877,12 +940,32 @@ public class ChartDataBuild {
 
     // 表格
     public static Map<String, Object> transTableNormal(Map<String, List<ChartViewFieldDTO>> fieldMap, ChartViewWithBLOBs view, List<String[]> data, List<String> desensitizationList) {
-        
+
         List<ChartViewFieldDTO> fields = new ArrayList<>();
-        if (CollectionUtils.isNotEmpty(fieldMap.get("xAxis")))fields.addAll(fieldMap.get("xAxis"));
-        if (CollectionUtils.isNotEmpty(fieldMap.get("tooltipAxis")))fields.addAll(fieldMap.get("tooltipAxis"));
-        if (CollectionUtils.isNotEmpty(fieldMap.get("labelAxis")))fields.addAll(fieldMap.get("labelAxis"));
-        if (CollectionUtils.isNotEmpty(fieldMap.get("yAxis")))fields.addAll(fieldMap.get("yAxis"));
+        List<ChartViewFieldDTO> yfields = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(fieldMap.get("xAxis"))) fields.addAll(fieldMap.get("xAxis"));
+        if (CollectionUtils.isNotEmpty(fieldMap.get("tooltipAxis"))) {
+            fieldMap.get("tooltipAxis").forEach(field -> {
+                Integer deType = field.getDeType();
+                if(deType == 2 || deType == 3) {
+                    yfields.add(field);
+                } else {
+                    fields.add(field);
+                }
+            });
+        }
+        if (CollectionUtils.isNotEmpty(fieldMap.get("labelAxis"))) {
+            fieldMap.get("labelAxis").forEach(field -> {
+                Integer deType = field.getDeType();
+                if(deType == 2 || deType == 3) {
+                    yfields.add(field);
+                } else {
+                    fields.add(field);
+                }
+            });
+        }
+        if (CollectionUtils.isNotEmpty(fieldMap.get("yAxis"))) fields.addAll(fieldMap.get("yAxis"));
+        if (CollectionUtils.isNotEmpty(yfields)) fields.addAll(yfields);
         return transTableNormal(fields, view, data, desensitizationList);
     }
 

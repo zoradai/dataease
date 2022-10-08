@@ -2,8 +2,8 @@
   <div ref="chartContainer" style="padding: 0;width: 100%;height: 100%;overflow: hidden;" :style="bg_class">
     <view-track-bar ref="viewTrack" :track-menu="trackMenu" class="track-bar" :style="trackBarStyleTime" @trackClick="trackClick" />
     <span v-if="chart.type && antVRenderStatus" v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
-      <div>
-        <p style="padding:6px 4px 0;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
+      <div style="padding:6px 4px 0;margin: 0;">
+        <p style="overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
         <title-remark v-if="remarkCfg.show" style="text-shadow: none!important;" :remark-cfg="remarkCfg" />
       </div>
     </span>
@@ -192,7 +192,11 @@ export default {
       }
       if (chart.type === 'bar') {
         this.myChart = baseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, true, false)
+      } else if (chart.type === 'bar-group') {
+        this.myChart = baseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, true, false)
       } else if (chart.type === 'bar-stack') {
+        this.myChart = baseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, false, true)
+      } else if (chart.type === 'percentage-bar-stack') {
         this.myChart = baseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, false, true)
       } else if (chart.type === 'bar-horizontal') {
         this.myChart = hBaseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, true, false)
@@ -200,8 +204,10 @@ export default {
         this.myChart = hBaseBarOptionAntV(this.myChart, this.chartId, chart, this.antVAction, false, true)
       } else if (chart.type === 'line') {
         this.myChart = baseLineOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
+      } else if (chart.type === 'area') {
+        this.myChart = baseAreaOptionAntV(this.myChart, this.chartId, chart, this.antVAction, false)
       } else if (chart.type === 'line-stack') {
-        this.myChart = baseAreaOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
+        this.myChart = baseAreaOptionAntV(this.myChart, this.chartId, chart, this.antVAction, true)
       } else if (chart.type === 'scatter') {
         this.myChart = baseScatterOptionAntV(this.myChart, this.chartId, chart, this.antVAction)
       } else if (chart.type === 'radar') {

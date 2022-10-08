@@ -4,7 +4,6 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.github.xiaoymin.knife4j.annotations.ApiSupport;
 import io.dataease.auth.annotation.DePermission;
-import io.dataease.plugins.common.base.domain.DatasetTableTask;
 import io.dataease.commons.constants.DePermissionType;
 import io.dataease.commons.constants.ResourceAuthLevel;
 import io.dataease.commons.utils.PageUtils;
@@ -12,6 +11,7 @@ import io.dataease.commons.utils.Pager;
 import io.dataease.controller.request.dataset.DataSetTaskRequest;
 import io.dataease.controller.sys.base.BaseGridRequest;
 import io.dataease.dto.dataset.DataSetTaskDTO;
+import io.dataease.plugins.common.base.domain.DatasetTableTask;
 import io.dataease.service.dataset.DataSetTableTaskLogService;
 import io.dataease.service.dataset.DataSetTableTaskService;
 import io.swagger.annotations.Api;
@@ -49,11 +49,25 @@ public class DataSetTableTaskController {
         dataSetTableTaskService.delete(id);
     }
 
+    @ApiOperation("批量删除")
+    @PostMapping("/batchDelete")
+    public void batchDelete(@RequestBody List<String> ids) {
+        dataSetTableTaskService.batchDelete(ids);
+    }
+
     @DePermission(type = DePermissionType.DATASET, value = "tableId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE)
     @ApiOperation("查询")
     @PostMapping("list")
-    public List<DatasetTableTask> list(@RequestBody DatasetTableTask datasetTableTask) {
+    public List<DataSetTaskDTO> list(@RequestBody DatasetTableTask datasetTableTask) {
         return dataSetTableTaskService.list(datasetTableTask);
+    }
+
+    @DePermission(type = DePermissionType.DATASET, value = "tableId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE)
+    @ApiOperation("分页查询")
+    @PostMapping("list/{goPage}/{pageSize}")
+    public Pager<List<DataSetTaskDTO>> list(@RequestBody DatasetTableTask datasetTableTask, @PathVariable int goPage, @PathVariable int pageSize) {
+        Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
+        return PageUtils.setPageInfo(page, dataSetTableTaskService.list(datasetTableTask));
     }
 
     @ApiOperation("分页查询")
@@ -61,7 +75,13 @@ public class DataSetTableTaskController {
     public Pager<List<DataSetTaskDTO>> taskList(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody BaseGridRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
 
-        return PageUtils.setPageInfo(page, dataSetTableTaskService.taskList4User(request));
+        Pager<List<DataSetTaskDTO>> listPager = PageUtils.setPageInfo(page, dataSetTableTaskService.taskList4User(request));
+        List<DataSetTaskDTO> listObject = listPager.getListObject();
+        for (DataSetTaskDTO dto : listObject) {
+            dataSetTableTaskLogService.lastExecStatus(dto);
+        }
+
+        return listPager;
     }
 
     @ApiIgnore
@@ -73,15 +93,22 @@ public class DataSetTableTaskController {
     @DePermission(type = DePermissionType.DATASET, value = "tableId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE)
     @ApiOperation("更新状态")
     @PostMapping("/updateStatus")
-    public void updateStatus(@RequestBody DatasetTableTask datasetTableTask) throws Exception{
+    public void updateStatus(@RequestBody DatasetTableTask datasetTableTask) throws Exception {
         dataSetTableTaskService.updateDatasetTableTaskStatus(datasetTableTask);
     }
 
     @DePermission(type = DePermissionType.DATASET, value = "tableId", level = ResourceAuthLevel.DATASET_LEVEL_MANAGE)
     @ApiOperation("执行任务")
     @PostMapping("/execTask")
-    public void execTask(@RequestBody DatasetTableTask datasetTableTask) throws Exception{
+    public void execTask(@RequestBody DatasetTableTask datasetTableTask) throws Exception {
         dataSetTableTaskService.execTask(datasetTableTask);
+    }
+
+
+    @ApiOperation("详情")
+    @PostMapping("detail/{id}")
+    public DataSetTaskDTO detail(@PathVariable("id") String id) {
+        return dataSetTableTaskService.detail(id);
     }
 
 }

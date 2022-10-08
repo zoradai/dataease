@@ -69,6 +69,15 @@ export function groupTree(data) {
   })
 }
 
+export function dsGroupTree(data) {
+  return request({
+    url: '/dataset/group/tree',
+    method: 'post',
+    loading: true,
+    data
+  })
+}
+
 export function listDatasource() {
   return request({
     url: '/datasource/list',
@@ -136,11 +145,12 @@ export function batchEdit(data) {
   })
 }
 
-export function post(url, data, showLoading = true, timeout = 60000) {
+export function post(url, data, showLoading = true, timeout = 60000, hideMsg) {
   return request({
     url: url,
     method: 'post',
     loading: showLoading,
+    hideMsg,
     data
   })
 }
@@ -221,6 +231,22 @@ export function checkCustomDs() {
     url: '/system/checkCustomDs',
     method: 'post',
     loading: true
+  })
+}
+export function exportExcel(data) {
+  return request({
+    url: '/dataset/taskLog/export',
+    method: 'post',
+    loading: true,
+    responseType: 'blob',
+    data
+  })
+}
+
+export function dsTable(page, size, id) {
+  return request({
+    url: '/datasource/getTables/' + id + '/' + page + '/' + size,
+    method: 'post',
   })
 }
 export default { loadTable, getScene, addGroup, delGroup, addTable, delTable, groupTree, checkCustomDs }

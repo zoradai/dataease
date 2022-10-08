@@ -20,11 +20,11 @@
               </el-dropdown-menu>
             </el-dropdown>
           </el-dropdown-item>
-          <el-dropdown-item v-if="'view'===curComponent.type" icon="el-icon-link" @click.native="linkageSetting">{{ $t('panel.linkage_setting') }}</el-dropdown-item>
+          <el-dropdown-item v-if="linkageSettingShow" icon="el-icon-link" @click.native="linkageSetting">{{ $t('panel.linkage_setting') }}</el-dropdown-item>
           <el-dropdown-item v-if="'de-tabs'===curComponent.type" icon="el-icon-plus" @click.native="addTab">{{ $t('panel.add_tab') }}</el-dropdown-item>
-          <el-dropdown-item v-if="'view'===curComponent.type" icon="el-icon-connection" @click.native="linkJumpSet">{{ $t('panel.setting_jump') }}</el-dropdown-item>
-          <el-dropdown-item icon="el-icon-magic-stick" @click.native="boardSet">{{ $t('panel.component_style') }}</el-dropdown-item>
-          <el-dropdown-item @click.native="hyperlinksSet">
+          <el-dropdown-item v-if="linkJumpSetShow" icon="el-icon-connection" @click.native="linkJumpSet">{{ $t('panel.setting_jump') }}</el-dropdown-item>
+          <el-dropdown-item v-if="curComponent.type != 'custom-button'" icon="el-icon-magic-stick" @click.native="boardSet">{{ $t('panel.component_style') }}</el-dropdown-item>
+          <el-dropdown-item v-if="curComponent.type != 'custom-button'" @click.native="hyperlinksSet">
             <i class="icon iconfont icon-font icon-chaolianjie1" />
             {{ $t('panel.hyperlinks') }}
           </el-dropdown-item>
@@ -56,6 +56,22 @@ export default {
   components: { HyperlinksDialog },
   data() {
     return {
+      jumpExcludeViewType: [
+        'richTextView',
+        'liquid',
+        'gauge',
+        'text',
+        'label',
+        'word-cloud'
+      ],
+      linkageExcludeViewType: [
+        'richTextView',
+        'liquid',
+        'gauge',
+        'text',
+        'label',
+        'word-cloud'
+      ],
       copyData: null,
       hyperlinksSetVisible: false,
       editFilter: [
@@ -65,10 +81,25 @@ export default {
       ]
     }
   },
-  computed: mapState([
-    'curComponent',
-    'componentData'
-  ]),
+  computed: {
+    linkJumpSetShow() {
+      return this.curComponent.type === 'view'
+        && !this.jumpExcludeViewType.includes(this.curComponent.propValue.innerType)
+        && !(this.curComponent.propValue.innerType.includes('table') && this.curComponent.propValue.render === 'echarts')
+    },
+    linkageSettingShow() {
+      return this.curComponent.type === 'view'
+        && !this.linkageExcludeViewType.includes(this.curComponent.propValue.innerType)
+        && !(this.curComponent.propValue.innerType.includes('table') && this.curComponent.propValue.render === 'echarts')
+    },
+    panelInfo() {
+      return this.$store.state.panel.panelInfo
+    },
+    ...mapState([
+      'curComponent',
+      'componentData'
+    ])
+  },
   methods: {
     edit() {
       if (this.curComponent.type === 'custom') {
@@ -103,11 +134,21 @@ export default {
     },
 
     paste() {
-      this.$store.commit('paste', true)
+      this.$store.commit('paste', false)
       this.$store.commit('recordSnapshot', 'paste')
     },
 
     deleteComponent() {
+      if (this.curComponent.type === 'custom-button' && this.curComponent.serviceName === 'buttonSureWidget') {
+        let len = this.componentData.length
+        while (len--) {
+          const item = this.componentData[len]
+
+          if (item.type === 'custom-button' && item.serviceName === 'buttonResetWidget') {
+            this.componentData.splice(len, 1)
+          }
+        }
+      }
       this.$emit('amRemoveItem')
       this.deleteCurCondition()
       this.$store.commit('deleteComponent')

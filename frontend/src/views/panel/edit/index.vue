@@ -158,6 +158,8 @@
           @mouseup="deselectCurComponent"
           @scroll="canvasScroll"
         >
+          <!-- 仪表板联动清除按钮-->
+          <canvas-opt-bar />
           <Editor ref="canvasEditor" :matrix-count="pcMatrixCountBase" :out-style="outStyle" :scroll-top="scrollTop" />
         </div>
         <!--移动端画布区域 保持宽高比2.5-->
@@ -246,12 +248,21 @@
       @close="cancelButton"
     >
       <button-dialog
-        v-if="buttonVisible && currentWidget"
+        v-if="buttonVisible && currentWidget && currentWidget.name === 'buttonSureWidget'"
         :ref="'filter-setting-' + currentFilterCom.id"
         :widget-info="currentWidget"
         :element="currentFilterCom"
         @sure-handler="sureHandler"
         @cancel-handler="cancelHandler"
+      />
+
+      <button-reset-dialog
+        v-if="buttonVisible && currentWidget && currentWidget.name === 'buttonResetWidget'"
+        :ref="'filter-setting-' + currentFilterCom.id"
+        :widget-info="currentWidget"
+        :element="currentFilterCom"
+        @reset-button-handler="sureHandler"
+        @cancel-button-handler="cancelHandler"
       />
 
     </el-dialog>
@@ -343,6 +354,27 @@
       </div>
     </el-dialog>
 
+    <!--关闭弹框-->
+    <el-dialog
+      :visible.sync="panelCacheExist"
+      :title="$t('panel.panel_no_save_tips')"
+      :show-close="false"
+      width="30%"
+    >
+      <el-row style="height: 20px">
+        <el-col :span="3">
+          <svg-icon icon-class="warn-tre" style="width: 20px;height: 20px;float: right" />
+        </el-col>
+        <el-col :span="21">
+          <span style="font-size: 13px;margin-left: 10px;font-weight: bold;line-height: 20px">{{ $t('panel.panel_cache_use_tips') }}</span>
+        </el-col>
+      </el-row>
+      <div slot="footer" class="dialog-footer">
+        <el-button size="mini" @click="useCache(false)">{{ $t('panel.no') }}</el-button>
+        <el-button type="primary" size="mini" @click="useCache(true)">{{ $t('panel.yes') }}</el-button>
+      </div>
+    </el-dialog>
+
   </el-row>
 </template>
 
@@ -355,7 +387,7 @@ import FilterGroup from '../filter'
 import SubjectSetting from '../SubjectSetting'
 import bus from '@/utils/bus'
 import Editor from '@/components/canvas/components/Editor/index'
-import { deepCopy, matrixBaseChange } from '@/components/canvas/utils/utils'
+import { deepCopy, imgUrlTrans, matrixBaseChange } from '@/components/canvas/utils/utils'
 import componentList, {
   BASE_MOBILE_STYLE,
   COMMON_BACKGROUND,
@@ -364,18 +396,27 @@ import componentList, {
 import { mapState } from 'vuex'
 import { uuid } from 'vue-uuid'
 import Toolbar from '@/components/canvas/components/Toolbar'
-import { initPanelData, initViewCache, queryPanelMultiplexingViewTree } from '@/api/panel/panel'
+import {
+  checkUserCache,
+  findUserCache,
+  initPanelData,
+  initViewCache,
+  queryPanelMultiplexingViewTree
+} from '@/api/panel/panel'
 import Preview from '@/components/canvas/components/Editor/Preview'
 import elementResizeDetectorMaker from 'element-resize-detector'
 import AssistComponent from '@/views/panel/AssistComponent'
 import ChartGroup from '@/views/chart/group/Group'
 import { chartCopy } from '@/api/chart/chart'
+import CanvasOptBar from '@/components/canvas/components/Editor/CanvasOptBar'
+
 // 引入样式
 import '@/components/canvas/assets/iconfont/iconfont.css'
 import '@/components/canvas/styles/animate.css'
 import { ApplicationContext } from '@/utils/ApplicationContext'
 import FilterDialog from '../filter/filterDialog'
 import ButtonDialog from '../filter/ButtonDialog'
+import ButtonResetDialog from '../filter/ButtonResetDialog'
 import toast from '@/components/canvas/utils/toast'
 import { commonAttr } from '@/components/canvas/custom-component/component-list'
 import generateID from '@/components/canvas/utils/generateID'
@@ -388,6 +429,7 @@ import ChartStyleBatchSet from '@/views/chart/view/ChartStyleBatchSet'
 import Multiplexing from '@/views/panel/ViewSelect/multiplexing'
 import { listenGlobalKeyDown } from '@/components/canvas/utils/shortcutKey'
 import { adaptCurThemeCommonStyle } from '@/components/canvas/utils/style'
+import eventBus from '@/components/canvas/utils/eventBus'
 export default {
   name: 'PanelEdit',
   components: {
@@ -403,15 +445,18 @@ export default {
     Toolbar,
     FilterDialog,
     ButtonDialog,
+    ButtonResetDialog,
     SubjectSetting,
     Preview,
     AssistComponent,
     TextAttr,
     ChartGroup,
-    ChartEdit
+    ChartEdit,
+    CanvasOptBar
   },
   data() {
     return {
+      panelCacheExist: false,
       viewData: [],
       multiplexingShow: false,
       asideToolType: 'none',
@@ -518,7 +563,7 @@ export default {
         return false
       } else if (this.curComponent && this.showAttrComponent.includes(this.curComponent.type)) {
         // 过滤组件有标题才显示
-        if (this.curComponent.type === 'custom' && !this.curComponent.options.attrs.title) {
+        if (this.curComponent.type === 'custom' && (!this.curComponent.options.attrs.showTitle || !this.curComponent.options.attrs.title)) {
           return false
         } else {
           return true
@@ -537,7 +582,7 @@ export default {
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && typeof (this.canvasStyleData.panel.imageUrl) === 'string') {
           style = {
-            background: `url(${this.canvasStyleData.panel.imageUrl}) no-repeat`
+            background: `url(${imgUrlTrans(this.canvasStyleData.panel.imageUrl)}) no-repeat`
           }
         } else if (this.canvasStyleData.panel.backgroundType === 'color') {
           style = {
@@ -559,7 +604,7 @@ export default {
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && typeof (this.canvasStyleData.panel.imageUrl) === 'string') {
           style = {
-            background: `url(${this.canvasStyleData.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.canvasStyleData.panel.imageUrl)}) no-repeat`,
             ...style
           }
         } else if (this.canvasStyleData.panel.backgroundType === 'color') {
@@ -653,6 +698,7 @@ export default {
     bus.$off('previewFullScreenClose', this.previewFullScreenClose)
     bus.$off('change_panel_right_draw', this.changeRightDrawOpen)
     bus.$off('delete-condition', this.deleteCustomComponent)
+    bus.$off('current-component-change', this.asideRefresh)
     const elx = this.$refs.rightPanel
     elx && elx.remove()
   },
@@ -674,6 +720,12 @@ export default {
       bus.$on('previewFullScreenClose', this.previewFullScreenClose)
       bus.$on('change_panel_right_draw', this.changeRightDrawOpen)
       bus.$on('delete-condition', this.deleteCustomComponent)
+      bus.$on('current-component-change', this.asideRefresh)
+    },
+    asideRefresh() {
+      if (this.$refs['chartEditRef']) {
+        this.$refs['chartEditRef'].resetChartData()
+      }
     },
     deleteCustomComponent(param) {
       param && param.componentId && this.componentData.forEach(com => {
@@ -711,19 +763,41 @@ export default {
       _this.initHasStar()
       this.$store.commit('initCanvas')
       if (panelId) {
-        initPanelData(panelId, function() {
-          // 清空当前缓存,快照
-          _this.$store.commit('refreshSnapshot')
-          // 初始化视图缓存
-          initViewCache(panelId)
-          // 初始化记录的视图信息
-          _this.$store.commit('setComponentViewsData')
-          // 初始化保存状态
-          setTimeout(() => {
-            _this.$store.commit('refreshSaveStatus')
-          }, 500)
+        checkUserCache(panelId, function(rsp) {
+          // the panel have cache
+          if (rsp.data) {
+            _this.panelCacheExist = true
+          } else {
+            _this.editPanelDataInit(panelId, false)
+          }
         })
       }
+    },
+    useCache(useCache) {
+      this.editPanelDataInit(this.$store.state.panel.panelInfo.id, useCache)
+      this.panelCacheExist = false
+    },
+    editPanelDataInit(panelId, useCache) {
+      const _this = this
+      initPanelData(panelId, useCache, function() {
+        // 清空当前缓存,快照
+        _this.$store.commit('refreshSnapshot')
+        // 初始化视图缓存
+        initViewCache(panelId)
+        // 初始化记录的视图信息
+        _this.$store.commit('setComponentViewsData')
+        // if panel data load from cache the save button should be active
+        // 初始化保存状态
+        setTimeout(() => {
+          if (useCache) {
+            _this.$store.commit('recordSnapshot', 'cache')
+            _this.$store.commit('recordChangeTimes')
+          } else {
+            _this.$store.commit('refreshSaveStatus')
+          }
+          eventBus.$emit('editPanelInitReady')
+        }, 500)
+      })
     },
     star() {
       this.panelInfo && saveEnshrine(this.panelInfo.id, false).then(res => {
@@ -1091,7 +1165,8 @@ export default {
           component = matrixBaseChange(deepCopy(componentTemp))
           const propValue = {
             id: newComponentId,
-            viewId: newViewInfo.id
+            viewId: newViewInfo.id,
+            textValue: '双击输入文本内容'
           }
           component.propValue = propValue
           component.filters = []
@@ -1124,19 +1199,6 @@ export default {
 
       // 打开属性栏
       bus.$emit('change_panel_right_draw', true)
-
-      //
-      // // 编辑时临时保存 当前修改的画布
-      // this.$store.dispatch('panel/setComponentDataTemp', JSON.stringify(this.componentData))
-      // this.$store.dispatch('panel/setCanvasStyleDataTemp', JSON.stringify(this.canvasStyleData))
-      // if (this.curComponent.type === 'view') {
-      //   this.$store.dispatch('chart/setViewId', null)
-      //   this.$store.dispatch('chart/setViewId', this.curComponent.propValue.viewId)
-      //   bus.$emit('PanelSwitchComponent', {
-      //     name: 'ChartEdit',
-      //     param: { 'id': this.curComponent.propValue.viewId, 'optType': 'edit' }
-      //   })
-      // }
     },
     canvasScroll(event) {
       this.scrollLeft = event.target.scrollLeft
@@ -1214,7 +1276,7 @@ export default {
       this.showMultiplexing(false)
       this.$store.commit('copyMultiplexingComponents')
       this.$store.commit('recordSnapshot')
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
     }
   }
 }
@@ -1347,7 +1409,6 @@ export default {
   }
 
   .this_mobile_canvas_cell {
-    text-align: center;
     height: 100%;
     display: flex;
     align-items: center;
@@ -1460,7 +1521,7 @@ export default {
     overflow-x: hidden;
   }
 
-  > > > .el-tabs__item {
+  ::v-deep .el-tabs__item {
     padding: 0 15px;
   }
   .view-selected-message-class {

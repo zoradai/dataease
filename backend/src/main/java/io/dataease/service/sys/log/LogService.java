@@ -9,8 +9,8 @@ import io.dataease.commons.constants.SysLogConstants;
 import io.dataease.commons.utils.AuthUtils;
 import io.dataease.commons.utils.BeanUtils;
 import io.dataease.commons.utils.ServletUtils;
-import io.dataease.controller.sys.base.BaseGridRequest;
 import io.dataease.controller.sys.base.ConditionEntity;
+import io.dataease.controller.sys.request.KeyGridRequest;
 import io.dataease.dto.SysLogDTO;
 import io.dataease.dto.SysLogGridDTO;
 import io.dataease.dto.log.FolderItem;
@@ -69,16 +69,28 @@ public class LogService {
     private LogManager logManager;
 
 
-    public List<SysLogGridDTO> query(BaseGridRequest request) {
-        request = detailRequest(request);
+    public List<SysLogGridDTO> query(KeyGridRequest request) {
 
+
+        request = detailRequest(request);
+        String keyWord = request.getKeyWord();
+        List<String> ids = null;
         GridExample gridExample = request.convertExample();
-        List<SysLogWithBLOBs> voLogs = extSysLogMapper.query(gridExample);
+        gridExample.setExtendCondition(keyWord);
+
+        LogQueryParam logQueryParam = gson.fromJson(gson.toJson(gridExample), LogQueryParam.class);
+        if (StringUtils.isNotBlank(keyWord)) {
+            List<FolderItem> types = types();
+            ids = types.stream().filter(item -> item.getName().toLowerCase().contains(keyWord.toLowerCase())).map(FolderItem::getId).collect(Collectors.toList());
+            if (CollectionUtils.isNotEmpty(ids))
+                logQueryParam.setUnionIds(ids);
+        }
+        List<SysLogWithBLOBs> voLogs = extSysLogMapper.query(logQueryParam);
         List<SysLogGridDTO> dtos = voLogs.stream().map(this::convertDTO).collect(Collectors.toList());
         return dtos;
     }
 
-    private BaseGridRequest detailRequest(BaseGridRequest request) {
+    private KeyGridRequest detailRequest(KeyGridRequest request) {
         List<ConditionEntity> conditions = request.getConditions();
         if (CollectionUtils.isNotEmpty(conditions)) {
 
@@ -170,8 +182,57 @@ public class LogService {
             results.add(folderItem);
         }
 
+        FolderItem userLogin = new FolderItem();
+        SysLogConstants.OPERATE_TYPE operateTypeLogin = SysLogConstants.OPERATE_TYPE.LOGIN;
+        SysLogConstants.SOURCE_TYPE sourceTypeLogin = SysLogConstants.SOURCE_TYPE.USER;
+        userLogin.setId(operateTypeLogin.getValue() + "-" + sourceTypeLogin.getValue());
+        String operateTypeName = SysLogConstants.operateTypeName(operateTypeLogin.getValue());
+        String sourceTypeName = sourceTypeLogin.getName();
+        userLogin.setName(Translator.get(operateTypeName) + Translator.get(sourceTypeName));
+        results.add(userLogin);
 
+        List<FolderItem> folderItems = viewPanelTypes();
+        results.addAll(folderItems);
+        results.addAll(viewRelativeTypes());
+        results.addAll(bindUserTypes());
         return results;
+    }
+
+    private List<FolderItem> viewRelativeTypes() {
+        Integer[] opTypes = new Integer[]{15};
+        Integer[] sourceTypes = new Integer[]{4};
+        return typesByArr(opTypes, sourceTypes);
+    }
+
+    private List<FolderItem> typesByArr(Integer[] opTypes, Integer[] sourceTypes) {
+        List<FolderItem> results = new ArrayList<>();
+        for (int i = 0; i < sourceTypes.length; i++) {
+            Integer sourceVal = sourceTypes[i];
+            String sourceTypeName = SysLogConstants.sourceTypeName(sourceVal);
+
+            for (int j = 0; j < opTypes.length; j++) {
+
+                Integer operateVal = opTypes[j];
+
+                String operateTypeName = SysLogConstants.operateTypeName(operateVal);
+                FolderItem folderItem = new FolderItem();
+                folderItem.setId(operateVal + "-" + sourceVal);
+                folderItem.setName(Translator.get(operateTypeName) + Translator.get(sourceTypeName));
+                results.add(folderItem);
+            }
+        }
+        return results;
+    }
+    private List<FolderItem> viewPanelTypes () {
+        Integer[] opTypes = new Integer[]{13, 14};
+        Integer[] sourceTypes = new Integer[]{3};
+        return typesByArr(opTypes, sourceTypes);
+    }
+
+    private List<FolderItem> bindUserTypes() {
+        Integer[] opTypes = new Integer[]{16, 17};
+        Integer[] sourceTypes = new Integer[]{6};
+        return typesByArr(opTypes, sourceTypes);
     }
 
     public SysLogGridDTO convertDTO(SysLogWithBLOBs vo) {
@@ -185,7 +246,6 @@ public class LogService {
     }
 
     public void saveLog(SysLogDTO sysLogDTO) {
-        // String ip = "";
         CurrentUserDto user = AuthUtils.getUser();
         SysLogWithBLOBs sysLogWithBLOBs = BeanUtils.copyBean(new SysLogWithBLOBs(), sysLogDTO);
         if (CollectionUtils.isNotEmpty(sysLogDTO.getPositions())) {
@@ -195,21 +255,37 @@ public class LogService {
             sysLogWithBLOBs.setRemark(gson.toJson(sysLogDTO.getRemarks()));
         }
         sysLogWithBLOBs.setTime(System.currentTimeMillis());
-        sysLogWithBLOBs.setUserId(user.getUserId());
-        sysLogWithBLOBs.setLoginName(user.getUsername());
-        sysLogWithBLOBs.setNickName(user.getNickName());
-        // sysLogWithBLOBs.setIp(ip);
+        if (ObjectUtils.isNotEmpty(user)) {
+            sysLogWithBLOBs.setUserId(user.getUserId());
+            sysLogWithBLOBs.setLoginName(user.getUsername());
+            sysLogWithBLOBs.setNickName(user.getNickName());
+        } else if (sysLogDTO.getOperateType() == SysLogConstants.OPERATE_TYPE.LOGIN.getValue()) {
+            sysLogWithBLOBs.setUserId(Long.parseLong(sysLogDTO.getSourceId()));
+            sysLogWithBLOBs.setLoginName(sysLogDTO.getSourceName());
+            sysLogWithBLOBs.setNickName(sysLogDTO.getSourceName());
+        }
+
         sysLogMapper.insert(sysLogWithBLOBs);
     }
 
 
-    public void exportExcel(BaseGridRequest request) throws Exception {
+    public void exportExcel(KeyGridRequest request) throws Exception {
         request = detailRequest(request);
+        String keyWord = request.getKeyWord();
+        List<String> ids = null;
         HttpServletResponse response = ServletUtils.response();
         OutputStream outputStream = response.getOutputStream();
         try {
             GridExample gridExample = request.convertExample();
-            List<SysLogWithBLOBs> lists = extSysLogMapper.query(gridExample);
+            gridExample.setExtendCondition(keyWord);
+            LogQueryParam logQueryParam = gson.fromJson(gson.toJson(gridExample), LogQueryParam.class);
+            if (StringUtils.isNotBlank(keyWord)) {
+                List<FolderItem> types = types();
+                ids = types.stream().filter(item -> item.getName().toLowerCase().contains(keyWord.toLowerCase())).map(FolderItem::getId).collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(ids))
+                    logQueryParam.setUnionIds(ids);
+            }
+            List<SysLogWithBLOBs> lists = extSysLogMapper.query(logQueryParam);
             List<String[]> details = lists.stream().map(item -> {
                 String operateTypeName = SysLogConstants.operateTypeName(item.getOperateType());
                 String sourceTypeName = SysLogConstants.sourceTypeName(item.getSourceType());

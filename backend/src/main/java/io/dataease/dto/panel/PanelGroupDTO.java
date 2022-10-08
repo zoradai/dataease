@@ -15,6 +15,10 @@ import java.util.Map;
  */
 @Data
 public class PanelGroupDTO extends PanelGroupWithBLOBs implements ITreeBase<PanelGroupDTO> {
+    @ApiModelProperty("创建用户名")
+    private String creatorName;
+    @ApiModelProperty("更新用户名")
+    private String updateName;
     @ApiModelProperty("标签")
     private String label;
     @ApiModelProperty("是否叶子节点")
@@ -37,4 +41,6 @@ public class PanelGroupDTO extends PanelGroupWithBLOBs implements ITreeBase<Pane
     private List<String> parents;
     @ApiModelProperty("请求ID")
     private String requestId;
+    @ApiModelProperty("数据返回来源")
+    private String responseSource;
 }

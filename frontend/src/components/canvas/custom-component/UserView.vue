@@ -36,10 +36,21 @@
       :terminal-type="scaleCoefficientType"
       :scale="scale"
       :theme-style="element.commonBackground"
+      :canvas-style-data="canvasStyleData"
       class="chart-class"
       @onChartClick="chartClick"
       @onJumpClick="jumpClick"
       @trigger-edit-click="pluginEditHandler"
+    />
+    <de-rich-text-view
+      v-else-if="richTextViewShowFlag"
+      :ref="element.propValue.id"
+      :element="element"
+      :prop-value="element.propValue.textValue"
+      :active="active"
+      :edit-mode="editMode"
+      :data-row-select="dataRowSelect"
+      :data-row-name-select="dataRowNameSelect"
     />
     <chart-component
       v-else-if="charViewShowFlag"
@@ -99,7 +110,7 @@
       @onJumpClick="jumpClick"
     />
     <div style="position: absolute;left: 8px;bottom:8px;">
-      <drill-path :drill-filters="drillFilters" @onDrillJump="drillJump" />
+      <drill-path :drill-filters="drillFilters" :theme-style="element.commonBackground" @onDrillJump="drillJump" />
     </div>
   </div>
 </template>
@@ -127,12 +138,15 @@ import { adaptCurTheme, customAttrTrans, customStyleTrans, recursionTransObj } f
 import ChartComponentS2 from '@/views/chart/components/ChartComponentS2'
 import PluginCom from '@/views/system/plugin/PluginCom'
 import LabelNormalText from '@/views/chart/components/normal/LabelNormalText'
-import { viewPropsSave } from '@/api/chart/chart'
+import { viewEditSave, viewPropsSave } from '@/api/chart/chart'
 import { checkAddHttp } from '@/utils/urlUtils'
+import DeRichTextView from '@/components/canvas/custom-component/DeRichTextView'
+import Vue from 'vue'
+import { formatterItem, valueFormatter } from '@/views/chart/chart/formatter'
 
 export default {
   name: 'UserView',
-  components: { LabelNormalText, PluginCom, ChartComponentS2, EditBarView, ChartComponent, TableNormal, LabelNormal, DrillPath, ChartComponentG2 },
+  components: { DeRichTextView, LabelNormalText, PluginCom, ChartComponentS2, EditBarView, ChartComponent, TableNormal, LabelNormal, DrillPath, ChartComponentG2 },
   props: {
     element: {
       type: Object,
@@ -188,10 +202,18 @@ export default {
       type: String,
       required: false,
       default: 'NotProvided'
+    },
+    editMode: {
+      type: String,
+      require: false,
+      default: 'preview'
     }
   },
   data() {
     return {
+      dataRowNameSelect: {},
+      dataRowSelect: {},
+      curFields: [],
       isFirstLoad: true, // 是否是第一次加载
       refId: null,
       chart: BASE_CHART_STRING,
@@ -239,6 +261,9 @@ export default {
     },
     editBarViewShowFlag() {
       return (this.active && this.inTab && !this.mobileLayoutStatus) && !this.showPosition.includes('multiplexing') || this.showPosition.includes('email-task')
+    },
+    richTextViewShowFlag() {
+      return this.httpRequest.status && this.chart.type && this.chart.type === 'richTextView'
     },
     charViewShowFlag() {
       return this.httpRequest.status && this.chart.type && !this.chart.type.includes('table') && !this.chart.type.includes('text') && this.chart.type !== 'label' && this.renderComponent() === 'echarts'
@@ -345,7 +370,7 @@ export default {
     },
     'cfilters': {
       handler: function(val1, val2) {
-        if (isChange(val1, val2) && !this.isFirstLoad) {
+        if ((isChange(val1, val2) || isChange(val1, this.filters)) && !this.isFirstLoad) {
           this.getData(this.element.propValue.viewId)
         }
       },
@@ -437,7 +462,7 @@ export default {
       }
     },
     optFromBatchSingleProp(param) {
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       const updateParams = { 'id': this.chart.id }
       if (param.custom === 'customAttr') {
         const sourceCustomAttr = JSON.parse(this.sourceCustomAttrStr)
@@ -452,7 +477,9 @@ export default {
         this.chart.customStyle = this.sourceCustomStyleStr
         updateParams['customStyle'] = this.sourceCustomStyleStr
       }
-      viewPropsSave(this.panelInfo.id, updateParams)
+      viewPropsSave(this.panelInfo.id, updateParams).then(rsp =>{
+        this.active && bus.$emit('current-component-change')
+      })
       this.$store.commit('recordViewEdit', { viewId: this.chart.id, hasEdit: true })
       this.mergeScale()
     },
@@ -467,7 +494,9 @@ export default {
       this.sourceCustomStyleStr = JSON.stringify(sourceCustomStyle)
       this.chart.customStyle = this.sourceCustomStyleStr
       updateParams['customStyle'] = this.sourceCustomStyleStr
-      viewPropsSave(this.panelInfo.id, updateParams)
+      viewPropsSave(this.panelInfo.id, updateParams).then(rsp =>{
+        this.active && bus.$emit('current-component-change')
+      })
       this.$store.commit('recordViewEdit', { viewId: this.chart.id, hasEdit: true })
       this.mergeScale()
     },
@@ -559,6 +588,15 @@ export default {
             this.chart['position'] = this.inTab ? 'tab' : 'panel'
             // 记录当前数据
             this.panelViewDetailsInfo[id] = JSON.stringify(this.chart)
+            if (this.element.needAdaptor) {
+              const customStyleObj = JSON.parse(this.chart.customStyle)
+              const customAttrObj = JSON.parse(this.chart.customAttr)
+              adaptCurTheme(customStyleObj, customAttrObj)
+              this.chart.customStyle = JSON.stringify(customStyleObj)
+              this.chart.customAttr = JSON.stringify(customAttrObj)
+              viewEditSave(this.panelInfo.id, { id: this.chart.id, customStyle: this.chart.customStyle, customAttr: this.chart.customAttr })
+              this.$store.commit('adaptorStatusDisable', this.element.id)
+            }
             this.sourceCustomAttrStr = this.chart.customAttr
             this.sourceCustomStyleStr = this.chart.customStyle
             this.chart.drillFields = this.chart.drillFields ? JSON.parse(this.chart.drillFields) : []
@@ -570,6 +608,7 @@ export default {
             this.drillFields = JSON.parse(JSON.stringify(response.data.drillFields))
             this.requestStatus = 'merging'
             this.mergeScale()
+            this.initCurFields(this.chart)
             this.requestStatus = 'success'
             this.httpRequest.status = true
           } else {
@@ -582,19 +621,91 @@ export default {
           this.requestStatus = 'error'
           if (err.message && err.message.indexOf('timeout') > -1) {
             this.message = this.$t('panel.timeout_refresh')
+          } else if (!err.response) {
+            this.httpRequest.status = false
           } else {
-            this.httpRequest.status = err.response.data.success
-            this.httpRequest.msg = err.response.data.message
-            if (err && err.response && err.response.data) {
-              this.message = err.response.data.message
-            } else {
-              this.message = err
+            if (err.response) {
+              this.httpRequest.status = err.response.data.success
+              this.httpRequest.msg = err.response.data.message
+              if (err && err.response && err.response.data) {
+                this.message = err.response.data.message
+              } else {
+                this.message = err
+              }
             }
           }
           this.isFirstLoad = false
           return true
         })
       }
+    },
+    initCurFields(chartDetails) {
+      this.curFields = []
+      this.dataRowSelect = []
+      this.dataRowNameSelect = []
+      if (chartDetails.data && chartDetails.data.sourceFields) {
+        const checkAllAxisStr = chartDetails.xaxis + chartDetails.xaxisExt + chartDetails.yaxis + chartDetails.yaxisExt
+        chartDetails.data.sourceFields.forEach(field => {
+          if (checkAllAxisStr.indexOf(field.id) > -1) {
+            this.curFields.push(field)
+          }
+        })
+        // Get the corresponding relationship between id and value
+        const nameIdMap = chartDetails.data.fields.reduce((pre, next) => {
+          pre[next['dataeaseName']] = next['id']
+          return pre
+        }, {})
+        const sourceFieldNameIdMap = chartDetails.data.fields.reduce((pre, next) => {
+          pre[next['dataeaseName']] = next['name']
+          return pre
+        }, {})
+        const rowData = chartDetails.data.tableRow[0]
+        if(chartDetails.type === 'richTextView'){
+          let yAxis = []
+          try {
+            yAxis = JSON.parse(chartDetails.yaxis)
+          } catch (err) {
+            yAxis = JSON.parse(JSON.stringify(chartDetails.yaxis))
+          }
+          let yDataeaseNames = []
+          let yDataeaseNamesCfg = []
+          yAxis.forEach(yItem => {
+            yDataeaseNames.push(yItem.dataeaseName)
+            yDataeaseNamesCfg[yItem.dataeaseName]=yItem.formatterCfg
+          })
+          this.rowDataFormat(rowData,yDataeaseNames,yDataeaseNamesCfg)
+        }
+        for (const key in rowData) {
+          this.dataRowSelect[nameIdMap[key]] = rowData[key]
+          this.dataRowNameSelect[sourceFieldNameIdMap[key]] = rowData[key]
+        }
+      }
+      Vue.set(this.element.propValue, 'innerType', chartDetails.type)
+      Vue.set(this.element.propValue, 'render', chartDetails.render)
+      if (chartDetails.type === 'richTextView') {
+        this.$nextTick(() => {
+          bus.$emit('initCurFields-' + this.element.id)
+        })
+      }
+    },
+    rowDataFormat(rowData,yDataeaseNames,yDataeaseNamesCfg) {
+      for (const key in rowData) {
+       if(yDataeaseNames.includes(key)){
+         let formatterCfg = yDataeaseNamesCfg[key]
+         let value = rowData[key]
+         if (value === null || value === undefined) {
+           rowData[key] = '-'
+         }
+         if (formatterCfg) {
+           const v = valueFormatter(value, formatterCfg)
+           rowData[key] = v.includes('NaN') ? value : v
+         } else {
+           const v = valueFormatter(value, formatterItem)
+           rowData[key] =  v.includes('NaN') ? value : v
+         }
+       }
+      }
+
     },
     viewIdMatch(viewIds, viewId) {
       return !viewIds || viewIds.length === 0 || viewIds.includes(viewId)
@@ -868,7 +979,7 @@ export default {
       return this.chart.render
     },
     getDataEdit(param) {
-      this.$store.state.styleChangeTimes++
+      this.$store.commit('canvasChange')
       if (param.type === 'propChange') {
         this.getData(param.viewId, false, true)
       } else if (param.type === 'styleChange') {
@@ -951,7 +1062,7 @@ export default {
 
   }
 
-  .active > > > .icon-fangda {
+  .active ::v-deep .icon-fangda {
     z-index: 2;
     display: block !important;
   }

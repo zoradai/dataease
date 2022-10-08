@@ -132,7 +132,7 @@
               </el-row>
 
               <el-row class="bottom">
-                <el-button size="mini" type="success" icon="el-icon-plus" round @click="addLinkJumpField">{{ $t('panel.add_jump_field') }}</el-button>
+                <el-button :disabled="!linkJumpInfo.targetPanelId" size="mini" type="success" icon="el-icon-plus" round @click="addLinkJumpField">{{ $t('panel.add_jump_field') }}</el-button>
               </el-row>
               <i slot="reference" class="icon iconfont icon-edit slot-class" />
             </el-row>
@@ -261,6 +261,7 @@ import 'codemirror/keymap/emacs.js'
 import 'codemirror/addon/hint/show-hint.css'
 import 'codemirror/addon/hint/sql-hint'
 import 'codemirror/addon/hint/show-hint'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   components: { codemirror, draggable },
@@ -327,7 +328,7 @@ export default {
     classBackground() {
       if (this.importTemplateInfo.snapshot) {
         return {
-          background: `url(${this.importTemplateInfo.snapshot}) no-repeat`
+          background: `url(${imgUrlTrans(this.importTemplateInfo.snapshot)}) no-repeat`
         }
       } else {
         return {}
@@ -359,8 +360,14 @@ export default {
     init() {
       const chartDetails = JSON.parse(this.panelViewDetailsInfo[this.viewId])
       const checkAllAxisStr = chartDetails.xaxis + chartDetails.xaxisExt + chartDetails.yaxis + chartDetails.yaxisExt + chartDetails.drillFields
-      const checkJumpStr = chartDetails.type.includes('table') ? checkAllAxisStr : chartDetails.xaxis + chartDetails.xaxisExt + chartDetails.drillFields
-
+      let checkJumpStr
+      if (chartDetails.type === 'table-pivot') {
+        checkJumpStr = chartDetails.yaxis + chartDetails.yaxisExt + chartDetails.drillFields
+      }else if(chartDetails.type === 'table-info') {
+        checkJumpStr = chartDetails.xaxis + chartDetails.drillFields
+      }else {
+        checkJumpStr = checkAllAxisStr
+      }
       // 获取可关联的仪表板
       groupTree({}).then(rsp => {
         this.panelList = rsp.data
@@ -452,6 +459,7 @@ export default {
     },
     panelNodeClick(data, node) {
       this.linkJumpInfo.targetViewInfoList = []
+      this.addLinkJumpField()
       this.getPanelViewList(data.id)
     },
     inputVal(value) {
@@ -541,16 +549,16 @@ export default {
 
 <style scoped>
 
-.my_table >>> .el-table__row>td{
+.my_table ::v-deep .el-table__row>td{
   /* 去除表格线 */
   border: none;
   padding: 0 0;
 }
-.my_table >>> .el-table th.is-leaf {
+.my_table ::v-deep .el-table th.is-leaf {
   /* 去除上边框 */
     border: none;
 }
-.my_table >>> .el-table::before{
+.my_table ::v-deep .el-table::before{
   /* 去除下边框 */
   height: 0;
 }
@@ -613,7 +621,7 @@ export default {
   height: 35px;
   border-radius: 3px;
 }
->>>.el-popover{
+::v-deep .el-popover{
   height: 200px;
   overflow: auto;
 }
@@ -672,7 +680,7 @@ export default {
   font-size: 12px;
 }
 
-.codemirror >>> .CodeMirror-scroll {
+.codemirror ::v-deep .CodeMirror-scroll {
   height: 200px;
   overflow-y: auto;
   font-size: 12px;

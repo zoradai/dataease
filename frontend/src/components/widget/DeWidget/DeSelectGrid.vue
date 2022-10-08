@@ -212,6 +212,11 @@ export default {
     bus.$off('reset-default-value', this.resetDefaultValue)
   },
   methods: {
+    clearHandler() {
+      this.value = this.element.options.attrs.multiple ? [] : null
+      this.checkAll = false
+      this.isIndeterminate = false
+    },
     resetDefaultValue(id) {
       if (this.inDraw && this.manualModify && this.element.id === id) {
         this.value = this.fillValueDerfault()
@@ -339,7 +344,7 @@ export default {
 
 <style lang="scss" scoped>
   .de-select-grid-search {
-    >>>input {
+    ::v-deep input {
       border-radius: 0px;
 
     }

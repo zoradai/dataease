@@ -1110,7 +1110,7 @@ public class OracleQueryProvider extends QueryProvider {
 
             String whereName = "";
             if (request.getIsTree()) {
-                whereName = "CONCAT(" + StringUtils.join(whereNameList, ",',',") + ")";
+                whereName = " (" + StringUtils.join(whereNameList, "||','||") + ") ";
             } else {
                 whereName = whereNameList.get(0);
             }
@@ -1123,7 +1123,7 @@ public class OracleQueryProvider extends QueryProvider {
                 whereValue = "'%" + value.get(0) + "%'";
             } else if (StringUtils.containsIgnoreCase(request.getOperator(), "between")) {
                 if (request.getDatasetTableField().getDeType() == 1) {
-                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+                    SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                     String startTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(0))));
                     String endTime = simpleDateFormat.format(new Date(Long.parseLong(value.get(1))));
                     String st = String.format(OracleConstants.TO_DATE, "'" + startTime + "'", OracleConstants.DEFAULT_DATE_FORMAT);
@@ -1369,5 +1369,12 @@ public class OracleQueryProvider extends QueryProvider {
         } else {
             return sql;
         }
+    }
+
+    @Override
+    public String sqlForPreview(String table, Datasource ds){
+        String schema = new Gson().fromJson(ds.getConfiguration(), JdbcConfiguration.class).getSchema();
+        schema = String.format(OracleConstants.KEYWORD_TABLE, schema);
+       return "SELECT * FROM " + schema + "." + String.format(OracleConstants.KEYWORD_TABLE, table);
     }
 }

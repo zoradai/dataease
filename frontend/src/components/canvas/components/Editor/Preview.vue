@@ -1,5 +1,6 @@
 <template>
   <div class="bg" :style="customStyle" @scroll="canvasScroll">
+    <canvas-opt-bar />
     <div id="canvasInfoMain" ref="canvasInfoMain" :style="canvasInfoMainStyle">
       <el-row v-if="showUnpublishedArea" class="custom-position">
         <div style="text-align: center">
@@ -8,7 +9,7 @@
           <span>{{ $t('panel.panel_off') }}</span>
         </div>
       </el-row>
-      <el-row v-else-if="componentDataShow.length===0" class="custom-position">
+      <el-row v-else-if="componentDataShow && componentDataShow.length===0" class="custom-position">
         {{ $t('panel.panelNull') }}
       </el-row>
       <div
@@ -20,7 +21,6 @@
         @mouseup="deselectCurComponent"
         @mousedown="handleMouseDown"
       >
-        <canvas-opt-bar />
         <ComponentWrapper
           v-for="(item, index) in componentDataInfo"
           :key="index"
@@ -52,7 +52,7 @@
               <svg-icon icon-class="ds-excel" class="ds-icon-excel" />{{ $t('chart.export') }}Excel
             </el-button>
           </span>
-          <UserViewDialog v-if="chartDetailsVisible" ref="userViewDialog" :open-type="showChartInfoType" :chart="showChartInfo" :chart-table="showChartTableInfo" />
+          <UserViewDialog v-if="chartDetailsVisible" ref="userViewDialog" :canvas-style-data="canvasStyleData" :open-type="showChartInfoType" :chart="showChartInfo" :chart-table="showChartTableInfo" />
         </el-dialog>
 
         <!--手机视图详情-->
@@ -62,7 +62,7 @@
           class="mobile-dialog-css"
           :destroy-on-close="true"
         >
-          <UserViewMobileDialog :chart="showChartInfo" :chart-table="showChartTableInfo" />
+          <UserViewMobileDialog v-if="mobileChartDetailsVisible" :canvas-style-data="canvasStyleData" :chart="showChartInfo" :chart-table="showChartTableInfo" />
         </el-dialog>
       </div>
     </div>
@@ -75,7 +75,7 @@ import { mapState } from 'vuex'
 import ComponentWrapper from './ComponentWrapper'
 import { changeStyleWithScale } from '@/components/canvas/utils/translate'
 import { uuid } from 'vue-uuid'
-import { deepCopy } from '@/components/canvas/utils/utils'
+import { deepCopy, imgUrlTrans } from '@/components/canvas/utils/utils'
 import eventBus from '@/components/canvas/utils/eventBus'
 import elementResizeDetectorMaker from 'element-resize-detector'
 import UserViewDialog from '@/components/canvas/custom-component/UserViewDialog'
@@ -163,7 +163,7 @@ export default {
       scaleWidth: '100',
       scaleHeight: '100',
       timer: null,
-      componentDataShow: [],
+      componentDataShow: null,
       mainWidth: '100%',
       mainHeight: '100%',
       searchCount: 0,
@@ -231,7 +231,7 @@ export default {
       if (this.canvasStyleData.openCommonStyle) {
         if (this.canvasStyleData.panel.backgroundType === 'image' && this.canvasStyleData.panel.imageUrl) {
           style = {
-            background: `url(${this.canvasStyleData.panel.imageUrl}) no-repeat`,
+            background: `url(${imgUrlTrans(this.canvasStyleData.panel.imageUrl)}) no-repeat`,
             ...style
           }
         } else if (this.canvasStyleData.panel.backgroundType === 'color') {
@@ -253,7 +253,7 @@ export default {
     },
     // 此处单独计算componentData的值 不放入全局mapState中
     componentDataInfo() {
-      return this.componentDataShow
+      return this.componentDataShow||[]
     },
     ...mapState([
       'isClickComponent'
@@ -302,22 +302,26 @@ export default {
     this.initListen()
     this.$store.commit('clearLinkageSettingInfo', false)
     this.canvasStyleDataInit()
-    // 如果当前终端设备是移动端，则进行移动端的布局设计
     if (this.terminal === 'mobile') {
       this.initMobileCanvas()
     }
     bus.$on('trigger-search-button', this.triggerSearchButton)
+    bus.$on('trigger-reset-button', this.triggerResetButton)
   },
   beforeDestroy() {
     erd.uninstall(this.$refs.canvasInfoTemp)
     erd.uninstall(this.$refs.canvasInfoMain)
     clearInterval(this.timer)
     eventBus.$off('openChartDetailsDialog', this.openChartDetailsDialog)
-    bus.$on('trigger-search-button', this.triggerSearchButton)
+    bus.$off('trigger-search-button', this.triggerSearchButton)
+    bus.$off('trigger-reset-button', this.triggerResetButton)
   },
   methods: {
-    triggerSearchButton() {
-      const result = this.buildButtonFilterMap(this.componentData)
+    triggerResetButton() {
+      this.triggerSearchButton(true)
+    },
+    triggerSearchButton(isClear = false) {
+      const result = this.buildButtonFilterMap(this.componentData, isClear)
       this.searchButtonInfo.autoTrigger = result.autoTrigger
       this.searchButtonInfo.filterMap = result.filterMap
       this.buttonFilterMap = this.searchButtonInfo.filterMap
@@ -326,9 +330,16 @@ export default {
         if (component.type === 'view' && this.buttonFilterMap[component.propValue.viewId]) {
           component.filters = this.buttonFilterMap[component.propValue.viewId]
         }
+        if (component.type === 'de-tabs') {
+          for (let idx = 0; idx < component.options.tabList.length; idx++) {
+            const ele = component.options.tabList[idx].content
+            if (!ele.type || ele.type !== 'view') continue
+            ele.filters = this.buttonFilterMap[ele.propValue.viewId]
+          }
+        }
       })
     },
-    buildButtonFilterMap(panelItems) {
+    buildButtonFilterMap(panelItems, isClear = false) {
       const result = {
         buttonExist: false,
         relationFilterIds: [],
@@ -357,11 +368,11 @@ export default {
       result.relationFilterIds = matchFilters.map(item => item.id)
 
       let viewKeyMap = buildViewKeyMap(panelItems)
-      viewKeyMap = this.buildViewKeyFilters(matchFilters, viewKeyMap)
+      viewKeyMap = this.buildViewKeyFilters(matchFilters, viewKeyMap, isClear)
       result.filterMap = viewKeyMap
       return result
     },
-    buildViewKeyFilters(panelItems, result) {
+    buildViewKeyFilters(panelItems, result, isClear = false) {
       const refs = this.$refs
       if (!this.$refs['viewWrapperChild'] || !this.$refs['viewWrapperChild'].length) return result
       panelItems.forEach((element) => {
@@ -375,6 +386,9 @@ export default {
         }
         let param = null
         const wrapperChild = refs['viewWrapperChild'][index]
+        if (isClear) {
+          wrapperChild.clearHandler && wrapperChild.clearHandler()
+        }
         param = wrapperChild.getCondition && wrapperChild.getCondition()
         const condition = formatCondition(param)
         const vValid = valueValid(condition)

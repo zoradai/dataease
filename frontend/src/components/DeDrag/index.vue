@@ -42,6 +42,7 @@
         @resizeView="resizeView"
         @linkJumpSet="linkJumpSet"
         @boardSet="boardSet"
+        @fieldSelect="fieldSelect"
       />
       <mobile-check-bar v-if="mobileCheckBarShow" :element="element" @amRemoveItem="amRemoveItem" />
       <div
@@ -60,6 +61,7 @@
         <slot :name="handlei" />
       </div>
       <div :id="componentCanvasId" :style="mainSlotStyleInner" class="main-background">
+        <svg-icon v-if="svgInnerEnable" :style="{'color':this.element.commonBackground.innerImageColor}" class="svg-background" :icon-class="mainSlotSvgInner" />
         <slot />
       </div>
     </div>
@@ -79,6 +81,7 @@ import { mapState } from 'vuex'
 import EditBar from '@/components/canvas/components/Editor/EditBar'
 import MobileCheckBar from '@/components/canvas/components/Editor/MobileCheckBar'
 import { hexColorToRGBA } from '@/views/chart/chart/util'
+import {imgUrlTrans} from "@/components/canvas/utils/utils";
 
 export default {
   replace: true,
@@ -401,6 +404,12 @@ export default {
     }
   },
   computed: {
+    svgBg() {
+      return {
+        width: this.width + 'px!important',
+        height: this.height + 'px!important'
+      }
+    },
     componentCanvasId() {
       if (this.element.type === 'view') {
         return 'user-view-' + this.element.propValue.viewId
@@ -565,6 +574,16 @@ export default {
       }
       return style
     },
+    svgInnerEnable() {
+      return this.element.commonBackground.enable && this.element.commonBackground.backgroundType === 'innerImage' && typeof this.element.commonBackground.innerImage === 'string'
+    },
+    mainSlotSvgInner() {
+      if (this.svgInnerEnable) {
+        return this.element.commonBackground.innerImage.replace('board/', '').replace('.svg', '')
+      } else {
+        return null
+      }
+    },
     mainSlotStyleInner() {
       const style = {}
       if (this.element.commonBackground) {
@@ -575,10 +594,8 @@ export default {
         style['padding'] = (this.element.commonBackground.innerPadding || 0) + 'px'
         style['border-radius'] = (this.element.commonBackground.borderRadius || 0) + 'px'
         if (this.element.commonBackground.enable) {
-          if (this.element.commonBackground.backgroundType === 'innerImage' && typeof this.element.commonBackground.innerImage === 'string') {
-            style['background'] = `url(${this.element.commonBackground.innerImage}) no-repeat ${colorRGBA}`
-          } else if (this.element.commonBackground.backgroundType === 'outerImage' && typeof this.element.commonBackground.outerImage === 'string') {
-            style['background'] = `url(${this.element.commonBackground.outerImage}) no-repeat ${colorRGBA}`
+          if (this.element.commonBackground.backgroundType === 'outerImage' && typeof this.element.commonBackground.outerImage === 'string') {
+            style['background'] = `url(${imgUrlTrans(this.element.commonBackground.outerImage)}) no-repeat ${colorRGBA}`
           } else {
             style['background-color'] = colorRGBA
           }
@@ -714,14 +731,14 @@ export default {
     },
     // private 监控dragging  resizing
     dragging(val) {
-      if (this.enabled) {
+      if (this.enabled && this.curComponent) {
         this.curComponent.optStatus.dragging = val
         this.$store.commit('setScrollAutoMove', 0)
       }
     },
     // private 监控dragging  resizing
     resizing(val) {
-      if (this.enabled) {
+      if (this.enabled && this.curComponent) {
         this.curComponent.optStatus.resizing = val
         this.$store.commit('setScrollAutoMove', 0)
       }
@@ -791,18 +808,20 @@ export default {
     elementMouseDown(e) {
       // private 设置当前组件数据及状态
       this.$store.commit('setClickComponentStatus', true)
-      if (this.element.component !== 'de-frame' && this.element.component !== 'v-text' && this.element.component !== 'de-rich-text' && this.element.component !== 'rect-shape' && this.element.component !== 'de-input-search' && this.element.component !== 'de-select-grid' && this.element.component !== 'de-number-range' && this.element.component !== 'de-date') {
+      if (this.element.component !== 'user-view' && this.element.component !== 'de-frame' && this.element.component !== 'v-text' && this.element.component !== 'de-rich-text' && this.element.component !== 'rect-shape' && this.element.component !== 'de-input-search' && this.element.component !== 'de-select-grid' && this.element.component !== 'de-number-range' && this.element.component !== 'de-date') {
         e.preventDefault()
       }
       // 阻止冒泡事件
       e.stopPropagation()
       // 此处阻止冒泡 但是外层需要获取pageX pageY
       this.element.auxiliaryMatrix && this.$emit('elementMouseDown', e)
-      this.$store.commit('setCurComponent', { component: this.element, index: this.index })
       // 移动端组件点击自动置顶
       this.mobileLayoutStatus && this.$store.commit('topComponent')
       eventsFor = events.mouse
       this.elementDown(e)
+      this.$nextTick(()=>{
+        this.$store.commit('setCurComponent', { component: this.element, index: this.index })
+      })
     },
     // 元素按下
     elementDown(e) {
@@ -1910,9 +1929,18 @@ export default {
 }
 
 .main-background {
+  position: relative;
   overflow: hidden;
   width: 100%;
   height: 100%;
   background-size: 100% 100% !important;
+}
+
+.svg-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
 </style>

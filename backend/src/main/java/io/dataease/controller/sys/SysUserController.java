@@ -5,9 +5,13 @@ import com.github.pagehelper.PageHelper;
 import com.github.xiaoymin.knife4j.annotations.ApiSupport;
 import io.dataease.auth.annotation.DeLog;
 import io.dataease.auth.api.dto.CurrentUserDto;
+import io.dataease.auth.entity.AccountLockStatus;
+import io.dataease.auth.service.AuthUserService;
 import io.dataease.commons.constants.SysLogConstants;
+import io.dataease.commons.exception.DEException;
 import io.dataease.commons.utils.BeanUtils;
-import io.dataease.controller.sys.request.UserGridRequest;
+import io.dataease.controller.sys.request.KeyGridRequest;
+import io.dataease.controller.sys.response.AuthBindDTO;
 import io.dataease.exception.DataEaseException;
 import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.SysRole;
@@ -21,6 +25,8 @@ import io.dataease.controller.sys.request.SysUserPwdRequest;
 import io.dataease.controller.sys.request.SysUserStateRequest;
 import io.dataease.controller.sys.response.RoleUserItem;
 import io.dataease.controller.sys.response.SysUserGridResponse;
+import io.dataease.plugins.common.base.domain.SysUser;
+import io.dataease.plugins.common.base.domain.SysUserAssist;
 import io.dataease.service.sys.SysRoleService;
 import io.dataease.service.sys.SysUserService;
 import io.swagger.annotations.Api;
@@ -28,6 +34,7 @@ import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.apache.shiro.authz.annotation.RequiresRoles;
@@ -45,11 +52,18 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/user")
 public class SysUserController {
 
+    private static final String WECOM = "wecom";
+    private static final String DINGTALK = "dingtalk";
+    private static final String LARK = "lark";
+
     @Resource
     private SysUserService sysUserService;
 
     @Resource
     private SysRoleService sysRoleService;
+
+    @Resource
+    private AuthUserService authUserService;
 
     @ApiOperation("查询用户")
     @RequiresPermissions("user:read")
@@ -60,25 +74,30 @@ public class SysUserController {
             @ApiImplicitParam(name = "request", value = "查询条件", required = true)
     })
     public Pager<List<SysUserGridResponse>> userGrid(@PathVariable int goPage, @PathVariable int pageSize,
-            @RequestBody UserGridRequest request) {
+                                                     @RequestBody KeyGridRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
-        return PageUtils.setPageInfo(page, sysUserService.query(request));
+        List<SysUserGridResponse> users = sysUserService.query(request);
+        users.forEach(user -> {
+            AccountLockStatus accountLockStatus = authUserService.lockStatus(user.getUsername(), user.getFrom());
+            user.setLocked(accountLockStatus.getLocked());
+        });
+        return PageUtils.setPageInfo(page, users);
     }
 
     @ApiIgnore
     @PostMapping("/userLists")
     public List<SysUserGridResponse> userLists(@RequestBody BaseGridRequest request) {
-        UserGridRequest userGridRequest = BeanUtils.copyBean(new UserGridRequest(), request);
-        return sysUserService.query(userGridRequest);
+        KeyGridRequest keyGridRequest = BeanUtils.copyBean(new KeyGridRequest(), request);
+        return sysUserService.query(keyGridRequest);
     }
 
     @ApiOperation("创建用户")
     @RequiresPermissions("user:add")
     @PostMapping("/create")
     @DeLog(
-        operatetype = SysLogConstants.OPERATE_TYPE.CREATE,
-        sourcetype = SysLogConstants.SOURCE_TYPE.USER,
-        value = "userId"
+            operatetype = SysLogConstants.OPERATE_TYPE.CREATE,
+            sourcetype = SysLogConstants.SOURCE_TYPE.USER,
+            value = "userId"
     )
     public void create(@RequestBody SysUserCreateRequest request) {
         sysUserService.save(request);
@@ -88,9 +107,9 @@ public class SysUserController {
     @RequiresPermissions("user:edit")
     @PostMapping("/update")
     @DeLog(
-        operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
-        sourcetype = SysLogConstants.SOURCE_TYPE.USER,
-        value = "userId"
+            operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
+            sourcetype = SysLogConstants.SOURCE_TYPE.USER,
+            value = "userId"
     )
     public void update(@RequestBody SysUserCreateRequest request) {
         sysUserService.update(request);
@@ -101,8 +120,8 @@ public class SysUserController {
     @PostMapping("/delete/{userId}")
     @ApiImplicitParam(paramType = "path", value = "用户ID", name = "userId", required = true, dataType = "Integer")
     @DeLog(
-        operatetype = SysLogConstants.OPERATE_TYPE.DELETE,
-        sourcetype = SysLogConstants.SOURCE_TYPE.USER
+            operatetype = SysLogConstants.OPERATE_TYPE.DELETE,
+            sourcetype = SysLogConstants.SOURCE_TYPE.USER
     )
     public void delete(@PathVariable("userId") Long userId) {
         sysUserService.delete(userId);
@@ -113,9 +132,9 @@ public class SysUserController {
     @RequiresRoles("1")
     @PostMapping("/updateStatus")
     @DeLog(
-        operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
-        sourcetype = SysLogConstants.SOURCE_TYPE.USER,
-        value = "userId"
+            operatetype = SysLogConstants.OPERATE_TYPE.MODIFY,
+            sourcetype = SysLogConstants.SOURCE_TYPE.USER,
+            value = "userId"
     )
     public void updateStatus(@RequestBody SysUserStateRequest request) {
         sysUserService.updateStatus(request);
@@ -190,7 +209,7 @@ public class SysUserController {
             @ApiImplicitParam(name = "request", value = "查询条件", required = true)
     })
     public Pager<List<SysRole>> roleGrid(@PathVariable int goPage, @PathVariable int pageSize,
-            @RequestBody BaseGridRequest request) {
+                                         @RequestBody BaseGridRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         Pager<List<SysRole>> listPager = PageUtils.setPageInfo(page, sysRoleService.query(request));
         return listPager;
@@ -205,6 +224,62 @@ public class SysUserController {
             ldapUser.setUsername(name);
             return ldapUser;
         }).collect(Collectors.toList());
+    }
+
+    @PostMapping("/unlock/{username}")
+    public void unlock(@PathVariable("username") String username) {
+        SysUser sysUser = new SysUser();
+        sysUser.setUsername(username);
+        SysUser one = sysUserService.findOne(sysUser);
+        authUserService.unlockAccount(username, one.getFrom());
+    }
+
+    @PostMapping("/assistInfo/{userId}")
+    public SysUserAssist assistInfo(@PathVariable("userId") Long userId) {
+        return sysUserService.assistInfo(userId);
+    }
+
+    @PostMapping("/bindStatus")
+    public AuthBindDTO bindStatus() {
+        Long userId = AuthUtils.getUser().getUserId();
+        SysUserAssist sysUserAssist = sysUserService.assistInfo(userId);
+        AuthBindDTO dto = new AuthBindDTO();
+        if (ObjectUtils.isEmpty(sysUserAssist)) return dto;
+        if (authUserService.supportWecom() && StringUtils.isNotBlank(sysUserAssist.getWecomId())) {
+            dto.setWecomBinded(true);
+        }
+        if (authUserService.supportDingtalk() && StringUtils.isNotBlank(sysUserAssist.getDingtalkId())) {
+            dto.setDingtalkBinded(true);
+        }
+        if (authUserService.supportLark() && StringUtils.isNotBlank(sysUserAssist.getLarkId())) {
+            dto.setLarkBinded(true);
+        }
+        return dto;
+    }
+
+    @PostMapping("/unbindAssist/{type}")
+    public void unbindAssist(@PathVariable("type") String type) {
+
+        Boolean valid = StringUtils.equals(WECOM, type) || StringUtils.equals(DINGTALK, type) || StringUtils.equals(LARK, type);
+        if (!valid) {
+            DEException.throwException("only [wecom, dingtalk, lark] is valid");
+        }
+        Long userId = AuthUtils.getUser().getUserId();
+        SysUserAssist sysUserAssist = sysUserService.assistInfo(userId);
+        if (StringUtils.equals(WECOM, type)) {
+            sysUserAssist.setWecomId(null);
+        }
+        if (StringUtils.equals(DINGTALK, type)) {
+            sysUserAssist.setDingtalkId(null);
+        }
+        if (StringUtils.equals(LARK, type)) {
+            sysUserAssist.setLarkId(null);
+        }
+        if (StringUtils.isBlank(sysUserAssist.getWecomId()) && StringUtils.isBlank(sysUserAssist.getDingtalkId()) && StringUtils.isBlank(sysUserAssist.getLarkId())) {
+            sysUserService.changeUserFrom(userId, 0);
+        }
+        sysUserService.saveAssist(userId, sysUserAssist.getWecomId(), sysUserAssist.getDingtalkId(), sysUserAssist.getLarkId());
+
     }
 
 }

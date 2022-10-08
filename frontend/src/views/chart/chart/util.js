@@ -45,6 +45,7 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
         'alpha'
@@ -88,6 +89,7 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
         'alpha'
@@ -134,6 +136,7 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'tableHeaderFontColor',
         'tableFontColor',
         'tableBorderColor',
         'alpha'
@@ -342,10 +345,99 @@ export const TYPE_CONFIGS = [
   },
   {
     render: 'antv',
+    category: 'chart.chart_type_quota',
+    value: 'richTextView',
+    title: 'chart.rich_text_view',
+    icon: 'richTextView',
+    properties: [],
+    propertyInner: {}
+  },
+  {
+    render: 'antv',
     category: 'chart.chart_type_trend',
     value: 'line',
     title: 'chart.chart_line',
     icon: 'line',
+    properties: [
+      'color-selector',
+      'size-selector-ant-v',
+      'label-selector-ant-v',
+      'tooltip-selector-ant-v',
+      'x-axis-selector-ant-v',
+      'y-axis-selector-ant-v',
+      'title-selector-ant-v',
+      'legend-selector-ant-v'
+    ],
+    propertyInner: {
+      'color-selector': [
+        'value',
+        'colorPanel',
+        'customColor',
+        'alpha'
+      ],
+      'size-selector-ant-v': [
+        'lineWidth',
+        'lineSymbol',
+        'lineSymbolSize',
+        'lineSmooth'
+      ],
+      'label-selector-ant-v': [
+        'show',
+        'fontSize',
+        'color'
+      ],
+      'tooltip-selector-ant-v': [
+        'show',
+        'textStyle'
+      ],
+      'x-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'y-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'axisValue',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'title-selector-ant-v': [
+        'show',
+        'title',
+        'fontSize',
+        'color',
+        'hPosition',
+        'isItalic',
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
+      ],
+      'legend-selector-ant-v': [
+        'show',
+        'icon',
+        'orient',
+        'textStyle',
+        'hPosition',
+        'vPosition'
+      ]
+    }
+  },
+  {
+    render: 'antv',
+    category: 'chart.chart_type_trend',
+    value: 'area',
+    title: 'chart.chart_area',
+    icon: 'area',
     properties: [
       'color-selector',
       'size-selector-ant-v',
@@ -507,6 +599,85 @@ export const TYPE_CONFIGS = [
     value: 'bar',
     title: 'chart.chart_bar',
     icon: 'bar',
+    properties: [
+      'color-selector',
+      'size-selector-ant-v',
+      'label-selector-ant-v',
+      'tooltip-selector-ant-v',
+      'x-axis-selector-ant-v',
+      'y-axis-selector-ant-v',
+      'title-selector-ant-v',
+      'legend-selector-ant-v'
+    ],
+    propertyInner: {
+      'color-selector': [
+        'value',
+        'colorPanel',
+        'customColor',
+        'alpha'
+      ],
+      'size-selector-ant-v': [
+        'barDefault',
+        'barGap'
+      ],
+      'label-selector-ant-v': [
+        'show',
+        'fontSize',
+        'color',
+        'position-v'
+      ],
+      'tooltip-selector-ant-v': [
+        'show',
+        'textStyle'
+      ],
+      'x-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'y-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'axisValue',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'title-selector-ant-v': [
+        'show',
+        'title',
+        'fontSize',
+        'color',
+        'hPosition',
+        'isItalic',
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
+      ],
+      'legend-selector-ant-v': [
+        'show',
+        'icon',
+        'orient',
+        'textStyle',
+        'hPosition',
+        'vPosition'
+      ]
+    }
+  },
+  {
+    render: 'antv',
+    category: 'chart.chart_type_compare',
+    value: 'bar-group',
+    title: 'chart.chart_bar_group',
+    icon: 'bar-group',
     properties: [
       'color-selector',
       'size-selector-ant-v',
@@ -999,6 +1170,87 @@ export const TYPE_CONFIGS = [
   },
   {
     render: 'antv',
+    category: 'chart.chart_type_compare',
+    value: 'percentage-bar-stack',
+    title: 'chart.chart_percentage_bar_stack',
+    icon: 'percentage-bar-stack',
+    properties: [
+      'color-selector',
+      'size-selector-ant-v',
+      'label-selector-ant-v',
+      'tooltip-selector-ant-v',
+      'x-axis-selector-ant-v',
+      'y-axis-selector-ant-v',
+      'title-selector-ant-v',
+      'legend-selector-ant-v'
+    ],
+    propertyInner: {
+      'color-selector': [
+        'value',
+        'colorPanel',
+        'customColor',
+        'alpha'
+      ],
+      'size-selector-ant-v': [
+        'barDefault',
+        'barGap'
+      ],
+      'label-selector-ant-v': [
+        'show',
+        'fontSize',
+        'color',
+        'position-v',
+        'reserve-decimal-count'
+      ],
+      'tooltip-selector-ant-v': [
+        'show',
+        'textStyle'
+      ],
+      'x-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'y-axis-selector-ant-v': [
+        'show',
+        'position',
+        'name',
+        'nameTextStyle',
+        'axisValue',
+        'splitLine',
+        'axisForm',
+        'axisLabel'
+      ],
+      'title-selector-ant-v': [
+        'show',
+        'title',
+        'fontSize',
+        'color',
+        'hPosition',
+        'isItalic',
+        'isBolder',
+        'remarkShow',
+        'fontFamily',
+        'letterSpace',
+        'fontShadow'
+      ],
+      'legend-selector-ant-v': [
+        'show',
+        'icon',
+        'orient',
+        'textStyle',
+        'hPosition',
+        'vPosition'
+      ]
+    }
+  },
+
+  {
+    render: 'antv',
     category: 'chart.chart_type_distribute',
     value: 'radar',
     title: 'chart.chart_radar',
@@ -1295,6 +1547,7 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'tableHeaderFontColor',
         'tableFontColor',
         'alpha'
       ],
@@ -1331,6 +1584,7 @@ export const TYPE_CONFIGS = [
       'color-selector': [
         'tableHeaderBgColor',
         'tableItemBgColor',
+        'tableHeaderFontColor',
         'tableFontColor',
         'alpha'
       ],
@@ -1368,6 +1622,7 @@ export const TYPE_CONFIGS = [
       'title-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'quotaColor',
         'dimensionColor'
@@ -1412,6 +1667,7 @@ export const TYPE_CONFIGS = [
       'title-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'quotaColor',
         'dimensionColor'
@@ -1457,6 +1713,7 @@ export const TYPE_CONFIGS = [
       'title-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -1501,9 +1758,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1581,9 +1846,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1662,9 +1935,17 @@ export const TYPE_CONFIGS = [
       'y-axis-selector',
       'y-axis-ext-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1747,9 +2028,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1826,9 +2115,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1905,9 +2202,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -1984,9 +2289,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -2066,6 +2379,7 @@ export const TYPE_CONFIGS = [
       'legend-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -2124,6 +2438,7 @@ export const TYPE_CONFIGS = [
       'legend-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -2184,6 +2499,7 @@ export const TYPE_CONFIGS = [
       'legend-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -2247,6 +2563,7 @@ export const TYPE_CONFIGS = [
       'title-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -2295,9 +2612,17 @@ export const TYPE_CONFIGS = [
       'x-axis-selector',
       'y-axis-selector',
       'title-selector',
-      'legend-selector'
+      'legend-selector',
+      'margin-selector'
     ],
     propertyInner: {
+      'margin-selector': [
+        'marginModel',
+        'marginTop',
+        'marginBottom',
+        'marginLeft',
+        'marginRight'
+      ],
       'color-selector': [
         'value',
         'custom',
@@ -2374,6 +2699,7 @@ export const TYPE_CONFIGS = [
       'legend-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
@@ -2429,10 +2755,12 @@ export const TYPE_CONFIGS = [
       'title-selector'
     ],
     propertyInner: {
+
       'color-selector': [
         'value',
         'custom',
-        'alpha'
+        'alpha',
+        'area-border-color'
       ],
       'label-selector': [
         'show',
@@ -2539,7 +2867,7 @@ export function getColors(chart, colors, reset) {
         })
       }
     }
-  } else if (chart.type.includes('bar') || chart.type.includes('line') || chart.type.includes('scatter') || chart.type.includes('radar')) {
+  } else if ((chart.type.includes('bar') || chart.type.includes('line') || chart.type.includes('scatter') || chart.type.includes('radar') || chart.type.includes('area')) && !chart.type.includes('group')) {
     if (Object.prototype.toString.call(chart.yaxis) === '[object Array]') {
       series = JSON.parse(JSON.stringify(chart.yaxis))
     } else {
@@ -2554,6 +2882,22 @@ export function getColors(chart, colors, reset) {
           isCustom: false
         })
       }
+    }
+  } else if (chart.type === 'bar-group') {
+    // 拿到data中的category，并去重，然后构建seriesColor
+    const data = chart.data.datas
+    const s = []
+    data.forEach((cur) => {
+      if (s.indexOf(cur.category) < 0) {
+        s.push(cur.category)
+      }
+    })
+    for (let i = 0; i < s.length; i++) {
+      seriesColors.push({
+        name: s[i],
+        color: colors[i % colors.length],
+        isCustom: false
+      })
     }
   } else {
     if (chart.data) {

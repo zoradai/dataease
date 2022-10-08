@@ -6,7 +6,7 @@
     <parent>
         <artifactId>dataease-server</artifactId>
         <groupId>io.dataease</groupId>
-        <version>1.14.0</version>
+        <version>1.15.0</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -100,17 +100,14 @@
         <dependency>
             <groupId>com.github.pagehelper</groupId>
             <artifactId>pagehelper</artifactId>
-            <version>5.3.0</version>
+            <version>5.3.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.shiro</groupId>
             <artifactId>shiro-spring</artifactId>
             <version>${shiro.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-validation</artifactId>
-        </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
@@ -159,18 +156,7 @@
             <artifactId>curator-recipes</artifactId>
             <version>4.0.1</version>
         </dependency>
-        <!-- easyexcel -->
-        <dependency>
-            <groupId>com.alibaba</groupId>
-            <artifactId>easyexcel</artifactId>
-            <version>2.1.7</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-api</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+
         <dependency>
             <groupId>com.fit2cloud</groupId>
             <artifactId>quartz-spring-boot-starter</artifactId>
@@ -219,7 +205,7 @@
         <dependency>
             <groupId>io.dataease</groupId>
             <artifactId>dataease-plugin-interface</artifactId>
-            <version>1.14.0</version>
+            <version>1.15.0</version>
             <exclusions>
                 <exclusion>
                     <artifactId>guava</artifactId>
@@ -230,12 +216,12 @@
         <dependency>
             <groupId>io.dataease</groupId>
             <artifactId>dataease-plugin-view</artifactId>
-            <version>1.14.0</version>
+            <version>1.15.0</version>
         </dependency>
         <dependency>
             <groupId>io.dataease</groupId>
             <artifactId>dataease-plugin-datasource</artifactId>
-            <version>1.14.0</version>
+            <version>1.15.0</version>
         </dependency>
         <!-- kettle及数据源依赖 -->
         <dependency>
@@ -322,7 +308,7 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.14.3</version>
+            <version>1.15.3</version>
         </dependency>
         <dependency>
             <groupId>com.jayway.jsonpath</groupId>
@@ -391,6 +377,12 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>3.1.0</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <nonFilteredFileExtensions>
+                        <nonFilteredFileExtension>xls</nonFilteredFileExtension>
+                    </nonFilteredFileExtensions>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
