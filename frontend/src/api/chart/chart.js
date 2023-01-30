@@ -9,6 +9,16 @@ export function post(url, data, loading = false) {
   })
 }
 
+export function tableField(id) {
+  return request({
+    url: '/dataset/table/getWithPermission/' + id,
+    method: 'post',
+    loading: false,
+    hideMsg: true,
+    timeout: 60000
+  })
+}
+
 export function getChartTree(data) {
   return request({
     url: 'api',
@@ -25,6 +35,7 @@ export function chartCopy(id, panelId) {
     loading: false
   })
 }
+
 export function chartBatchCopy(params, panelId) {
   return request({
     url: '/chart/view/chartBatchCopy/' + panelId,
@@ -33,6 +44,7 @@ export function chartBatchCopy(params, panelId) {
     loading: false
   })
 }
+
 export function chartGroupTree(data) {
   return request({
     url: '/chart/group/tree',
@@ -107,6 +119,7 @@ export function resetViewCacheCallBack(viewId, panelId, callback) {
     callback(rep)
   })
 }
+
 export function resetViewCache(viewId, panelId) {
   return request({
     url: '/chart/view/resetViewCache/' + viewId + '/' + panelId,
@@ -137,5 +150,32 @@ export const viewOptions = panelId => {
   return request({
     url: '/chart/view/viewOptions/' + panelId,
     method: 'post'
+  })
+}
+
+
+export function getDatasourceRelationship(id) {
+  return request({
+    url: `/api/relation/datasource/${id}`,
+    method: 'get',
+    loading: true
+  })
+}
+
+
+export function getDatasetRelationship(id) {
+  return request({
+    url: `/api/relation/dataset/${id}`,
+    method: 'get',
+    loading: true
+  })
+}
+
+
+export function getPanelRelationship(id) {
+  return request({
+    url: `/api/relation/panel/${id}`,
+    method: 'get',
+    loading: true
   })
 }

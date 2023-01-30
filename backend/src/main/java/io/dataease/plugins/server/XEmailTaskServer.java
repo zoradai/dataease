@@ -1,8 +1,10 @@
 package io.dataease.plugins.server;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.ArrayUtil;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import io.dataease.auth.annotation.DeRateLimiter;
 import io.dataease.auth.api.dto.CurrentUserDto;
 import io.dataease.commons.exception.DEException;
 import io.dataease.commons.model.excel.ExcelSheetModel;
@@ -14,10 +16,7 @@ import io.dataease.plugins.common.entity.GlobalTaskInstance;
 import io.dataease.plugins.common.entity.XpackConditionEntity;
 import io.dataease.plugins.common.entity.XpackGridRequest;
 import io.dataease.plugins.config.SpringContextUtil;
-import io.dataease.plugins.xpack.email.dto.request.XpackEmailCreate;
-import io.dataease.plugins.xpack.email.dto.request.XpackEmailTaskRequest;
-import io.dataease.plugins.xpack.email.dto.request.XpackEmailViewRequest;
-import io.dataease.plugins.xpack.email.dto.request.XpackPixelEntity;
+import io.dataease.plugins.xpack.email.dto.request.*;
 import io.dataease.plugins.xpack.email.dto.response.XpackTaskGridDTO;
 import io.dataease.plugins.xpack.email.dto.response.XpackTaskInstanceDTO;
 import io.dataease.plugins.xpack.email.service.EmailXpackService;
@@ -27,7 +26,12 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.*;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Base64Utils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
 import springfox.documentation.annotations.ApiIgnore;
 
 import java.io.*;
@@ -56,7 +60,7 @@ public class XEmailTaskServer {
     @RequiresPermissions("task-email:read")
     @PostMapping("/queryTasks/{goPage}/{pageSize}")
     public Pager<List<XpackTaskGridDTO>> queryTask(@PathVariable int goPage, @PathVariable int pageSize,
-            @RequestBody XpackGridRequest request) {
+                                                   @RequestBody XpackGridRequest request) {
         EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         CurrentUserDto user = AuthUtils.getUser();
@@ -74,19 +78,19 @@ public class XEmailTaskServer {
         List<XpackTaskGridDTO> tasks = emailXpackService.taskGrid(request);
         if (CollectionUtils.isNotEmpty(tasks)) {
             tasks.forEach(item -> {
-                if (CronUtils.taskExpire(item.getEndTime())) {
+                if (CronUtils.taskExpire(item.getEndTime()) || !item.getStatus()) {
                     item.setNextExecTime(null);
-                }else {
+                } else {
                     GlobalTaskEntity globalTaskEntity = new GlobalTaskEntity();
                     globalTaskEntity.setRateType(item.getRateType());
                     globalTaskEntity.setRateVal(item.getRateVal());
-                    try{
+                    try {
                         String cron = CronUtils.cron(globalTaskEntity);
                         if (StringUtils.isNotBlank(cron)) {
                             Long nextTime = CronUtils.getNextTriggerTime(cron).getTime();
                             item.setNextExecTime(nextTime);
                         }
-                    }catch (Exception e) {
+                    } catch (Exception e) {
                         item.setNextExecTime(null);
                     }
                 }
@@ -98,8 +102,31 @@ public class XEmailTaskServer {
         return listPager;
     }
 
+    @RequiresPermissions("task-email:edit")
+    @PostMapping("/fireNow/{taskId}")
+    public void fireNow(@PathVariable("taskId") Long taskId) throws Exception {
+        EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
+        XpackEmailTaskRequest request = emailXpackService.taskForm(taskId);
+        GlobalTaskEntity globalTaskEntity = BeanUtils.copyBean(new GlobalTaskEntity(), request);
+        Boolean invalid = false;
+        if (CronUtils.taskExpire(globalTaskEntity.getEndTime())) {
+            globalTaskEntity.setEndTime(null);
+            invalid = true;
+        }
+        if (!globalTaskEntity.getStatus()) {
+            globalTaskEntity.setStatus(true);
+            invalid = true;
+        }
+        if (invalid) {
+            scheduleService.addTempSchedule(globalTaskEntity);
+            return;
+        }
+        scheduleService.fireNow(globalTaskEntity);
+    }
+
     @RequiresPermissions("task-email:add")
     @PostMapping("/save")
+    @Transactional
     public void save(@RequestBody XpackEmailCreate param) throws Exception {
         XpackEmailTaskRequest request = param.fillContent();
         EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
@@ -122,6 +149,9 @@ public class XEmailTaskServer {
             String emailContent;
             try {
                 emailContent = new String(bytes, "UTF-8");
+                if (StringUtils.isNotBlank(emailContent)) {
+                    emailContent = HtmlUtils.htmlUnescape(emailContent);
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -132,7 +162,83 @@ public class XEmailTaskServer {
         return xpackEmailCreate;
     }
 
-    @PostMapping("/preview")
+    @DeRateLimiter
+    @PostMapping(value = "/screenpdf", produces = {MediaType.APPLICATION_PDF_VALUE})
+    public ResponseEntity<ByteArrayResource> screenpdf(@RequestBody XpackReportExportRequest request) {
+        EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
+        String url = ServletUtils.domain() + "/#/previewScreenShot/" + request.getPanelId() + "/true";
+        byte[] bytes = null;
+        try {
+            String currentToken = ServletUtils.getToken();
+            Future<?> future = priorityExecutor.submit(() -> {
+                try {
+                    return emailXpackService.printPdf(url, currentToken, buildPixel(request.getPixel()), request.isShowPageNo());
+                } catch (Exception e) {
+                    LogUtil.error(e.getMessage(), e);
+                    DEException.throwException("预览失败，请联系管理员");
+                }
+                return null;
+            }, 0);
+            Object object = future.get();
+            if (ObjectUtils.isNotEmpty(object)) {
+                bytes = (byte[]) object;
+                if (ArrayUtil.isNotEmpty(bytes)) {
+                    String fileName = request.getPanelId() + ".pdf";
+                    ByteArrayResource bar = new ByteArrayResource(bytes);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_PDF);
+                    ContentDisposition contentDisposition = ContentDisposition.parse("attachment; filename=" + URLEncoder.encode(fileName, "UTF-8"));
+                    headers.setContentDisposition(contentDisposition);
+                    return new ResponseEntity(bar, headers, HttpStatus.OK);
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            DEException.throwException("预览失败，请联系管理员");
+        }
+
+        return null;
+    }
+
+    @DeRateLimiter
+    @PostMapping(value = "/screenshot", produces = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE})
+    public ResponseEntity<ByteArrayResource> screenshot(@RequestBody XpackEmailViewRequest request) {
+        EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
+        String url = ServletUtils.domain() + "/#/previewScreenShot/" + request.getPanelId() + "/true";
+        byte[] bytes = null;
+        try {
+            String currentToken = ServletUtils.getToken();
+            Future<?> future = priorityExecutor.submit(() -> {
+                try {
+                    return emailXpackService.print(url, currentToken, buildPixel(request.getPixel()));
+                } catch (Exception e) {
+                    LogUtil.error(e.getMessage(), e);
+                    DEException.throwException("预览失败，请联系管理员");
+                }
+                return null;
+            }, 0);
+            Object object = future.get();
+            if (ObjectUtils.isNotEmpty(object)) {
+                bytes = (byte[]) object;
+                if (ArrayUtil.isNotEmpty(bytes)) {
+                    String fileName = request.getPanelId() + ".jpeg";
+                    ByteArrayResource bar = new ByteArrayResource(bytes);
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+                    ContentDisposition contentDisposition = ContentDisposition.parse("attachment; filename=" + URLEncoder.encode(fileName, "UTF-8"));
+                    headers.setContentDisposition(contentDisposition);
+                    return new ResponseEntity(bar, headers, HttpStatus.OK);
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error(e.getMessage(), e);
+            DEException.throwException("预览失败，请联系管理员");
+        }
+
+        return null;
+    }
+
+    @PostMapping(value = "/preview")
     public String preview(@RequestBody XpackEmailViewRequest request) {
         EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
         String panelId = request.getPanelId();
@@ -141,7 +247,6 @@ public class XEmailTaskServer {
         String url = ServletUtils.domain() + "/#/previewScreenShot/" + panelId + "/true";
 
         String token = ServletUtils.getToken();
-        String fileId = null;
         try {
             Future<?> future = priorityExecutor.submit(() -> {
                 try {
@@ -154,19 +259,21 @@ public class XEmailTaskServer {
             }, 0);
             Object object = future.get();
             if (ObjectUtils.isNotEmpty(object)) {
-                fileId = object.toString();
+                byte[] bytes = (byte[]) object;
+                String baseCode = Base64Utils.encodeToString(bytes);
+                String imageUrl = "data:image/jpeg;base64," + baseCode;
+                String html = "<div>" +
+                        content +
+                        "<img style='width: 100%;' id='" + panelId + "' src='" + imageUrl + "' />" +
+                        "</div>";
+
+                return html;
             }
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
             DEException.throwException("预览失败，请联系管理员");
         }
-        String imageUrl = "/system/ui/image/" + fileId;
-        String html = "<div>" +
-                "<h2>" + content + "</h2>" +
-                "<img style='width: 100%;' id='" + panelId + "' src='" + imageUrl + "' />" +
-                "</div>";
-
-        return html;
+        return null;
 
     }
 
@@ -208,9 +315,15 @@ public class XEmailTaskServer {
         emailXpackService.stop(taskId);
     }
 
+    @PostMapping("/start/{taskId}")
+    public Boolean start(@PathVariable Long taskId) throws Exception {
+        EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
+        return emailXpackService.start(taskId);
+    }
+
     @PostMapping("/queryInstancies/{goPage}/{pageSize}")
     public Pager<List<XpackTaskInstanceDTO>> instancesGrid(@PathVariable int goPage, @PathVariable int pageSize,
-            @RequestBody XpackGridRequest request) {
+                                                           @RequestBody XpackGridRequest request) {
         EmailXpackService emailXpackService = SpringContextUtil.getBean(EmailXpackService.class);
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         List<XpackTaskInstanceDTO> instances = emailXpackService.taskInstanceGrid(request);
@@ -227,13 +340,13 @@ public class XEmailTaskServer {
 
     @RequiresPermissions("task-email:read")
     @PostMapping("/export")
-    public void export(@RequestBody XpackGridRequest request) throws Exception{
+    public void export(@RequestBody XpackGridRequest request) throws Exception {
         Pager<List<XpackTaskInstanceDTO>> listPager = instancesGrid(0, 0, request);
         List<XpackTaskInstanceDTO> instanceDTOS = listPager.getListObject();
         ExcelSheetModel excelSheetModel = excelSheetModel(instanceDTOS);
         List<ExcelSheetModel> sheetModels = new ArrayList<>();
         sheetModels.add(excelSheetModel);
-        File file = ExcelUtils.exportExcel(sheetModels, null);
+        File file = ExcelUtils.exportExcel(sheetModels, null, null);
         InputStream inputStream = new FileInputStream(file);
         HttpServletResponse response = ServletUtils.response();
         try {
@@ -257,7 +370,7 @@ public class XEmailTaskServer {
             inputStream.close();
         } catch (IOException ex) {
             ex.printStackTrace();
-        }finally {
+        } finally {
             if (file.exists())
                 FileUtil.del(file);
         }
@@ -267,11 +380,11 @@ public class XEmailTaskServer {
     private ExcelSheetModel excelSheetModel(List<XpackTaskInstanceDTO> instanceDTOS) {
         ExcelSheetModel excelSheetModel = new ExcelSheetModel();
         excelSheetModel.setSheetName(Translator.get("I18N_XPACKTASK_FILE_NAME"));
-        String[] headArr = new String[] {Translator.get("I18N_XPACKTASK_NAME"), Translator.get("I18N_XPACKTASK_EXEC_TIME"), Translator.get("I18N_XPACKTASK_STATUS")};
+        String[] headArr = new String[]{Translator.get("I18N_XPACKTASK_NAME"), Translator.get("I18N_XPACKTASK_EXEC_TIME"), Translator.get("I18N_XPACKTASK_STATUS")};
         List<String> head = Arrays.asList(headArr);
         excelSheetModel.setHeads(head);
-        List<List<String>> datas = instanceDTOS.stream().map(this::formatExcelData).collect(Collectors.toList());
-        excelSheetModel.setDatas(datas);
+        List<List<String>> data = instanceDTOS.stream().map(this::formatExcelData).collect(Collectors.toList());
+        excelSheetModel.setData(data);
         return excelSheetModel;
     }
 

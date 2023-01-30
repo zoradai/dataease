@@ -1,4 +1,4 @@
-import { sin, cos } from '@/components/canvas/utils/translate'
+import { cos, sin } from '@/components/canvas/utils/translate'
 import store from '@/store'
 import Vue from 'vue'
 
@@ -8,7 +8,7 @@ export const LIGHT_THEME_PANEL_BACKGROUND = '#F1F3F5'
 export const LIGHT_THEME_COMPONENT_BACKGROUND = '#FFFFFF'
 
 export const DARK_THEME_COLOR_MAIN = '#FFFFFF'
-export const DARK_THEME_COLOR_SLAVE1 = '#CCCCCC'
+export const DARK_THEME_COLOR_SLAVE1 = '#858383'
 export const DARK_THEME_PANEL_BACKGROUND = '#030B2E'
 export const DARK_THEME_COMPONENT_BACKGROUND = '#131E42'
 export const DARK_THEME_COMPONENT_BACKGROUND_BACK = '#5a5c62'
@@ -277,8 +277,8 @@ export const THEME_ATTR_TRANS_SLAVE1_BACKGROUND = {
 
 // 移动端特殊属性
 export const mobileSpecialProps = {
-  'lineWidth': 3, // 线宽固定值
-  'lineSymbolSize': 5// 折点固定值
+  'lineWidth': 2, // 线宽固定值
+  'lineSymbolSize': 8// 折点固定值
 }
 
 export function getScaleValue(propValue, scale) {
@@ -361,7 +361,13 @@ export function adaptCurTheme(customStyle, customAttr, chartType) {
     }
   }
   customAttr['color'] = { ...canvasStyle.chartInfo.chartColor }
-  customStyle['text'] = { ...canvasStyle.chartInfo.chartTitle, title: customStyle['text']['title'], show: customStyle['text']['show'] }
+  customStyle['text'] = {
+    ...canvasStyle.chartInfo.chartTitle,
+    title: customStyle['text']['title'],
+    show: customStyle['text']['show'],
+    remarkShow: customStyle['text']['remarkShow'],
+    remark: customStyle['text']['remark']
+  }
   if (customStyle.background) {
     delete customStyle.background
   }
@@ -370,7 +376,7 @@ export function adaptCurTheme(customStyle, customAttr, chartType) {
 export function adaptCurThemeCommonStyle(component) {
   const commonStyle = store.state.canvasStyleData.chartInfo.chartCommonStyle
   for (const key in commonStyle) {
-    component.commonBackground[key] = commonStyle[key]
+    Vue.set(component.commonBackground, key, commonStyle[key])
   }
   if (isFilterComponent(component.component)) {
     const filterStyle = store.state.canvasStyleData.chartInfo.filterStyle
@@ -380,9 +386,9 @@ export function adaptCurThemeCommonStyle(component) {
   } else if (isTabComponent(component.component)) {
     const tabStyle = store.state.canvasStyleData.chartInfo.tabStyle
     for (const styleKey in tabStyle) {
-      if(typeof tabStyle[styleKey] === 'string'){
+      if (typeof tabStyle[styleKey] === 'string') {
         Vue.set(component.style, styleKey, tabStyle[styleKey])
-      }else{
+      } else {
         Vue.set(component.style, styleKey, null)
       }
     }

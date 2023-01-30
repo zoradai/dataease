@@ -1,8 +1,18 @@
 <template>
   <div style="width: 100%;display: flex;justify-content: center;">
-    <el-card class="box-card about-card">
-      <div slot="header" class="clearfix license-header">
-        <img src="@/assets/DataEase-white.png" alt="" width="300">
+    <el-card
+      class="box-card about-card"
+      :class="dynamicCardClass"
+    >
+      <div
+        slot="header"
+        class="clearfix license-header"
+      >
+        <img
+          src="@/assets/DataEase-white.png"
+          alt=""
+          width="300"
+        >
       </div>
       <div class="license-content">
         <div v-if="license.status === 'Fail'">{{ $t('about.invalid_license') }}</div>
@@ -15,7 +25,10 @@
             <tr>
               <th>{{ $t('about.expiration_time') }}</th>
               <td>
-                <label v-if="license.status === 'expired'" style="color: red">{{ license.expired }} {{ $t('about.expirationed') }}</label>
+                <label
+                  v-if="license.status === 'expired'"
+                  style="color: red"
+                >{{ license.expired }} {{ $t('about.expirationed') }}</label>
                 <label v-if="license.status === 'valid'">{{ license.expired }}</label>
               </td>
             </tr>
@@ -38,11 +51,28 @@
                 <span>{{ build }}</span>
               </td>
             </tr>
+            <tr v-if="license.serialNo">
+              <th>{{ $t('about.serial_no') }}</th>
+              <td>
+                <span>{{ license.serialNo }}</span>
+              </td>
+            </tr>
+            <tr v-if="license.remark">
+              <th>{{ $t('about.remark') }}</th>
+              <td>
+                <span>{{ license.remark }}</span>
+              </td>
+            </tr>
           </table>
         </div>
 
         <div class="md-padding" />
-        <div v-if="user.isAdmin" layout="row" layout-align="space-between center" class="lic_rooter">
+        <div
+          v-if="user.isAdmin"
+          layout="row"
+          layout-align="space-between center"
+          class="lic_rooter"
+        >
           <el-upload
             action=""
             :multiple="false"
@@ -56,7 +86,10 @@
 
           </el-upload>
 
-          <a class="md-primary pointer" @click="support">{{ $t('about.suport') }}</a>
+          <a
+            class="md-primary pointer"
+            @click="support"
+          >{{ $t('about.support') }}</a>
 
         </div>
       </div>
@@ -80,6 +113,15 @@ export default {
     }
   },
   computed: {
+    dynamicCardClass() {
+      if (this.license?.serialNo && this.license?.remark) {
+        return 'about-card-max'
+      }
+      if (!this.license?.serialNo && !this.license?.remark) {
+        return ''
+      }
+      return 'about-card-medium'
+    },
     ...mapGetters([
       'user'
     ])
@@ -119,7 +161,9 @@ export default {
         expired: result.license ? result.license.expired : '',
         count: result.license ? result.license.count : '',
         version: result.license ? result.license.version : '',
-        edition: result.license ? result.license.edition : ''
+        edition: result.license ? result.license.edition : '',
+        serialNo: result.license ? result.license.serialNo : '',
+        remark: result.license ? result.license.remark : ''
       }
     },
     importLic(file) {
@@ -169,6 +213,12 @@ export default {
         ::v-deep div.el-card__header {
             padding: 0;
         }
+    }
+    .about-card-medium {
+      height: 415px !important;
+    }
+    .about-card-max {
+      height: 430px !important;
     }
     .license-header {
         height: 100px;

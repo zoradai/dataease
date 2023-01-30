@@ -1,11 +1,20 @@
 <template xmlns:el-col="http://www.w3.org/1999/html">
   <el-col class="tree-style">
     <el-col>
-      <el-row v-show="showView === 'Datasource'" class="title-css">
-        <el-col class="title-text" :span="12">
+      <el-row
+        v-show="showView === 'Datasource'"
+        class="title-css"
+      >
+        <el-col
+          class="title-text"
+          :span="12"
+        >
           {{ $t('commons.datasource') }}
         </el-col>
-        <el-col class="title-operate" :span="12">
+        <el-col
+          class="title-operate"
+          :span="12"
+        >
           <el-tooltip
             class="item"
             effect="dark"
@@ -24,7 +33,10 @@
             :content="$t('datasource.create')"
             placement="top"
           >
-            <i class="el-icon-plus" @click="addFolder" />
+            <i
+              class="el-icon-plus"
+              @click="addFolder"
+            />
           </el-tooltip>
         </el-col>
       </el-row>
@@ -40,9 +52,15 @@
 
       <el-col class="custom-tree-container de-tree">
         <div class="block">
-          <div v-if="!tData.length && !treeLoading" class="no-tdata">
+          <div
+            v-if="!tData.length && !treeLoading"
+            class="no-tdata"
+          >
             {{ showView === 'Driver' ? '暂无驱动' : '暂无数据源' }}
-            <span @click="() => createDriveOrDs()" class="no-tdata-new">{{
+            <span
+              class="no-tdata-new"
+              @click="() => createDriveOrDs()"
+            >{{
               $t('deDataset.create')
             }}</span>
           </div>
@@ -56,7 +74,10 @@
             :filter-node-method="filterNode"
             @node-click="nodeClick"
           >
-            <span slot-scope="{ data }" class="custom-tree-node-list">
+            <span
+              slot-scope="{ data }"
+              class="custom-tree-node-list"
+            >
               <span style="display: flex; width: calc(100% - 20px)">
                 <span
                   v-if="
@@ -82,7 +103,7 @@
                   />
                 </span>
                 <span v-if="data.type === 'folder'">
-                  <svg-icon icon-class="scene"/>
+                  <svg-icon icon-class="scene" />
                 </span>
                 <span
                   style="
@@ -139,12 +160,25 @@
                   trigger="click"
                   @command="(type) => handleCommand(type, data)"
                 >
-                  <i class="el-icon-more" @click.stop />
-                  <el-dropdown-menu slot="dropdown" class="de-card-dropdown">
+                  <i
+                    class="el-icon-more"
+                    @click.stop
+                  />
+                  <el-dropdown-menu
+                    slot="dropdown"
+                    class="de-card-dropdown"
+                  >
                     <slot>
                       <el-dropdown-item command="edit">
                         <i class="el-icon-edit" />
                         {{ $t('chart.edit') }}
+                      </el-dropdown-item>
+                      <el-dropdown-item command="copy" v-show="showView === 'Datasource'">
+                        <svg-icon
+                          icon-class="de-copy"
+                          class="de-copy-icon"
+                        />
+                        {{ $t('commons.copy') }}
                       </el-dropdown-item>
                       <el-dropdown-item command="delete">
                         <i class="el-icon-delete" />
@@ -175,13 +209,19 @@
           size="small"
           :rules="rule"
         >
-          <el-form-item :label="$t('datasource.driver_name')" prop="name">
+          <el-form-item
+            :label="$t('datasource.driver_name')"
+            prop="name"
+          >
             <el-input
               v-model="driverForm.name"
               :placeholder="$t('fu.search_bar.please_input')"
             />
           </el-form-item>
-          <el-form-item :label="$t('datasource.drive_type')" prop="type">
+          <el-form-item
+            :label="$t('datasource.drive_type')"
+            prop="type"
+          >
             <el-select
               v-model="driverForm.type"
               :placeholder="$t('fu.search_bar.please_select')"
@@ -201,8 +241,14 @@
             <deTextarea v-model="driverForm.desc" />
           </el-form-item>
         </el-form>
-        <div slot="footer" class="dialog-footer">
-          <deBtn secondary @click="close()">{{ $t('commons.cancel') }}</deBtn>
+        <div
+          slot="footer"
+          class="dialog-footer"
+        >
+          <deBtn
+            secondary
+            @click="close()"
+          >{{ $t('commons.cancel') }}</deBtn>
           <deBtn
             type="primary"
             size="mini"
@@ -216,41 +262,63 @@
         v-dialogDrag
         :title="$t('datasource.create')"
         :visible.sync="dsTypeRelate"
-        width="1200px"
+        width="1005px"
         class="de-dialog-form none-scroll-bar"
         append-to-body
       >
-        <el-tabs v-model="tabActive">
-          <el-tab-pane :label="$t('datasource.all')" name="all" />
+        <el-tabs
+          v-model="tabActive"
+          class="de-tabs"
+          @tab-click="handleClick"
+        >
           <el-tab-pane
-            :label="$t('datasource.relational_database')"
-            name="RDBMS"
+            label="OLTP"
+            name="OLTP"
           />
           <el-tab-pane
-            :label="$t('datasource.non_relational_database')"
-            name="NORDBMS"
+            label="OLAP"
+            name="OLAP"
           />
-          <el-tab-pane :label="$t('datasource.other')" name="OTHER" />
+          <el-tab-pane
+            :label="$t('datasource.data_warehouse_lake')"
+            name="dataWarehouseLake"
+          />
+          <el-tab-pane
+            :label="$t('datasource.other')"
+            name="OTHER"
+          />
         </el-tabs>
         <div class="db-container">
-          <div
-            v-for="(db, index) in databaseList"
-            :key="db.type"
-            class="db-card"
-            :class="[{ marLeft: index % 4 === 0 }]"
-            @click="addDb(db)"
-          >
-            <img
-              v-if="!db.isPlugin"
-              :src="require('../../../assets/datasource/' + db.type + '.jpg')"
-              alt=""
+          <template v-for="(list, idx) in databaseList">
+            <div
+              :key="nameMap[idx]"
+              :class="nameMap[idx]"
+              class="name"
+            >{{ nameClassMap[idx] }}</div>
+            <div
+              :key="nameMap[idx] + 'cont'"
+              class="item-container"
             >
-            <img
-              v-if="db.isPlugin"
-              :src="`/api/pluginCommon/staticInfo/${db.type}/jpg`"
-            >
-            <p class="db-name">{{ db.name }}</p>
-          </div>
+              <div
+                v-for="(db, index) in list"
+                :key="db.type"
+                class="db-card"
+                :class="[{ marLeft: index % 5 === 0 }]"
+                @click="addDb(db)"
+              >
+                <img
+                  v-if="!db.isPlugin"
+                  :src="require('../../../assets/datasource/' + db.type + '.jpg')"
+                  alt=""
+                >
+                <img
+                  v-if="db.isPlugin"
+                  :src="`/api/pluginCommon/staticInfo/${db.type}/jpg`"
+                >
+                <p class="db-name">{{ db.name }}</p>
+              </div>
+            </div>
+          </template>
         </div>
       </el-dialog>
     </el-col>
@@ -259,6 +327,7 @@
 <script>
 import { mapGetters } from 'vuex'
 import i18n from '@/lang'
+import { Base64 } from 'js-base64'
 import {
   listDatasource,
   listDatasourceByType,
@@ -270,8 +339,12 @@ import {
   listDriverByType,
   updateDriver
 } from '@/api/system/datasource'
-import deTextarea from '@/components/deCustomCm/deTextarea.vue'
+import { getDatasourceRelationship } from '@/api/chart/chart.js'
+
+import msgContent from './MsgContent.vue'
+import deTextarea from '@/components/deCustomCm/DeTextarea.vue'
 import msgCfm from '@/components/msgCfm'
+import { checkPermission } from '@/utils/permission'
 export default {
   name: 'DsTree',
   components: { deTextarea },
@@ -284,10 +357,16 @@ export default {
   },
   data() {
     return {
-      tabActive: 'all',
+      tabActive: 'OLTP',
+      treeData: [],
+      databaseList: [],
+      currentNodeId: '',
       dsTypeRelate: false,
       expandedArray: [],
       tData: [],
+      nameMap: ['OLTP', 'OLAP', 'dataWarehouseLake', 'OTHER'],
+      nameClassMap: ['OLTP', 'OLAP', this.$t(`datasource.data_warehouse_lake`), this.$t(`datasource.other`)],
+      typeList: ['OLTP', 'OLAP', 'DL', 'OTHER'],
       treeLoading: false,
       dsTypes: [],
       dsTypesForDriver: [],
@@ -339,27 +418,42 @@ export default {
       }
     }
   },
+  computed: {
+    ...mapGetters(['user'])
+  },
   watch: {
     key(val) {
       this.$refs.myDsTree.filter(val)
     }
   },
-  computed: {
-    ...mapGetters(['user']),
-    databaseList() {
-      if (this.tabActive === 'all') {
-        return this.dsTypes
-      }
-      return this.dsTypes.filter(
-        (ele) => ele.databaseClassification === this.tabActive
-      )
-    }
-  },
   created() {
-    this.queryTreeDatas()
+    this.queryTreeData()
     this.datasourceTypes()
   },
   methods: {
+    getDatasourceRelationship({ queryType, label, id }) {
+     return getDatasourceRelationship(id).then((res) => {
+        const arr = res.data || []
+        this.treeData = []
+        this.dfsTree(arr, { queryType, label })
+      })
+    },
+    dfsTree(arr = [], { queryType, label }, item) {
+      arr.forEach((ele) => {
+        const { name, type, subRelation = [] } = ele
+        const obj = {}
+        obj[type] = name
+        obj[queryType] = label
+        if (subRelation.length) {
+          this.dfsTree(subRelation, { queryType: type, label: name }, obj)
+        } else {
+          this.treeData.push({ ...item, ...obj })
+        }
+      })
+    },
+    handleClick() {
+      document.querySelector(`.${this.tabActive}`).scrollIntoView()
+    },
     createDriveOrDs() {
       if (this.showView === 'Driver') {
         this.addDriver()
@@ -392,36 +486,65 @@ export default {
       this.key = ''
       this.showSearchInput = false
     },
-    queryTreeDatas() {
+    dfsTableData(arr, id) {
+      arr.some((ele) => {
+        if (ele.id === id) {
+          this.$refs.myDsTree?.setCurrentNode(ele)
+          this.showInfo({ data: ele })
+          this.expandedArray.push(id)
+          return true
+        } else if (ele.children?.length) {
+          this.dfsTableData(ele.children, id)
+        }
+        return false
+      })
+    },
+    queryTreeData() {
       this.treeLoading = true
       if (this.showView === 'Datasource') {
         listDatasource().then((res) => {
           this.tData = this.buildTree(res.data)
+          this.$nextTick(() => {
+            const currentNodeId = sessionStorage.getItem('datasource-current-node')
+            if (currentNodeId) {
+              sessionStorage.setItem('datasource-current-node', '')
+              this.dfsTableData(this.tData, currentNodeId)
+            }
+          })
         }).finally(() => {
-        this.treeLoading = false
-      })
+          this.treeLoading = false
+        })
       }
       if (this.showView === 'Driver') {
         listDrivers().then((res) => {
           this.tData = this.buildTree(res.data)
         }).finally(() => {
-        this.treeLoading = false
-      })
+          this.treeLoading = false
+        })
       }
     },
     datasourceTypes() {
       listDatasourceType().then((res) => {
         this.dsTypes = res.data
+        const databaseList = [[], [], [], []]
         this.dsTypes.forEach((item) => {
+          const index = this.typeList.findIndex(ele => ele === item.databaseClassification)
+          if (index !== -1) {
+            databaseList[index].push(item)
+          }
           if (item.isJdbc) {
             this.dsTypesForDriver.push(item)
           }
         })
+        this.databaseList = databaseList.map(ele => {
+          return ele.sort((a, b) => {
+            return a.name.toLowerCase().charCodeAt(0) - b.name.toLowerCase().charCodeAt(0)
+          })
+        })
       })
     },
     refreshType(datasource) {
-      const method =
-        this.showView === 'Datasource' ? listDatasourceByType : listDriverByType
+      const method = this.showView === 'Datasource' ? listDatasourceByType : listDriverByType
       let typeData = []
       method(datasource.type).then((res) => {
         typeData = this.buildTree(res.data)
@@ -449,6 +572,11 @@ export default {
             this.tData.push(typeData[0])
           }
         }
+
+        if (!this.key) return
+        this.$nextTick(() => {
+          this.$refs.myDsTree.filter(this.key)
+        })
       })
     },
     buildTree(array = []) {
@@ -456,6 +584,12 @@ export default {
       const newArr = []
       for (let index = 0; index < array.length; index++) {
         const element = array[index]
+        if (element.configuration) {
+          element.configuration = Base64.decode(element.configuration)
+        }
+        if (element.apiConfigurationStr) {
+          element.apiConfiguration = JSON.parse(Base64.decode(element.apiConfigurationStr))
+        }
         if (this.msgNodeId) {
           if (element.id === this.msgNodeId) {
             element.msgNode = true
@@ -493,17 +627,17 @@ export default {
       this.showView = 'Driver'
       this.expandedArray = []
       this.tData = []
-      this.queryTreeDatas()
+      this.queryTreeData()
     },
     dsMgm() {
       this.$emit('switch-main', {})
       this.showView = 'Datasource'
       this.expandedArray = []
       this.tData = []
-      this.queryTreeDatas()
+      this.queryTreeData()
     },
     addDb({ type }) {
-      const name = (this.dsTypes.find(ele => type === ele.type ) || {}).name
+      const name = (this.dsTypes.find(ele => type === ele.type) || {}).name
       this.$router.push({
         path: '/ds-form',
         query: { type, name }
@@ -515,7 +649,7 @@ export default {
         this.dialogTitle = this.$t('datasource.add_driver')
         this.editDriver = true
       } else {
-        const name = (this.dsTypes.find(ele => data.id === ele.type ) || {}).name
+        const name = (this.dsTypes.find(ele => data.id === ele.type) || {}).name
         this.$router.push({
           path: '/ds-form',
           query: { type: data.id, name }
@@ -524,6 +658,7 @@ export default {
     },
     nodeClick(node, data) {
       if (node.type === 'folder') return
+      this.currentNodeId = this.showView !== 'Driver' && node.id
       this.showInfo(data)
     },
     clickFileMore(param) {
@@ -557,6 +692,9 @@ export default {
         case 'edit':
           this._handleEditer(data)
           break
+        case 'copy':
+          this._handleCopy(data)
+          break
         case 'delete':
           this._handleDelete(data)
           break
@@ -566,15 +704,27 @@ export default {
     },
     _handleEditer(row) {
       if (this.showView === 'Datasource') {
-        const param = { ...row, ...{ showModel: 'show' }}
-        this.switchMain('DsForm', param, this.tData, this.dsTypes)
+        const param = { ...row, ...{ showModel: 'show', editor: 'editor' }}
+        this.switchMain('dsTable', param, this.tData, this.dsTypes)
+        this.currentNodeId && sessionStorage.setItem('datasource-current-node', this.currentNodeId)
         return
       }
       this.editDriver = true
       this.dialogTitle = this.$t('datasource.edit_driver')
-      this.driverForm = {...row}
+      this.driverForm = { ...row }
     },
-    _handleDelete(datasource) {
+    _handleCopy(row){
+      if (this.showView === 'Datasource') {
+        const param = { ...row, ...{ showModel: 'copy' }}
+        this.switchMain('DsForm', param, this.tData, this.dsTypes)
+        this.currentNodeId && sessionStorage.setItem('datasource-current-node', this.currentNodeId)
+        return
+      }
+      this.editDriver = true
+      this.dialogTitle = this.$t('commons.copy')
+      this.driverForm = { ...row }
+    },
+    async _handleDelete(datasource) {
       const params = {
         title:
           this.showView === 'Datasource'
@@ -589,6 +739,9 @@ export default {
           }
           method(parma).then((res) => {
             if (res.success) {
+              if (datasource.id === this.currentNodeId) {
+                sessionStorage.setItem('datasource-current-node', '')
+              }
               this.openMessageSuccess('commons.delete_success')
               this.switchMain('', {}, this.tData, this.dsTypes)
               this.refreshType(datasource)
@@ -598,9 +751,43 @@ export default {
           })
         }
       }
+      const { queryType = 'datasource', name: label, id } = datasource
+      if (this.showView === 'Datasource') {
+        if (checkPermission(['relationship:read'])) {
+          await this.getDatasourceRelationship({ queryType, label, id })
+          if (this.treeData.length) {
+            params.title = this.$t('datasource.this_data_source')
+            params.link = this.$t('datasource.click_to_check')
+            params.content = this.$t('datasource.cannot_be_deleted_datasource')
+            params.templateDel = msgContent
+            params.linkTo = this.linkTo.bind(this, { queryType, id, name: label })
+            this.withLink(params)
+            return
+          }
+        }
+      }
       this.handlerConfirm(params)
     },
+    linkTo(query) {
+      window.open(this.$router.resolve({
+        path: '/system/relationship',
+        query
+      }).href, '_blank')
+    },
     switchMain(component, componentParam, tData, dsTypes) {
+      if (component === 'dsTable') {
+        this.$emit('switch-main', {
+          component,
+          componentParam: {
+            ...componentParam,
+            msgNodeId: this.msgNodeId
+          },
+          tData,
+          dsTypes
+        })
+        return
+      }
+
       if (component === 'DsForm') {
         const { id, type, showModel } = componentParam
         this.$router.push({
@@ -731,24 +918,38 @@ export default {
   width: 100%;
   max-height: 65vh;
   overflow-y: auto;
-  display: flex;
-  flex-wrap: wrap;
-  margin-top: -3px;
+  margin-top: 3px;
   position: relative;
   z-index: 10;
+
+  .name {
+    margin: 16px 0;
+    font-family: PingFang SC;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    color: var(--deTextPrimary, #1F2329);
+  }
+
+  .item-container {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
   .db-card {
-    height: 193px;
-    width: 270px;
+    height: 141px;
+    width: 177.6px;
     display: flex;
     flex-wrap: wrap;
     background: #ffffff;
     border: 1px solid #dee0e3;
     border-radius: 4px;
-    margin-bottom: 24px;
-    margin-left: 22px;
+    margin-bottom: 16px;
+    margin-left: 16px;
     img {
       width: 100%;
-      height: 154.58px;
+      height: 102px;
       border-top-left-radius: 4px;
       border-top-right-radius: 4px;
     }
@@ -768,5 +969,10 @@ export default {
   .marLeft {
     margin-left: 0;
   }
+}
+.de-copy-icon {
+  cursor: pointer;
+  margin-right: 5px;
+  color: var(--deTextSecondary, #646a73);
 }
 </style>

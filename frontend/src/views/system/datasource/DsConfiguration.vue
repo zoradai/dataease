@@ -12,8 +12,14 @@
       <template v-if="form.type == 'api'">
         <div class="de-row-rules flex-space">
           <span>{{ $t('datasource.data_table') }}</span>
-           <el-button style="min-width: 80px;
-    font-size: 14px;padding: 8px 15px;" icon="el-icon-plus" size="small" @click="() => addApiItem()" type="primary">{{ $t('commons.add') }}</el-button>
+          <el-button
+            style="min-width: 80px;
+    font-size: 14px;padding: 8px 15px;"
+            icon="el-icon-plus"
+            size="small"
+            type="primary"
+            @click="() => addApiItem()"
+          >{{ $t('commons.add') }}</el-button>
         </div>
         <el-empty
           v-if="!form.apiConfiguration.length"
@@ -29,7 +35,10 @@
             @click="addApiItem(api)"
           >
             <el-row>
-              <el-col style="display: flex" :span="19">
+              <el-col
+                style="display: flex"
+                :span="19"
+              >
                 <span class="name">{{ api.name }}</span>
                 <span
                   v-if="api.status === 'Error'"
@@ -42,9 +51,13 @@
                   style="color: green; background: rgba(52, 199, 36, 0.2)"
                 >{{ $t('datasource.valid') }}</span>
               </el-col>
-              <el-col style="text-align: right" :span="5">
+              <el-col
+                style="text-align: right"
+                :span="5"
+              >
                 <svg-icon
                   icon-class="de-copy"
+                  :disabled="disabled"
                   class="de-copy-icon"
                   @click.stop="copyItem(api)"
                 />
@@ -54,15 +67,20 @@
                     :ref="`apiTable${api.name}`"
                     placement="top"
                     width="200"
+                    :disabled="disabled"
                     popper-class="api-table-delete"
                     trigger="click"
                   >
-                    <i class="el-icon-warning" />
+                    <i :disabled="disabled" class="el-icon-warning" />
                     <div class="tips">
                       {{ $t('datasource.delete_this_item') }}
                     </div>
                     <div class="foot">
-                      <deBtn class="small" secondary @click="cancelItem(api)">{{
+                      <deBtn
+                        class="small"
+                        secondary
+                        @click="cancelItem(api)"
+                      >{{
                         $t('fu.search_bar.cancel')
                       }}</deBtn>
                       <deBtn
@@ -75,6 +93,7 @@
                       slot="reference"
                       icon-class="de-delete"
                       class="de-delete-icon"
+                      :class="[disabled ? 'not-allow' : '']"
                     />
                   </el-popover>
                 </span>
@@ -86,7 +105,7 @@
             </div>
             <div class="req-value">
               <span>{{ api.method }}</span>
-              <span>{{ api.url }}</span>
+              <span :title="api.url">{{ api.url }}</span>
             </div>
           </div>
         </template>
@@ -150,7 +169,10 @@
         v-if="form.type == 'hive'"
         :label="$t('datasource.auth_method')"
       >
-        <el-select v-model="form.configuration.authMethod" class="de-select">
+        <el-select
+          v-model="form.configuration.authMethod"
+          class="de-select"
+        >
           <el-option
             v-for="item in authMethodList"
             :key="item.id"
@@ -166,7 +188,10 @@
         "
         :label="$t('datasource.client_principal')"
       >
-        <el-input v-model="form.configuration.username" autocomplete="off" />
+        <el-input
+          v-model="form.configuration.username"
+          autocomplete="off"
+        />
       </el-form-item>
 
       <el-form-item
@@ -243,7 +268,11 @@
         "
         :label="$t('datasource.extra_params')"
       >
-        <el-input v-model="form.configuration.extraParams" :placeholder="$t('fu.search_bar.please_input') + $t('datasource.extra_params')" autocomplete="off" />
+        <el-input
+          v-model="form.configuration.extraParams"
+          :placeholder="$t('fu.search_bar.please_input') + $t('datasource.extra_params')"
+          autocomplete="off"
+        />
       </el-form-item>
 
       <el-form-item
@@ -267,7 +296,7 @@
         class="schema-label"
       >
         <template slot="label">
-          {{ $t('datasource.schema') }}
+          <span class="name">{{ $t('datasource.schema') }}<i class="required" /></span>
           <el-button
             type="text"
             icon="el-icon-plus"
@@ -281,6 +310,8 @@
           filterable
           :placeholder="$t('fu.search_bar.please_select')"
           class="de-select"
+          @change="validatorSchema"
+          @blur="validatorSchema"
         >
           <el-option
             v-for="item in schemas"
@@ -289,6 +320,12 @@
             :value="item"
           />
         </el-select>
+        <div
+          v-if="configurationSchema"
+          class="el-form-item__error"
+        >
+          {{ $t('datasource.please_choose_schema') }}
+        </div>
       </el-form-item>
 
       <el-form-item
@@ -334,8 +371,14 @@
         class="de-expand de-mar0"
         @click="showPriority = !showPriority"
       >{{ $t('datasource.priority')
-       }}<i v-if="showPriority" class="el-icon-arrow-up" />
-        <i v-else class="el-icon-arrow-down" /></span>
+       }}<i
+         v-if="showPriority"
+         class="el-icon-arrow-up"
+       />
+        <i
+          v-else
+          class="el-icon-arrow-down"
+        /></span>
 
       <template v-if="showPriority">
         <el-row :gutter="24">
@@ -407,12 +450,16 @@
       v-closePress
       :title="api_table_title"
       :visible.sync="edit_api_item"
-      custom-class="api-datasource-drawer"
+      custom-class="api-datasource-drawer ds-configuration-input"
       size="840px"
       :before-close="closeEditItem"
       direction="rtl"
     >
-      <el-steps :active="active" align-center :space="144">
+      <el-steps
+        :active="active"
+        align-center
+        :space="144"
+      >
         <el-step
           v-if="active === 1"
           :title="$t('datasource.api_step_1')"
@@ -437,11 +484,21 @@
           <div class="row-rules">
             <span>{{ $t('datasource.base_info') }}</span>
           </div>
-          <el-form-item :label="$t('commons.name')" prop="name">
-            <el-input v-model="apiItem.name" :placeholder="$t('commons.input_name')" autocomplete="off" />
+          <el-form-item
+            :label="$t('commons.name')"
+            prop="name"
+          >
+            <el-input
+              v-model="apiItem.name"
+              :placeholder="$t('commons.input_name')"
+              autocomplete="off"
+            />
           </el-form-item>
 
-          <el-form-item :label="$t('datasource.request')" prop="url">
+          <el-form-item
+            :label="$t('datasource.request')"
+            prop="url"
+          >
             <el-input
               v-model="apiItem.url"
               :placeholder="$t('datasource.path_all_info')"
@@ -478,6 +535,64 @@
               />
             </el-form-item>
           </div>
+
+          <el-form-item
+            :label="$t('datasource.isUseJsonPath')"
+          >
+            <el-input
+              :disabled="!apiItem.useJsonPath"
+              v-model="apiItem.jsonPath"
+              :placeholder="$t('datasource.jsonpath_info')"
+              class="input-with-select"
+              size="small"
+            >
+              <el-select
+                slot="prepend"
+                v-model="apiItem.useJsonPath"
+                style="width: 100px"
+                size="small"
+              >
+                <el-option
+                  v-for="item in isUseJsonPath"
+                  :key="item.id"
+                  :label="item.label"
+                  :value="item.id"
+                />
+              </el-select>
+
+              <el-button
+                :disabled="!apiItem.useJsonPath"
+                slot="append"
+                @click="showApiData"
+              >{{ $t('datasource.show_api_data') }}
+              </el-button>
+            </el-input>
+          </el-form-item>
+
+          <div class="row-rules" v-show="apiItem.useJsonPath">
+            <span>{{ $t('datasource.column_info') }}</span>
+          </div>
+          <div class="table-container de-svg-in-table" v-show="apiItem.useJsonPath">
+            <el-table
+              ref="apiItemTable"
+              :data="originFieldItem.jsonFields"
+              style="width: 100%"
+              row-key="jsonPath"
+            >
+              <el-table-column
+                class-name="checkbox-table"
+                prop="originName"
+                :label="$t('dataset.parse_filed')"
+                :show-overflow-tooltip="true"
+                width="255"
+              >
+                <template slot-scope="scope">
+                  {{ scope.row.originName }}
+                </template>
+              </el-table-column>
+
+            </el-table>
+          </div>
         </el-form>
       </el-row>
       <el-row v-show="active === 2">
@@ -510,14 +625,17 @@
                   <el-checkbox
                     :key="scope.row.jsonPath"
                     v-model="scope.row.checked"
-                    :disabled="scope.row.disabled"
-                    @change="handleCheckAllChange(scope.row)"
+                    :disabled="scope.row.disabled || apiItem.useJsonPath"
+                    @change="handleCheckAllChange(apiItem, scope.row, 'plxTable')"
                   >
                     {{ scope.row.originName }}
                   </el-checkbox>
                 </template>
               </el-table-column>
-              <el-table-column prop="name" :label="$t('dataset.field_rename')">
+              <el-table-column
+                prop="name"
+                :label="$t('dataset.field_rename')"
+              >
                 <template slot-scope="scope">
                   <el-input
                     v-model="scope.row.name"
@@ -638,7 +756,10 @@
         </el-form>
       </el-row>
       <div class="foot">
-        <el-button class="btn normal" @click="closeEditItem">{{
+        <el-button
+          class="btn normal"
+          @click="closeEditItem"
+        >{{
           $t('commons.cancel')
         }}</el-button>
         <el-button
@@ -672,8 +793,9 @@
 import i18n from '@/lang'
 import { checkApiDatasource, getSchema } from '@/api/system/datasource'
 import ApiHttpRequestForm from '@/views/system/datasource/ApiHttpRequestForm'
-import dePwd from '@/components/deCustomCm/dePwd.vue'
+import dePwd from '@/components/deCustomCm/DePwd.vue'
 import msgCfm from '@/components/msgCfm'
+import { Base64 } from 'js-base64'
 export default {
   name: 'DsConfiguration',
   components: {
@@ -689,9 +811,10 @@ export default {
       }
     },
     method: String,
-    request: {},
-    response: {},
-    datasourceType: {},
+    datasourceType: {
+      type: Object,
+      default: () => {}
+    },
     showScript: {
       type: Boolean,
       default: true
@@ -858,6 +981,7 @@ export default {
         ]
       },
       api_table_title: '',
+      configurationSchema: false,
       schemas: [],
       showEmpty: false,
       canEdit: false,
@@ -907,11 +1031,17 @@ export default {
             originName: 'comments',
             deExtractType: 0
           }
-        ]
+        ],
+        useJsonPath: false,
+        jsonPath: ''
       },
       reqOptions: [
         { id: 'GET', label: 'GET' },
         { id: 'POST', label: 'POST' }
+      ],
+      isUseJsonPath: [
+        { id: true, label: this.$t('commons.yes') },
+        { id: false, label: this.$t('commons.no') }
       ],
       loading: false,
       responseData: { type: 'HTTP', responseResult: {}, subRequestResults: [] },
@@ -949,12 +1079,17 @@ export default {
           value: 3
         }
       ],
-      certinKey: false
+      certinKey: false,
+      originFieldItem: {
+        jsonFields: [],
+        fields: []
+      },
     }
   },
-  watch: {},
-  created() {},
   methods: {
+    validatorSchema() {
+      this.configurationSchema = !this.form.configuration.schema
+    },
     getSchema() {
       this.$refs.DsConfig.validate((valid) => {
         if (valid) {
@@ -1004,12 +1139,16 @@ export default {
           this.$message.error(i18n.t('datasource.has_repeat_name'))
           return
         }
+        if (this.apiItem.useJsonPath && !this.apiItem.jsonPath) {
+          this.$message.error(i18n.t('datasource.please_input_dataPath'))
+          return
+        }
         this.$refs.apiItemBasicInfo.validate((valid) => {
           if (valid) {
-            const data = JSON.parse(JSON.stringify(this.apiItem))
+            const data = Base64.encode(JSON.stringify(this.apiItem))
             this.loading = true
             this.disabledNext = true
-            checkApiDatasource(data)
+            checkApiDatasource({'data': data})
               .then((res) => {
                 this.loading = false
                 this.disabledNext = false
@@ -1018,8 +1157,10 @@ export default {
                 this.active++
                 this.apiItem.jsonFields = res.data.jsonFields
                 this.apiItem.fields = []
-                this.handleFiledChange()
-                this.previewData()
+                this.handleFiledChange(this.apiItem)
+                this.$nextTick(() => {
+                  this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
+                })
               })
               .catch((res) => {
                 this.loading = false
@@ -1031,6 +1172,32 @@ export default {
           }
         })
       }
+    },
+    showApiData(){
+      if (this.apiItem.useJsonPath && !this.apiItem.jsonPath) {
+        this.$message.error(i18n.t('datasource.please_input_dataPath'))
+        return
+      }
+      this.$refs.apiItemBasicInfo.validate((valid) => {
+        if (valid) {
+          const data = Base64.encode(JSON.stringify(this.apiItem))
+          this.loading = true
+          checkApiDatasource({'data': data, 'type': 'apiStructure'})
+            .then((res) => {
+              res.data.jsonFields.forEach(((item) => {
+                item.checked = false
+              }))
+             this.originFieldItem.jsonFields = res.data.jsonFields
+              this.loading = false
+              this.$success(i18n.t('commons.success'))
+            })
+            .catch((res) => {
+              this.loading = false
+            })
+        } else {
+          return false
+        }
+      })
     },
     before() {
       this.active--
@@ -1045,8 +1212,8 @@ export default {
         this.$message.warning(i18n.t('datasource.api_field_not_empty'))
         return
       }
-      for (var i = 0; i < this.apiItem.fields.length - 1; i++) {
-        for (var j = i + 1; j < this.apiItem.fields.length; j++) {
+      for (let i = 0; i < this.apiItem.fields.length - 1; i++) {
+        for (let j = i + 1; j < this.apiItem.fields.length; j++) {
           if (this.apiItem.fields[i].name === this.apiItem.fields[j].name) {
             this.$message.error(
               this.apiItem.fields[i].name +
@@ -1060,7 +1227,7 @@ export default {
       this.active = 0
       this.edit_api_item = false
       if (!this.add_api_item) {
-        for (var i = 0; i < this.form.apiConfiguration.length; i++) {
+        for (let i = 0; i < this.form.apiConfiguration.length; i++) {
           if (
             this.form.apiConfiguration[i].serialNumber ===
             this.apiItem.serialNumber
@@ -1076,6 +1243,9 @@ export default {
       }
     },
     copyItem(item) {
+      if (this.disabled) {
+        return
+      }
       var newItem = JSON.parse(JSON.stringify(item))
       newItem.serialNumber =
         this.form.apiConfiguration[this.form.apiConfiguration.length - 1]
@@ -1089,7 +1259,7 @@ export default {
             this.form.apiConfiguration[i].name.length + 5,
             match[0].length - 1
           )
-          if (parseInt(num) != NaN && parseInt(num) > number) {
+          if (!isNaN(parseInt(num)) && parseInt(num) > number) {
             number = parseInt(num)
           }
         }
@@ -1130,38 +1300,47 @@ export default {
     cancelItem({ name }) {
       this.$refs[`apiTable${name}`][0].doClose()
     },
-    handleCheckAllChange(row) {
+    handleCheckAllChange(apiItem, row, ref) {
       this.errMsg = []
-      this.handleCheckChange(row)
-      this.apiItem.fields = []
-      this.handleFiledChange(row)
-      this.previewData()
+      this.handleCheckChange(apiItem, row)
+      apiItem.fields = []
+      this.handleFiledChange(apiItem, row)
+      if(ref === 'plxTable'){
+        this.$nextTick(() => {
+          this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
+        })
+      }else {
+        this.$nextTick(() => {
+          this.$refs.originPlxTable?.reloadData(this.previewData(this.originFieldItem))
+        })
+      }
+
       if (this.errMsg.length) {
         this.$message.error(
-                 [...new Set(this.errMsg)].join(',') +
+          [...new Set(this.errMsg)].join(',') +
                    ', ' +
                    i18n.t('datasource.has_repeat_field_name')
-               )
+        )
       }
     },
-    handleFiledChange() {
-      for (var i = 0; i < this.apiItem.jsonFields.length; i++) {
+    handleFiledChange(apiItem) {
+      for (var i = 0; i < apiItem.jsonFields.length; i++) {
         if (
-          this.apiItem.jsonFields[i].checked &&
-          this.apiItem.jsonFields[i].children === undefined
+          apiItem.jsonFields[i].checked &&
+          apiItem.jsonFields[i].children === undefined
         ) {
-          this.apiItem.fields.push(this.apiItem.jsonFields[i])
+          apiItem.fields.push(apiItem.jsonFields[i])
         }
-        if (this.apiItem.jsonFields[i].children !== undefined) {
-          this.handleFiledChange2(this.apiItem.jsonFields[i].children)
+        if (apiItem.jsonFields[i].children !== undefined) {
+          this.handleFiledChange2(apiItem, apiItem.jsonFields[i].children)
         }
       }
     },
-    handleFiledChange2(jsonFields) {
+    handleFiledChange2(apiItem, jsonFields) {
       for (var i = 0; i < jsonFields.length; i++) {
         if (jsonFields[i].checked && jsonFields[i].children === undefined) {
-          for (var j = 0; j < this.apiItem.fields.length; j++) {
-            if (this.apiItem.fields[j].name === jsonFields[i].name) {
+          for (var j = 0; j < apiItem.fields.length; j++) {
+            if (apiItem.fields[j].name === jsonFields[i].name) {
               jsonFields[i].checked = false
               this.$nextTick(() => {
                 jsonFields[i].checked = false
@@ -1169,52 +1348,52 @@ export default {
               this.errMsg.push(jsonFields[i].name)
             }
           }
-          this.apiItem.fields.push(jsonFields[i])
+          apiItem.fields.push(jsonFields[i])
         }
         if (jsonFields[i].children !== undefined) {
           this.handleFiledChange2(jsonFields[i].children)
         }
       }
     },
-    previewData() {
+    previewData(apiItem) {
       this.showEmpty = false
-      const datas = []
+      const data = []
       let maxPreviewNum = 0
-      for (let j = 0; j < this.apiItem.fields.length; j++) {
+      for (let j = 0; j < apiItem.fields.length; j++) {
         if (
-          this.apiItem.fields[j].value &&
-          this.apiItem.fields[j].value.length > maxPreviewNum
+          apiItem.fields[j].value &&
+          apiItem.fields[j].value.length > maxPreviewNum
         ) {
-          maxPreviewNum = this.apiItem.fields[j].value.length
+          maxPreviewNum = apiItem.fields[j].value.length
         }
       }
       for (let i = 0; i < maxPreviewNum; i++) {
-        datas.push({})
+        data.push({})
       }
-      for (let i = 0; i < this.apiItem.fields.length; i++) {
-        for (let j = 0; j < this.apiItem.fields[i].value.length; j++) {
+      for (let i = 0; i < apiItem.fields.length; i++) {
+        for (let j = 0; j < apiItem.fields[i].value.length; j++) {
           this.$set(
-            datas[j],
-            this.apiItem.fields[i].name,
-            this.apiItem.fields[i].value[j]
+            data[j],
+            apiItem.fields[i].name,
+            apiItem.fields[i].value[j]
           )
         }
-        this.$nextTick(() => {
-          this.$refs.plxTable?.reloadData(datas)
-        })
       }
-      this.showEmpty = this.apiItem.fields.length === 0
+      this.showEmpty = apiItem.fields.length === 0
+      return data
     },
-    handleCheckChange(node) {
+    handleCheckChange(apiItem, node) {
       if (node.children !== undefined) {
         node.children.forEach((item) => {
           item.checked = node.checked
-          this.handleCheckChange(item)
+          this.handleCheckChange(apiItem, item)
         })
       }
     },
     fieldNameChange(row) {
-      this.previewData()
+      this.$nextTick(() => {
+        this.$refs.plxTable?.reloadData(this.previewData(this.apiItem))
+      })
     },
     fieldTypeChange(row) {}
   }
@@ -1448,6 +1627,12 @@ export default {
     text-overflow: ellipsis;
   }
 }
+
+.ds-configuration-input {
+  .el-input__inner {
+    color: var(--deTextPrimary, #1F2329);
+  }
+}
 .checkbox-table {
   .el-checkbox {
     display: flex;
@@ -1491,6 +1676,10 @@ export default {
     }
     :nth-child(2) {
       margin-left: 84px;
+      max-width: 415px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
   .req-title {
@@ -1505,7 +1694,7 @@ export default {
     margin-right: 20px;
     color: var(--deTextSecondary, #646a73);
   }
-  .de-delete-icon {
+  .de-delete-icon:not(.not-allow) {
     cursor: pointer;
     &:hover {
       color: var(--deDanger, #f54a45);
@@ -1557,6 +1746,22 @@ export default {
   ::v-deep.el-table__expand-icon {
     .el-icon-arrow-right::before {
       content: "\E791" !important;
+    }
+  }
+}
+.schema-label {
+  ::v-deep.el-form-item__label {
+    display: flex;
+    justify-content: space-between;
+    &::after {
+      display: none;
+    }
+    .name {
+      .required::after {
+        content: "*";
+        color: #f54a45;
+        margin-left: 2px;
+      }
     }
   }
 }

@@ -7,45 +7,69 @@
       class="de-input-search"
       clearable
     >
-      <svg-icon slot="prefix" icon-class="de-search"></svg-icon>
+      <svg-icon
+        slot="prefix"
+        icon-class="de-search"
+      />
     </el-input>
     <el-empty
-      :image="noneImg"
       v-if="!templateListComputed.length && templateFilterText === ''"
+      :image="noneImg"
       :description="$t('components.no_classification')"
-    ></el-empty>
+    />
     <el-empty
-      :image="nothingImg"
       v-if="!templateListComputed.length && templateFilterText !== ''"
+      :image="nothingImg"
       :description="$t('components.relevant_content_found')"
-    ></el-empty>
+    />
     <ul>
       <li
-        :class="[{ select: activeTemplate === ele.id }]"
-        @click="nodeClick(ele)"
         v-for="ele in templateListComputed"
         :key="ele.name"
+        :class="[{ select: activeTemplate === ele.id }]"
+        @click="nodeClick(ele)"
       >
-        <svg-icon icon-class="scene" class="de-icon-sence"/>
-        <span class="text-template-overflow" :title="ele.name">{{ ele.name }}</span>
-        <span @click.stop class="more">
+        <svg-icon
+          icon-class="scene"
+          class="de-icon-sense"
+        />
+        <span
+          class="text-template-overflow"
+          :title="ele.name"
+        >{{ ele.name }}</span>
+        <span
+          class="more"
+          @click.stop
+        >
           <el-dropdown
             trigger="click"
             size="small"
             @command="(type) => clickMore(type, ele)"
           >
             <span class="el-dropdown-link">
-              <i class="el-icon-more"></i>
+              <i class="el-icon-more"/>
             </span>
-            <el-dropdown-menu class="de-template-dropdown" slot="dropdown">
-              <el-dropdown-item icon="el-icon-upload2" command="import">
-                {{ $t("panel.import") }}
+            <el-dropdown-menu
+              slot="dropdown"
+              class="de-template-dropdown"
+            >
+              <el-dropdown-item
+                icon="el-icon-upload2"
+                command="import"
+              >
+                {{ $t('panel.import') }}
               </el-dropdown-item>
-              <el-dropdown-item icon="el-icon-edit" command="edit">
-                {{ $t("panel.rename") }}
+              <el-dropdown-item
+                icon="el-icon-edit"
+                command="edit"
+              >
+                {{ $t('panel.rename') }}
               </el-dropdown-item>
-              <el-dropdown-item icon="el-icon-delete" command="delete">
-                {{ $t("panel.delete") }}
+              <el-dropdown-item
+                icon="el-icon-delete"
+                command="delete"
+              >
+                {{ $t('panel.delete') }}
               </el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
@@ -59,37 +83,37 @@
       secondary
       @click="add()"
     >
-      {{ $t("panel.add_category") }}
+      {{ $t('panel.add_category') }}
     </deBtn>
   </div>
 </template>
 
 <script>
-import msgCfm from "@/components/msgCfm/index";
+import msgCfm from '@/components/msgCfm/index'
 
 export default {
-  name: "TemplateList",
-  mixins: [msgCfm],
+  name: 'TemplateList',
   components: {},
+  mixins: [msgCfm],
   props: {
     templateType: {
       type: String,
-      default: "",
+      default: ''
     },
     templateList: {
       type: Array,
-      default: function () {
-        return [];
-      },
-    },
+      default: function() {
+        return []
+      }
+    }
   },
   data() {
     return {
-      templateFilterText: "",
-      activeTemplate: "",
-      noneImg: require("@/assets/None.png"),
-      nothingImg: require("@/assets/nothing.png"),
-    };
+      templateFilterText: '',
+      activeTemplate: '',
+      noneImg: require('@/assets/None.png'),
+      nothingImg: require('@/assets/nothing.png')
+    }
   },
   computed: {
     templateListComputed() {
@@ -100,62 +124,64 @@ export default {
       //     ...this.templateList,
       //     ...this.templateList,
       //   ];
-      if (!this.templateFilterText) return [...this.templateList];
+      if (!this.templateFilterText) return [...this.templateList]
       return this.templateList.filter((ele) =>
         ele.name.includes(this.templateFilterText)
-      );
-    },
+      )
+    }
   },
   methods: {
     clickMore(type, data) {
       switch (type) {
-        case "edit":
-          this.templateEdit(data);
-          break;
-        case "delete":
-          this.templateDelete(data);
-          break;
-        case "import":
-          this.templateImport(data);
-          break;
+        case 'edit':
+          this.templateEdit(data)
+          break
+        case 'delete':
+          this.templateDelete(data)
+          break
+        case 'import':
+          this.templateImport(data)
+          break
       }
     },
     nodeClick({ id, label }) {
-      this.activeTemplate = id;
-      this.$emit("showCurrentTemplate", id, label);
+      this.activeTemplate = id
+      this.$emit('showCurrentTemplate', id, label)
     },
     add() {
-      this.$emit("showTemplateEditDialog", "new");
+      this.$emit('showTemplateEditDialog', 'new')
     },
     templateDelete(template) {
       const options = {
-        title: "system_parameter_setting.delete_this_category",
-        content: "system_parameter_setting.also_be_deleted",
-        type: "primary",
-        cb: () => this.$emit("templateDelete", template.id),
-      };
-      this.handlerConfirm(options);
+        title: 'system_parameter_setting.delete_this_category',
+        content: 'system_parameter_setting.also_be_deleted',
+        type: 'primary',
+        cb: () => this.$emit('templateDelete', template.id)
+      }
+      this.handlerConfirm(options)
     },
     templateEdit(template) {
-      this.$emit("templateEdit", template);
+      this.$emit('templateEdit', template)
     },
     templateImport(template) {
-      this.$emit("templateImport", template.id);
-    },
-  },
-};
+      this.$emit('templateImport', template.id)
+    }
+  }
+}
 </script>
 
 <style scoped lang="scss">
 .de-template-list {
   height: 100%;
   position: relative;
+
   ul {
     margin: 16px 0 20px 0;
     padding: 0;
     overflow-y: auto;
     max-height: calc(100% - 90px);
   }
+
   li {
     list-style: none;
     width: 100%;
@@ -176,7 +202,7 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
 
-    .text-template-overflow{
+    .text-template-overflow {
       display: inline-block;
       max-width: 87%;
       overflow: hidden;
@@ -188,12 +214,14 @@ export default {
       color: #8f959e;
       margin-right: 9px;
     }
+
     .more {
       position: absolute;
       top: 50%;
       right: 10px;
       transform: translateY(-50%);
       display: none;
+
       .el-icon-more {
         width: 24px;
         height: 24px;
@@ -225,17 +253,20 @@ export default {
   }
 
   li.select {
-    background: var(--deWhiteHover, #3370ff);
-    color: var(--primary, #3370ff);
+    background: var(--deWhiteHover, #e0eaff) !important;
+    color: var(--TextActive, #3370ff) !important;
   }
+
   .de-btn-fix {
     position: absolute;
     bottom: 0;
     left: 0;
   }
 }
+
 .de-template-dropdown {
   margin-top: 0 !important;
+
   .popper__arrow {
     display: none !important;
   }

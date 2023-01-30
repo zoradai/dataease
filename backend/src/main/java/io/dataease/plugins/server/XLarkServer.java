@@ -6,15 +6,20 @@ import io.dataease.auth.service.AuthUserService;
 import io.dataease.auth.util.JWTUtils;
 import io.dataease.commons.constants.SysLogConstants;
 import io.dataease.commons.exception.DEException;
+import io.dataease.commons.utils.BeanUtils;
 import io.dataease.commons.utils.DeLogUtils;
 import io.dataease.commons.utils.LogUtil;
 import io.dataease.commons.utils.ServletUtils;
+import io.dataease.exception.DataEaseException;
+import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.SysUserAssist;
 import io.dataease.plugins.config.SpringContextUtil;
 
 import io.dataease.plugins.xpack.display.dto.response.SysSettingDto;
+import io.dataease.plugins.xpack.lark.dto.entity.LarkAppUserEntity;
 import io.dataease.plugins.xpack.lark.dto.entity.LarkQrResult;
 import io.dataease.plugins.xpack.lark.dto.entity.LarkUserInfo;
+import io.dataease.plugins.xpack.lark.dto.response.LarkAppUserResult;
 import io.dataease.plugins.xpack.lark.dto.response.LarkInfo;
 import io.dataease.plugins.xpack.lark.service.LarkXpackService;
 import io.dataease.service.sys.SysUserService;
@@ -45,6 +50,13 @@ public class XLarkServer {
     private AuthUserService authUserService;
     @Resource
     private SysUserService sysUserService;
+
+    @ResponseBody
+    @GetMapping("/appId")
+    public String getAppId() {
+        LarkXpackService larkXpackService = SpringContextUtil.getBean(LarkXpackService.class);
+        return larkXpackService.appId();
+    }
 
     @ResponseBody
     @GetMapping("/info")
@@ -79,8 +91,12 @@ public class XLarkServer {
         return larkXpackService.getQrParam();
     }
 
-    @GetMapping("/callBack")
-    public ModelAndView callBack(@RequestParam("code") String code, @RequestParam("state") String state) {
+    @GetMapping("/callBackWithoutLogin")
+    public ModelAndView callBackWithoutLogin(@RequestParam("code") String code) {
+        return privateCallBack(code, null, true);
+    }
+
+    private ModelAndView privateCallBack(String code, String state, Boolean withoutLogin) {
         ModelAndView modelAndView = new ModelAndView("redirect:/");
         HttpServletResponse response = ServletUtils.response();
         LarkXpackService larkXpackService = null;
@@ -94,14 +110,25 @@ public class XLarkServer {
             if (!isOpen) {
                 DEException.throwException("未开启飞书");
             }
-            LarkUserInfo larkUserInfo = larkXpackService.userInfo(code, state, false);
+            LarkUserInfo larkUserInfo = null;
+            if (withoutLogin) {
+                LarkAppUserResult larkAppUserResult = larkXpackService.userInfoWithoutLogin(code);
+                LarkAppUserEntity userResultData = larkAppUserResult.getData();
+                larkUserInfo = BeanUtils.copyBean(new LarkUserInfo(), userResultData);
+            } else {
+                larkUserInfo = larkXpackService.userInfo(code, state, false);
+            }
             String username = larkUserInfo.getUser_id();
             SysUserEntity sysUserEntity = authUserService.getUserByLarkId(username);
             if (null == sysUserEntity) {
+                if (authUserService.checkScanCreateLimit())
+                    DEException.throwException(Translator.get("I18N_PROHIBIT_SCANNING_TO_CREATE_USER"));
                 String email = StringUtils.isNotBlank(larkUserInfo.getEmail()) ? larkUserInfo.getEmail() : (username + "@lark.work");
                 sysUserService.validateExistUser(username, larkUserInfo.getName(), email);
                 sysUserService.saveLarkCUser(larkUserInfo, email);
                 sysUserEntity = authUserService.getUserByLarkId(username);
+            } else if (sysUserEntity.getEnabled() == 0) {
+                DataEaseException.throwException(Translator.get("i18n_user_is_disable"));
             }
             TokenInfo tokenInfo = TokenInfo.builder().userId(sysUserEntity.getUserId()).username(sysUserEntity.getUsername()).build();
             String realPwd = sysUserEntity.getPassword();
@@ -114,6 +141,11 @@ public class XLarkServer {
             cookie_token.setPath("/");
 
             response.addCookie(cookie_token);
+            if (withoutLogin) {
+                Cookie platformCookie = new Cookie("inOtherPlatform", "true");
+                platformCookie.setPath("/");
+                response.addCookie(platformCookie);
+            }
         } catch (Exception e) {
 
             String msg = e.getMessage();
@@ -132,6 +164,11 @@ public class XLarkServer {
             }
         }
         return modelAndView;
+    }
+
+    @GetMapping("/callBack")
+    public ModelAndView callBack(@RequestParam("code") String code, @RequestParam("state") String state) {
+        return privateCallBack(code, state, false);
     }
 
     private void bindError(HttpServletResponse response, String url, String errorMsg) {
@@ -185,7 +222,7 @@ public class XLarkServer {
                 sysUserAssist.setUserId(Long.parseLong(state));
             }
             sysUserAssist.setLarkId(userId);
-            sysUserService.saveAssist(sysUserAssist.getUserId(), sysUserAssist.getWecomId(), sysUserAssist.getDingtalkId(), sysUserAssist.getLarkId());
+            sysUserService.saveAssist(sysUserAssist.getUserId(), sysUserAssist.getWecomId(), sysUserAssist.getDingtalkId(), sysUserAssist.getLarkId(), sysUserAssist.getLarksuiteId());
             response.sendRedirect(url);
         } catch (Exception e) {
 

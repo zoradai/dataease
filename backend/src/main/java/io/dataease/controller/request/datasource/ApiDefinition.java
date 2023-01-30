@@ -18,10 +18,13 @@ public class ApiDefinition {
     private ApiDefinitionRequest request;
     private String dataPath;
     private String status;
-    private List<Map<String,String>> datas = new ArrayList<>();
+    private List<Map<String,String>> data = new ArrayList<>();
     private List<JSONObject> jsonFields = new ArrayList<>();
     private int previewNum = 10;
     private int maxPreviewNum = 10;
     private int serialNumber;
+    private boolean useJsonPath;
+    private String jsonPath;
+    private boolean showApiStructure;
 
 }

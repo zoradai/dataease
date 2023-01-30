@@ -6,20 +6,71 @@
     element-loading-spinner="el-icon-loading"
     element-loading-background="rgba(220,220,220,1)"
   >
-    <el-col v-if="panelInfo.name.length>0" class="panel-design">
+    <el-col
+      v-if="panelInfo.name.length>0"
+      class="panel-design"
+    >
 
-      <el-row v-if="showType === 2" class="panel-design-head panel-share-head" style="border-bottom: 1px solid;border-bottom-color:#E6E6E6;">
+      <el-row
+        v-if="showType === 2"
+        class="panel-design-head panel-share-head"
+        style="border-bottom: 1px solid;border-bottom-color:#E6E6E6;"
+      >
         <div style="height: 100%;">
           <share-head />
         </div>
       </el-row>
-      <el-row v-else class="panel-design-head" style="border-bottom: 1px solid;border-bottom-color:#E6E6E6;">
+      <el-row
+        v-else
+        class="panel-design-head"
+        style="border-bottom: 1px solid;border-bottom-color:#E6E6E6;"
+      >
         <!--仪表板头部区域-->
         <div style="height: 100%;">
-          <el-col :span="12" style="text-overflow:ellipsis;overflow: hidden;white-space: nowrap;font-size: 14px">
-            <span>{{ panelInfo.name || '测试仪表板' }}</span>
-            <span v-if="panelInfo.isDefault" style="color: green;font-size: 12px">({{ $t('panel.default_panel_name') }}:{{ panelInfo.defaultPanelName }})</span>
-            <span v-if="panelInfo.sourcePanelName" style="color: green;font-size: 12px">&nbsp;({{ $t('panel.source_panel_name') }}:{{ panelInfo.sourcePanelName }})</span>
+          <el-col
+            :span="12"
+            style="text-overflow:ellipsis;overflow: hidden;white-space: nowrap;font-size: 14px"
+          >
+            <span class="panel-name">{{ panelInfo.name || '测试仪表板' }}</span>
+            <span
+              v-if="panelInfo.isDefault"
+              style="color: green;font-size: 12px"
+            >({{ $t('panel.default_panel_name') }}:{{ panelInfo.defaultPanelName }})</span>
+            <span
+              v-if="panelInfo.sourcePanelName"
+              style="color: green;font-size: 12px"
+            >&nbsp;({{ $t('panel.source_panel_name') }}:{{ panelInfo.sourcePanelName }})</span>
+            <span
+              v-if="!hasStar && panelInfo && showType !== 1&&panelInfo.status==='publish'"
+              style="margin-left: 9px"
+            >
+              <el-tooltip :content="$t('panel.store')">
+                <i
+                  class="el-icon-star-off"
+                  @click="star"
+                />
+              </el-tooltip>
+            </span>
+            <span
+              v-if="hasStar && panelInfo && showType !== 1&&panelInfo.status==='publish'"
+              style="margin-left: 9px"
+            >
+              <el-tooltip :content="$t('commons.cancel') + $t('panel.store')">
+                <i
+                  class="el-icon-star-on"
+                  @click="unstar"
+                />
+              </el-tooltip>
+            </span>
+            <template v-if="panelInfo.creatorName">
+              <el-divider
+                style="margin: 0 16px;"
+                direction="vertical"
+              />
+              <span class="panel-create">
+                {{ $t('panel.create_by') + ':' + panelInfo.creatorName }}
+              </span>
+            </template>
             <el-popover
               placement="right-start"
               width="400"
@@ -28,82 +79,172 @@
               <panel-detail-info />
               <i
                 slot="reference"
-                class="el-icon-warning icon-class"
+                class="el-icon-warning-outline icon-class"
                 style="margin-left: 4px;cursor: pointer;font-size: 14px;"
               />
             </el-popover>
           </el-col>
           <el-col :span="12">
 
-            <span v-if="hasDataPermission('manage',panelInfo.privileges)&&activeTab==='PanelList'&&!panelInfo.sourcePanelName" style="float: right;margin-right: 10px">
-              <el-button size="mini" type="primary" @click="editPanel">
+            <span
+              v-if="hasDataPermission('manage',panelInfo.privileges)&&activeTab==='PanelList'&&!panelInfo.sourcePanelName"
+              style="float: right;margin-right: 10px"
+            >
+              <de-btn
+                type="primary"
+                @click="editPanel"
+              >
                 {{ $t('commons.edit') }}
-              </el-button>
+              </de-btn>
             </span>
 
-            <span v-if="hasDataPermission('manage',panelInfo.privileges)&&activeTab==='PanelList'&&!panelInfo.sourcePanelName" style="float: right;margin-right: 10px">
-              <el-button size="mini" type="primary" @click="changePublishState">
-                <span v-if="panelInfo.status==='publish'">{{ $t('commons.unpublished') }}</span>
-                <span v-if="panelInfo.status!=='publish'">{{ $t('commons.publish') }}</span>
-              </el-button>
+            <span
+              v-if="showType !== 1"
+              style="float: right;margin-right: 10px"
+            >
+              <de-btn
+                secondary
+                @click="share"
+              >
+                {{ $t('panel.share') }}
+              </de-btn>
             </span>
 
-            <span v-if="hasDataPermission('export',panelInfo.privileges)&&panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('panel.save_to_panel')">
-                <el-button class="el-icon-folder-checked" size="mini" circle @click="saveToTemplate" />
-              </el-tooltip>
+            <span
+              v-if="panelInfo.status==='publish' && !isOtherPlatform"
+              style="float: right;margin-right: 10px"
+            >
+              <de-btn
+                secondary
+                @click="clickFullscreen"
+              >
+                {{ $t('panel.fullscreen_preview') }}
+              </de-btn>
             </span>
-            <span v-if="hasDataPermission('export',panelInfo.privileges)&&panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-dropdown>
-                <el-button size="mini" class="el-icon-download" circle />
-                <el-dropdown-menu slot="dropdown">
-                  <el-dropdown-item icon="el-icon-copy-document" @click.native="downloadToTemplate">{{ $t('panel.export_to_panel') }}</el-dropdown-item>
-                  <el-dropdown-item icon="el-icon-notebook-2" @click.native="downloadAsPDF">{{ $t('panel.export_to_pdf') }}</el-dropdown-item>
-                  <el-dropdown-item icon="el-icon-picture-outline" @click.native="downloadAsImage">{{ $t('panel.export_to_img') }}</el-dropdown-item>
+
+            <span
+              v-if="activeTab!=='panels_star' || (activeTab ==='panels_star' && panelInfo.status === 'publish')"
+              style="float: right;margin-right: 10px"
+              class="de-tree"
+            >
+              <el-dropdown
+                trigger="click"
+                size="small"
+                placement="bottom-start"
+              >
+                <span class="el-dropdown-link de-el-tree-node__content">
+                  <el-button
+                    icon="el-icon-more"
+                    type="text"
+                    size="small"
+                  />
+                </span>
+                <el-dropdown-menu
+                  slot="dropdown"
+                  class="de-card-dropdown"
+                >
+                  <el-dropdown-item
+                    v-if="panelInfo.status==='publish' && !isOtherPlatform"
+                    @click.native="newTab"
+                  >
+                    <svg-icon
+                      icon-class="icon_pc_outlined_copy"
+                      class="preview-icon-svg"
+                    />
+                    {{ $t('panel.new_tab_preview') }}
+                  </el-dropdown-item>
+
+                  <el-dropdown-item
+                    icon="el-icon-refresh"
+                    @click.native="refreshPanel"
+                  >
+                    {{ $t('commons.refresh') + $t('chart.chart_data') }}
+                  </el-dropdown-item>
+
+                  <el-dropdown-item
+                    v-if="hasDataPermission('export',panelInfo.privileges)&&panelInfo.status==='publish'"
+                    @click.native="saveToTemplate"
+                  >
+                    <svg-icon
+                      icon-class="icon_yes_outlined"
+                      class="preview-icon-svg"
+                    />
+                    {{ $t('panel.save_to_panel') }}
+                  </el-dropdown-item>
+
+                  <el-dropdown-item
+                    v-if="hasDataPermission('manage',panelInfo.privileges)&&activeTab==='PanelList'&&!panelInfo.sourcePanelName"
+                    @click.native="changePublishState"
+                  >
+                    <svg-icon
+                      :icon-class="panelInfo.status==='publish' ? 'cancel_release' : 'release'"
+                      class="preview-icon-svg"
+                    />
+                    {{ $t(`commons.${panelInfo.status === 'publish' ? 'unpublished' : 'publish'}`) }}
+                  </el-dropdown-item>
+
+                  <el-dropdown
+                    v-if="hasDataPermission('export',panelInfo.privileges)&&panelInfo.status==='publish'"
+                    style="width: 100%"
+                    trigger="hover"
+                    placement="right-start"
+                  >
+                    <div class="el-dropdown-menu__item">
+                      <svg-icon
+                        icon-class="icon_bottom-align_outlined"
+                        class="preview-icon-svg"
+                      />
+                      {{ $t('log.export_as') }}
+                      <svg-icon
+                        style="margin-top: 7px;float: right"
+                        icon-class="icon_right_outlined"
+                        class="preview-icon-svg"
+                      />
+                    </div>
+                    <el-dropdown-menu
+                      slot="dropdown"
+                      class="de-card-dropdown de-card-dropdown-right"
+                    >
+                      <el-dropdown-item
+                        icon="el-icon-copy-document"
+                        @click.native="downloadToTemplate"
+                      >{{ $t('panel.export_to_panel') }}</el-dropdown-item>
+                      <el-dropdown-item
+                        icon="el-icon-notebook-2"
+                        @click.native="downloadAsPDF"
+                      >{{ $t('panel.export_to_pdf') }}</el-dropdown-item>
+                      <el-dropdown-item
+                        icon="el-icon-picture-outline"
+                        @click.native="downloadAsImage"
+                      >{{ $t('panel.export_to_img') }}</el-dropdown-item>
+                      <el-dropdown-item
+                        icon="el-icon-s-data"
+                        @click.native="downLoadToAppPre"
+                      >{{ $t('panel.export_to_app') }}</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </el-dropdown>
                 </el-dropdown-menu>
               </el-dropdown>
             </span>
-            <span v-if="panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('panel.fullscreen_preview')">
-                <el-button class="el-icon-view" size="mini" circle @click="clickFullscreen" />
-              </el-tooltip>
-            </span>
-
-            <span v-if="panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('panel.new_tab_preview')">
-                <el-button class="el-icon-data-analysis" size="mini" circle @click="newTab" />
-              </el-tooltip>
-            </span>
-
-            <span v-if="!hasStar && panelInfo && showType !== 1&&panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('panel.store')">
-                <el-button class="el-icon-star-off" size="mini" circle @click="star" />
-              </el-tooltip>
-            </span>
-
-            <span v-if="hasStar && panelInfo && showType !== 1&&panelInfo.status==='publish'" style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('commons.cancel')">
-                <el-button class="el-icon-star-on" size="mini" circle @click="unstar" />
-              </el-tooltip>
-            </span>
-
-            <span style="float: right;margin-right: 10px">
-              <el-tooltip :content="$t('commons.refresh')">
-                <el-button class="el-icon-refresh" size="mini" circle @click="refreshPanel" />
-              </el-tooltip>
-            </span>
-
           </el-col>
         </div>
       </el-row>
       <!-- 仪表板预览区域-->
       <el-row class="panel-design-preview">
         <!--        <div id="imageWrapper" ref="imageWrapper" style="width: 4096px;height: 2160px">-->
-        <div id="imageWrapper" ref="imageWrapper" :style="imageWrapperStyle">
-          <fullscreen style="height: 100%;background: #f7f8fa;overflow-y: auto" :fullscreen.sync="fullscreen">
+        <div
+          id="imageWrapper"
+          ref="imageWrapper"
+          :style="imageWrapperStyle"
+        >
+          <fullscreen
+            style="height: 100%;background: #f7f8fa;overflow-y: auto"
+            :fullscreen.sync="fullscreen"
+          >
             <Preview
               v-if="showMainFlag"
-              :component-data="componentData"
+              ref="paneViewPreviewRef"
+              :component-data="mainCanvasComponentData"
               :canvas-style-data="canvasStyleData"
               :active-tab="activeTab"
               :in-screen="!fullscreen"
@@ -115,23 +256,32 @@
         </div>
       </el-row>
     </el-col>
-    <el-col v-if="panelInfo.name.length===0" style="height: 100%;">
-      <el-row style="height: 100%; background-color: var(--ContentBG);" class="custom-position">
+    <el-col
+      v-if="panelInfo.name.length===0"
+      style="height: 100%;"
+    >
+      <el-row
+        style="height: 100%; background-color: var(--ContentBG);"
+        class="custom-position"
+      >
         {{ $t('panel.select_panel_from_left') }}
       </el-row>
     </el-col>
 
     <el-dialog
       v-if="templateSaveShow"
-      :title="templateSaveTitle"
+      :title="$t('panel.save_to_panel')"
       :visible.sync="templateSaveShow"
       width="500px"
     >
-      <save-to-template :template-info="templateInfo" @closeSaveDialog="closeSaveDialog" />
+      <save-to-template
+        :template-info="templateInfo"
+        @closeSaveDialog="closeSaveDialog"
+      />
     </el-dialog>
     <el-dialog
       v-if="pdfExportShow"
-      :title="'['+panelInfo.name+']'+'PDF导出'"
+      :title="'['+panelInfo.name+']'+$t('panel.pdf_export')"
       :visible.sync="pdfExportShow"
       width="80%"
       :top="'8vh'"
@@ -139,8 +289,15 @@
       class="dialog-css2"
     >
       <span style="position: absolute;right: 70px;top:15px">
-        <svg-icon icon-class="PDF" class="ds-icon-pdf" />
-        <el-select v-model="pdfTemplateSelectedIndex" :placeholder="'切换PDF模板'" @change="changePdfTemplate()">
+        <svg-icon
+          icon-class="PDF"
+          class="ds-icon-pdf"
+        />
+        <el-select
+          v-model="pdfTemplateSelectedIndex"
+          :placeholder="$t('panel.switch_pdf_template')"
+          @change="changePdfTemplate()"
+        >
           <el-option
             v-for="(item, index) in pdfTemplateAll"
             :key="index"
@@ -149,30 +306,96 @@
           />
         </el-select>
       </span>
-      <PDFPreExport :snapshot="snapshotInfo" :panel-name="panelInfo.name" :template-content="pdfTemplateContent" @closePreExport="closePreExport" />
+      <PDFPreExport
+        :snapshot="snapshotInfo"
+        :panel-name="panelInfo.name"
+        :template-content="pdfTemplateContent"
+        @closePreExport="closePreExport"
+      />
     </el-dialog>
+
+    <el-dialog
+      v-if="appExportShow"
+      :title="$t('app_template.app_export')"
+      :visible.sync="appExportShow"
+      width="80%"
+      :top="'8vh'"
+      :destroy-on-close="true"
+      class="dialog-css2"
+    >
+      <span style="position: absolute;right: 70px;top:15px">
+        <svg-icon
+          icon-class="PDF"
+          class="ds-icon-pdf"
+        />
+        <el-select
+          v-model="pdfTemplateSelectedIndex"
+          :placeholder="$t('panel.switch_pdf_template')"
+          @change="changePdfTemplate()"
+        >
+          <el-option
+            v-for="(item, index) in pdfTemplateAll"
+            :key="index"
+            :label="item.name"
+            :value="index"
+          />
+        </el-select>
+      </span>
+      <PDFPreExport
+        :snapshot="snapshotInfo"
+        :panel-name="panelInfo.name"
+        :template-content="pdfTemplateContent"
+        @closePreExport="closePreExport"
+      />
+    </el-dialog>
+
+    <el-dialog
+      v-dialogDrag
+      :title="authTitle"
+      :visible.sync="authVisible"
+      width="800px"
+      class="dialog-css"
+    >
+      <grant-auth
+        v-if="authVisible"
+        :resource-id="authResourceId"
+        @close-grant="closeGrant"
+      />
+    </el-dialog>
+
+    <keep-alive>
+      <app-export-form
+        ref="appExportForm"
+        @downLoadApp="downLoadApp"
+      />
+    </keep-alive>
   </el-row>
 </template>
 <script>
 import PDFPreExport from '@/views/panel/export/PDFPreExport'
-import Preview from '@/components/canvas/components/Editor/Preview'
+import Preview from '@/components/canvas/components/editor/Preview'
 import SaveToTemplate from '@/views/panel/list/SaveToTemplate'
 import { mapState } from 'vuex'
 import html2canvas from 'html2canvasde'
 import FileSaver from 'file-saver'
-import { starStatus, saveEnshrine, deleteEnshrine } from '@/api/panel/enshrine'
+import JSZip from 'jszip'
+import { deleteEnshrine, saveEnshrine, starStatus } from '@/api/panel/enshrine'
 import bus from '@/utils/bus'
 import { queryAll } from '@/api/panel/pdfTemplate'
-import ShareHead from '@/views/panel/GrantAuth/ShareHead'
+import ShareHead from '@/views/panel/grantAuth/shareHead'
 import { export2AppCheck, initPanelData, updatePanelStatus } from '@/api/panel/panel'
 import { proxyInitPanelData } from '@/api/panel/shareProxy'
-import { dataURLToBlob } from '@/components/canvas/utils/utils'
+import { dataURLToBlob, getNowCanvasComponentData } from '@/components/canvas/utils/utils'
 import { findResourceAsBase64 } from '@/api/staticResource/staticResource'
 import PanelDetailInfo from '@/views/panel/list/common/PanelDetailInfo'
-
+import AppExportForm from '@/views/panel/list/AppExportForm'
+import GrantAuth from '../grantAuth'
+import msgCfm from '@/components/msgCfm/index'
+import { inOtherPlatform } from '@/utils/index'
 export default {
   name: 'PanelViewShow',
-  components: { PanelDetailInfo, Preview, SaveToTemplate, PDFPreExport, ShareHead },
+  components: { AppExportForm, PanelDetailInfo, Preview, SaveToTemplate, PDFPreExport, ShareHead, GrantAuth },
+  mixins: [msgCfm],
   props: {
     activeTab: {
       type: String,
@@ -181,16 +404,21 @@ export default {
   },
   data() {
     return {
+      authTitle: null,
+      authResourceId: null,
+      authVisible: false,
+      canvasInfoTemp: 'preview-temp-canvas-main',
+      canvasId: 'canvas-main',
       showMain: true,
       pdfTemplateSelectedIndex: 0,
       pdfTemplateContent: '',
       templateInfo: {},
       pdfTemplateAll: [],
-      templateSaveTitle: '保存为模板',
       templateSaveShow: false,
       hasStar: false,
       fullscreen: false,
       pdfExportShow: false,
+      appExportShow: false,
       snapshotInfo: '',
       showType: 0,
       dataLoading: false,
@@ -199,11 +427,14 @@ export default {
     }
   },
   computed: {
+    mainCanvasComponentData() {
+      return getNowCanvasComponentData(this.canvasId)
+    },
     imageWrapperStyle() {
       if (this.exporting) {
         return {
-          width: '2560px',
-          height: '1440px'
+          width: '1280px',
+          height: '720px'
         }
       } else {
         return {
@@ -217,6 +448,9 @@ export default {
     },
     panelInfo() {
       return this.$store.state.panel.panelInfo
+    },
+    isOtherPlatform() {
+      return inOtherPlatform()
     },
     ...mapState([
       'componentData',
@@ -253,6 +487,18 @@ export default {
     bus.$off('set-panel-share-user', this.setPanelShareUser)
   },
   methods: {
+    // 画布高度大于6000px 自动使用原尺寸导出 减小浏览器再渲染压力
+    changeExportingState() {
+      const canvasHeight = this.$refs.paneViewPreviewRef.getCanvasHeight()
+      if (canvasHeight && canvasHeight > 6000) {
+        return false
+      } else {
+        return true
+      }
+    },
+    downLoadApp(appAttachInfo) {
+      this.downLoadToApp(appAttachInfo)
+    },
     setPanelShowType(type) {
       this.showType = type || 0
     },
@@ -268,6 +514,15 @@ export default {
     clickFullscreen() {
       this.fullscreen = true
     },
+    share() {
+      this.authResourceId = this.panelInfo.id
+      this.authTitle = this.$t('panel.share_to_some', { some: this.panelInfo.name })
+      this.authVisible = true
+    },
+    closeGrant() {
+      this.authResourceId = null
+      this.authVisible = false
+    },
     newTab() {
       let url = '#/preview/' + this.$store.state.panel.panelInfo.id
       if (this.showType === 1 && this.shareUserId !== null) {
@@ -278,7 +533,7 @@ export default {
     saveToTemplate() {
       this.dataLoading = true
       setTimeout(() => {
-        html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+        html2canvas(document.getElementById(this.canvasInfoTemp)).then(canvas => {
           this.templateSaveShow = true
           this.dataLoading = false
           const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.2是图片质量
@@ -303,7 +558,7 @@ export default {
       _this.dataLoading = true
       try {
         _this.findStaticSource(function(staticResource) {
-          html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+          html2canvas(document.getElementById(_this.canvasInfoTemp)).then(canvas => {
             _this.dataLoading = false
             const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.1是图片质量
             if (snapshot !== '') {
@@ -326,14 +581,15 @@ export default {
         _this.dataLoading = false
       }
     },
-    saveAppFile(appAttachInfo) {
+    saveAppFile(appRelationInfo, appAttachInfo) {
       const _this = this
       _this.dataLoading = true
       try {
+        const jsZip = new JSZip()
         _this.findStaticSource(function(staticResource) {
-          html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+          html2canvas(document.getElementById(_this.canvasInfoTemp)).then(canvas => {
             _this.dataLoading = false
-            const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.1是图片质量
+            const snapshot = canvas.toDataURL('image/jpeg', 1) // 0.1是图片质量
             if (snapshot !== '') {
               const panelInfo = {
                 name: _this.$store.state.panel.panelInfo.name,
@@ -341,11 +597,19 @@ export default {
                 snapshot: snapshot,
                 panelStyle: JSON.stringify(_this.canvasStyleData),
                 panelData: JSON.stringify(_this.componentData),
+                dynamicData: JSON.stringify(_this.panelViewDetailsInfo),
                 staticResource: JSON.stringify(staticResource || {})
               }
-              appAttachInfo['panelInfo'] = JSON.stringify(panelInfo)
-              const blob = new Blob([JSON.stringify(appAttachInfo)], { type: '' })
-              FileSaver.saveAs(blob, _this.$store.state.panel.panelInfo.name + '-APP.DEAPP')
+              const blobTemplate = new Blob([JSON.stringify(panelInfo)], { type: '' })
+              const blobRelation = new Blob([JSON.stringify(appRelationInfo)], { type: '' })
+              const blobAppInfo = new Blob([JSON.stringify(appAttachInfo)], { type: '' })
+              jsZip.file('TEMPLATE.DET', blobTemplate, { binary: true })
+              jsZip.file('DATA_RELATION.DE', blobRelation, { binary: true })
+              jsZip.file('APP.json', blobAppInfo, { binary: true })
+              jsZip.generateAsync({ type: 'blob' }).then(content => {
+                // 生成二进制流
+                FileSaver.saveAs(content, appAttachInfo.appName + '.zip') // 利用file-saver保存文件  自定义文件名
+              })
             }
           })
         })
@@ -354,11 +618,21 @@ export default {
         _this.dataLoading = false
       }
     },
-    downLoadToApp() {
+    downLoadToAppPre() {
+      this.$refs.appExportForm.init({
+        appName: this.$store.state.panel.panelInfo.name,
+        icon: null,
+        version: '1.0',
+        creator: this.$store.getters.user.nickName,
+        required: '1.16.0',
+        description: null
+      })
+    },
+    downLoadToApp(appAttachInfo) {
       this.dataLoading = true
       export2AppCheck(this.$store.state.panel.panelInfo.id).then(rsp => {
         if (rsp.data.checkStatus) {
-          this.saveAppFile(rsp.data)
+          this.saveAppFile(rsp.data, appAttachInfo)
         } else {
           this.dataLoading = false
           this.$message({
@@ -378,6 +652,9 @@ export default {
       this.componentData.forEach(item => {
         if (typeof item.commonBackground.outerImage === 'string' && item.commonBackground.outerImage.indexOf('static-resource') > -1) {
           staticResource.push(item.commonBackground.outerImage)
+        }
+        if (item.type === 'picture-add' && item.propValue && typeof item.propValue === 'string' && item.propValue.indexOf('static-resource') > -1) {
+          staticResource.push(item.propValue)
         }
       })
       if (staticResource.length > 0) {
@@ -399,9 +676,9 @@ export default {
     downloadAsImage() {
       this.dataLoading = true
       setTimeout(() => {
-        this.exporting = true
+        this.exporting = this.changeExportingState()
         setTimeout(() => {
-          const canvasID = document.getElementById('canvasInfoTemp')
+          const canvasID = document.getElementById(this.canvasInfoTemp)
           const a = document.createElement('a')
           html2canvas(canvasID).then(canvas => {
             this.exporting = false
@@ -430,9 +707,9 @@ export default {
       this.dataLoading = true
 
       setTimeout(() => {
-        this.exporting = true
+        this.exporting = this.changeExportingState()
         setTimeout(() => {
-          html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+          html2canvas(document.getElementById(this.canvasInfoTemp)).then(canvas => {
             const snapshot = canvas.toDataURL('image/jpeg', 1) // 是图片质量
             this.dataLoading = false
             this.exporting = false
@@ -446,7 +723,7 @@ export default {
     },
     refreshTemplateInfo() {
       this.templateInfo = {}
-      html2canvas(document.getElementById('canvasInfoTemp')).then(canvas => {
+      html2canvas(document.getElementById(this.canvasInfoTemp)).then(canvas => {
         const snapshot = canvas.toDataURL('image/jpeg', 0.1) // 0.2是图片质量
         if (snapshot !== '') {
           this.templateInfo = {
@@ -496,14 +773,24 @@ export default {
       if (this.showType === 1 && this.shareUserId !== null) {
         const param = { userId: this.shareUserId }
         proxyInitPanelData(this.panelInfo.id, param, null)
-      } else { initPanelData(this.panelInfo.id, false) }
+      } else {
+        initPanelData(this.panelInfo.id, false)
+      }
     },
     changePublishState() {
       if (this.panelInfo.status === 'publish') {
-        this.panelInfo.status = 'unpublished'
+        const options = {
+          title: this.$t('panel.unpublished_tips'),
+          type: 'primary',
+          cb: () => this.updatePublishStatus('unpublished')
+        }
+        this.handlerConfirm(options, this.$t('commons.confirm'))
       } else {
-        this.panelInfo.status = 'publish'
+        this.updatePublishStatus('publish')
       }
+    },
+    updatePublishStatus(newStatus) {
+      this.panelInfo.status = newStatus
       updatePanelStatus(this.panelInfo.id, { 'status': this.panelInfo.status })
       this.$emit('editPanelBashInfo', {
         'operation': 'status',
@@ -514,73 +801,100 @@ export default {
 }
 </script>
 
-<style>
-  .view-list {
-    height: 100%;
-    width: 20%;
-    min-width: 180px;
-    max-width: 220px;
-    border: 1px solid #E6E6E6;
-    border-left: 0 solid;
-    overflow-y: auto;
+<style lang="less">
+.view-list {
+  height: 100%;
+  width: 20%;
+  min-width: 180px;
+  max-width: 220px;
+  border: 1px solid #E6E6E6;
+  border-left: 0 solid;
+  overflow-y: auto;
+}
+
+.view-list-thumbnails-outline {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.view-list-thumbnails {
+  width: 100%;
+  padding: 0px 15px 15px 0px;
+}
+
+.panel-design {
+  min-height: 400px;
+  height: 100%;
+  min-width: 500px;
+  overflow-y: hidden;
+  border-top: 1px solid #E6E6E6;
+}
+
+.panel-design-head {
+  height: 56px;
+  background-color: var(--SiderBG, white);
+  padding: 0 10px;
+  line-height: 56px;
+
+  .panel-name {
+    font-family: PingFang SC;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    color: var(--deTextPrimary, #1F2329);
+
   }
 
-  .view-list-thumbnails-outline {
-    height: 100%;
-    overflow-y: auto;
-  }
-
-  .view-list-thumbnails {
-    width: 100%;
-    padding: 0px 15px 15px 0px;
-  }
-
-  .panel-design {
-    min-height: 400px;
-    height: 100%;
-    min-width: 500px;
-    overflow-y: hidden;
-    border-top: 1px solid #E6E6E6;
-  }
-
-  .panel-design-head {
-    height: 40px;
-    background-color: var(--SiderBG, white);
-    padding: 0 10px;
-    line-height: 40px;
-  }
-  .panel-share-head {
-      height: auto !important;
-  }
-  .blackTheme .panel-design-head  {
-      color: var(--TextActive);
-  }
-
-  .panel-design-preview {
-    width: 100%;
-    height: calc(100% - 40px);
-    overflow-x: hidden;
-    overflow-y: auto;
-    /*padding: 5px;*/
-  }
-
-  .custom-position {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .panel-create {
+    font-family: PingFang SC;
     font-size: 14px;
-    flex-flow: row nowrap;
-    color: #9ea6b2;
+    font-weight: 400;
+    line-height: 22px;
+    color: var(--deTextSecondary, #646A73);
   }
+}
 
-  .dialog-css2 ::v-deep .el-dialog__title {
-    font-size: 14px!important;
-  }
-  .dialog-css2 ::v-deep .el-dialog__header {
-    padding: 20px 20px 0!important;
-  }
-  .dialog-css2 ::v-deep .el-dialog__body {
-    padding: 0px 20px!important;
-  }
+.panel-share-head {
+  height: auto !important;
+}
+
+.blackTheme .panel-design-head {
+  color: var(--TextActive);
+}
+
+.panel-design-preview {
+  width: 100%;
+  height: calc(100% - 56px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  /*padding: 5px;*/
+}
+
+.custom-position {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  flex-flow: row nowrap;
+  color: #9ea6b2;
+}
+
+.dialog-css2 ::v-deep .el-dialog__title {
+  font-size: 14px !important;
+}
+
+.dialog-css2 ::v-deep .el-dialog__header {
+  padding: 20px 20px 0 !important;
+}
+
+.dialog-css2 ::v-deep .el-dialog__body {
+  padding: 0px 20px !important;
+}
+
+.preview-icon-svg {
+  color: inherit;
+  margin-right: 5px;
+}
 </style>
+

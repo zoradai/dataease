@@ -22,14 +22,12 @@ import layer from '@/components/canvas/store/layer'
 import snapshot from '@/components/canvas/store/snapshot'
 import lock from '@/components/canvas/store/lock'
 import task from './modules/task'
-import { valueValid, formatCondition } from '@/utils/conditionUtil'
+import { formatCondition, valueValid } from '@/utils/conditionUtil'
 import { Condition } from '@/components/widget/bean/Condition'
 
-import {
-  DEFAULT_COMMON_CANVAS_STYLE_STRING
-} from '@/views/panel/panel'
+import { DEFAULT_COMMON_CANVAS_STYLE_STRING } from '@/views/panel/panel'
 import bus from '@/utils/bus'
-import { BASE_MOBILE_STYLE } from '@/components/canvas/custom-component/component-list'
+import { BASE_MOBILE_STYLE } from '@/components/canvas/customComponent/component-list'
 import { TYPE_CONFIGS } from '@/views/chart/chart/util'
 import { deepCopy } from '@/components/canvas/utils/utils'
 
@@ -63,6 +61,7 @@ const data = {
     // 当前点击组件
     curComponent: null,
     curCanvasScale: null,
+    curCanvasScaleMap: {},
     curComponentIndex: null,
     // 预览仪表板缩放信息
     previewCanvasScale: {
@@ -95,6 +94,10 @@ const data = {
     mobileLayoutStatus: false,
     // 公共链接状态(当前是否是公共链接打开)
     publicLinkStatus: false,
+    pcTabMatrixCount: {
+      x: 36,
+      y: 36
+    },
     pcMatrixCount: {
       x: 36,
       y: 18
@@ -134,7 +137,22 @@ const data = {
       customAttr: {}
     },
     allViewRender: [],
-    isInEditor: false // 是否在编辑器中，用于判断复制、粘贴组件时是否生效，如果在编辑器外，则无视这些操作
+    isInEditor: false, // 是否在编辑器中，用于判断复制、粘贴组件时是否生效，如果在编辑器外，则无视这些操作
+    tabCollisionActiveId: null, // 当前在碰撞的Tab组件ID
+    tabMoveInActiveId: null, // 当前在移入的Tab ID
+    tabMoveOutActiveId: null, // 当前在移出的Tab ID
+    tabMoveOutComponentId: null, // 当前在移出Tab de组件ID
+    tabActiveTabNameMap: {}, // 编辑器中 tab组件中的活动tab页,
+    // 鼠标处于drag状态的坐标点
+    mousePointShadowMap: {
+      mouseX: 0,
+      mouseY: 0,
+      width: 0,
+      height: 0
+    },
+    previewVisible: false,
+    previewComponentData: [],
+    currentCanvasNewId: []
   },
   mutations: {
     ...animation.mutations,
@@ -146,8 +164,16 @@ const data = {
     ...snapshot.mutations,
     ...lock.mutations,
 
+    setTabActiveTabNameMap(state, tabActiveInfo) {
+      state.tabActiveTabNameMap[tabActiveInfo.tabId] = tabActiveInfo.activeTabName
+    },
+
     setClickComponentStatus(state, status) {
       state.isClickComponent = status
+    },
+
+    setPreviewVisible(state, previewVisible) {
+      state.previewVisible = previewVisible
     },
 
     setEditMode(state, mode) {
@@ -163,7 +189,18 @@ const data = {
       state.canvasStyleData = style
     },
 
+    setComponentFromList(state, playload) {
+      state.componentData.some((ele, index) => {
+        if (ele.id !== playload.id) return false
+        state.componentData.splice(index, 1, playload)
+        return true
+      })
+    },
+
     setCurComponent(state, { component, index }) {
+      if (!component && state.curComponent) {
+        Vue.set(state.curComponent, 'editing', false)
+      }
       // 当前视图操作状态置空
       if (component) {
         component['optStatus'] = {
@@ -172,9 +209,9 @@ const data = {
         }
         // Is the current component in editing status
         if (!state.curComponent) {
-          component['editing'] = false
+          Vue.set(component, 'editing', false)
         } else if (component.id !== state.curComponent.id) {
-          component['editing'] = false
+          Vue.set(component, 'editing', false)
         }
       }
       state.styleChangeTimes = 0
@@ -186,8 +223,9 @@ const data = {
       state.curActiveTabInner = curActiveTabInner
     },
 
-    setCurCanvasScale(state, curCanvasScale) {
-      state.curCanvasScale = curCanvasScale
+    setCurCanvasScale(state, curCanvasScaleSelf) {
+      Vue.set(state.curCanvasScaleMap, curCanvasScaleSelf.canvasId, curCanvasScaleSelf)
+      state.curCanvasScale = curCanvasScaleSelf
     },
     setPreviewCanvasScale(state, scale) {
       if (scale.scaleWidth) {
@@ -197,12 +235,13 @@ const data = {
         state.previewCanvasScale.scalePointHeight = scale.scaleHeight
       }
     },
-    setShapeStyle({ curComponent, canvasStyleData, curCanvasScale }, { top, left, width, height, rotate }) {
+    setShapeStyle({ curComponent, canvasStyleData, curCanvasScaleMap }, { top, left, width, height, rotate }) {
       if (curComponent) {
-        if (top || top === 0) curComponent.style.top = (top / curCanvasScale.scalePointHeight) + 0.0000001
-        if (left || left === 0) curComponent.style.left = (left / curCanvasScale.scalePointWidth) + 0.0000001
-        if (width || width === 0) curComponent.style.width = (width / curCanvasScale.scalePointWidth + 0.0000001)
-        if (height || height === 0) curComponent.style.height = (height / curCanvasScale.scalePointHeight) + 0.0000001
+        const curCanvasScaleSelf = curCanvasScaleMap[curComponent.canvasId]
+        if (top || top === 0) curComponent.style.top = Math.round((top / curCanvasScaleSelf.scalePointHeight))
+        if (left || left === 0) curComponent.style.left = Math.round((left / curCanvasScaleSelf.scalePointWidth))
+        if (width || width === 0) curComponent.style.width = Math.round((width / curCanvasScaleSelf.scalePointWidth))
+        if (height || height === 0) curComponent.style.height = Math.round((height / curCanvasScaleSelf.scalePointHeight))
         if (rotate || rotate === 0) curComponent.style.rotate = rotate
       }
     },
@@ -214,7 +253,9 @@ const data = {
     setComponentData(state, componentData = []) {
       Vue.set(state, 'componentData', componentData)
     },
-
+    setPreviewComponentData(state, previewComponentData = []) {
+      Vue.set(state, 'previewComponentData', previewComponentData)
+    },
     setComponentViewsData(state, componentViewsData = {}) {
       Vue.set(state, 'componentViewsData', componentViewsData)
     },
@@ -234,7 +275,9 @@ const data = {
         state.componentData.splice(index, 0, component)
       } else {
         state.componentData.push(component)
+        state.currentCanvasNewId.push(component.id)
       }
+      this.commit('setCurComponent', { component: component, index: index || state.componentData.length - 1 })
     },
     removeViewFilter(state, componentId) {
       state.componentData = state.componentData.map(item => {
@@ -264,6 +307,13 @@ const data = {
       const vValid = valueValid(condition)
       //   1.根据componentId过滤
       const filterComponentId = condition.componentId
+      const canvasId = data.canvasId
+
+      // 过滤时 主画布的过滤组件可以过滤所有的视图
+      const canvasViewIds = state.componentData.filter(item => item.type === 'view' && (canvasId === 'canvas-main' || item.canvasId === canvasId)).map((itemView) => {
+        return itemView.propValue.viewId
+      })
+      const canvasViewIdMatch = (viewId) => canvasViewIds && canvasViewIds.length > 0 && canvasViewIds.includes(viewId)
 
       //   2.循环每个Component 得到 三种情况 a增加b删除c无操作
       const viewIdMatch = (viewIds, viewId) => !viewIds || viewIds.length === 0 || viewIds.includes(viewId)
@@ -293,7 +343,7 @@ const data = {
         }
         if (!element.type || element.type !== 'view') continue
         const currentFilters = element.filters || []
-        const vidMatch = viewIdMatch(condition.viewIds, element.propValue.viewId)
+        const vidMatch = viewIdMatch(condition.viewIds, element.propValue.viewId) && canvasViewIdMatch(element.propValue.viewId)
         let j = currentFilters.length
         while (j--) {
           const filter = currentFilters[j]
@@ -456,16 +506,15 @@ const data = {
         const element = state.componentData[index]
         if (element.id && element.id === id) {
           state.componentData.splice(index, 1)
+          if (element.type === 'de-tabs') {
+            this.commit('deleteComponentsWithCanvasId', element.id)
+          }
           break
         }
       }
     },
-
-    deleteComponent(state, index) {
-      if (index === undefined) {
-        index = state.curComponentIndex
-      }
-      state.componentData.splice(index, 1)
+    deleteComponent(state) {
+      this.commit('deleteComponentWithId', state.curComponent.id)
     },
     setLinkageInfo(state, targetLinkageInfo) {
       state.linkageSettingStatus = true
@@ -528,7 +577,7 @@ const data = {
       // 移动端布局转换
       state.componentData.forEach(item => {
         item.mobileStyle = (item.mobileStyle || BASE_MOBILE_STYLE)
-        if (item.mobileSelected) {
+        if (item.mobileSelected && item.canvasId === 'canvas-main') {
           item.style.width = item.mobileStyle.style.width
           item.style.height = item.mobileStyle.style.height
           item.style.top = item.mobileStyle.style.top
@@ -540,10 +589,12 @@ const data = {
           item.sizey = item.mobileStyle.sizey
           item.auxiliaryMatrix = item.mobileStyle.auxiliaryMatrix
           mainComponentData.push(item)
+        } else if (item.canvasId !== 'canvas-main') {
+          mainComponentData.push(item)
         }
       })
       state.componentData = mainComponentData
-      state.mobileLayoutStatus = !state.mobileLayoutStatus
+      state.mobileLayoutStatus = true
     },
     setScrollAutoMove(state, offset) {
       state.scrollAutoMove = offset
@@ -565,10 +616,22 @@ const data = {
         if (element === id) {
           delete state.batchOptViews[id]
           state.curBatchOptComponents.splice(index, 1)
-          this.commit('setBatchOptChartInfo')
           break
         }
       }
+      if (state.curBatchOptComponents.length === 1) {
+        const lastViewId = state.curBatchOptComponents[0]
+        const viewBaseInfo = state.componentViewsData[lastViewId]
+        state.changeProperties.customAttr = JSON.parse(viewBaseInfo.customAttr)
+        state.changeProperties.customStyle = JSON.parse(viewBaseInfo.customStyle)
+      }
+      if (state.curBatchOptComponents.length === 0) {
+        state.changeProperties = {
+          customStyle: {},
+          customAttr: {}
+        }
+      }
+      this.commit('setBatchOptChartInfo')
     },
     addCurBatchComponent(state, id) {
       if (id) {
@@ -578,16 +641,30 @@ const data = {
         // get properties
         const viewConfig = state.allViewRender.filter(item => item.render === viewBaseInfo.render && item.value === viewBaseInfo.type)
         if (viewConfig && viewConfig.length > 0) {
+          if (state.curBatchOptComponents.length === 1) {
+            state.changeProperties.customAttr = JSON.parse(viewBaseInfo.customAttr)
+            state.changeProperties.customStyle = JSON.parse(viewBaseInfo.customStyle)
+          }
           state.batchOptViews[id] = viewConfig[0]
           this.commit('setBatchOptChartInfo')
         }
       }
+    },
+    updateComponentViewsData(state, { viewId, propertyKey, propertyValue }) {
+      state.componentViewsData[viewId][propertyKey] = propertyValue
     },
     removeCurMultiplexingComponentWithId(state, id) {
       delete state.curMultiplexingComponents[id]
     },
     addCurMultiplexingComponent(state, { component, componentId }) {
       if (componentId) {
+        if (component.type === 'custom-button' && component.serviceName === 'buttonSureWidget') {
+          const copyComponent = deepCopy(component)
+          copyComponent.options.attrs.customRange = false
+          copyComponent.options.attrs.filterIds = []
+          state.curMultiplexingComponents[componentId] = copyComponent
+          return
+        }
         state.curMultiplexingComponents[componentId] = component
       }
     },
@@ -680,6 +757,7 @@ const data = {
       this.commit('clearLinkageSettingInfo', false)
       this.commit('resetViewEditInfo')
       this.commit('initCurMultiplexingComponents')
+      state.currentCanvasNewId = []
       state.batchOptStatus = false
       // Currently selected components
       state.curBatchOptComponents = []
@@ -709,12 +787,63 @@ const data = {
     setInEditorStatus(state, status) {
       state.isInEditor = status
     },
-    adaptorStatusDisable(state,componentId) {
+    adaptorStatusDisable(state, componentId) {
       state.componentData.forEach(item => {
-       if(item.id === componentId){
-         item.needAdaptor = false
-       }
+        if (item.id === componentId) {
+          item.needAdaptor = false
+        }
       })
+    },
+    setTabMoveInActiveId(state, tabId) {
+      state.tabMoveInActiveId = tabId
+    },
+    setTabCollisionActiveId(state, tabId) {
+      state.tabCollisionActiveId = tabId
+    },
+    setTabMoveOutActiveId(state, tabId) {
+      state.tabMoveOutActiveId = tabId
+    },
+    setTabMoveOutComponentId(state, componentId) {
+      state.tabMoveOutComponentId = componentId
+    },
+    clearTabMoveInfo(state) {
+      state.tabMoveInActiveId = null
+      state.tabCollisionActiveId = null
+      state.tabMoveOutActiveId = null
+      state.tabMoveOutComponentId = null
+    },
+    setMousePointShadowMap(state, mousePoint) {
+      state.mousePointShadowMap.mouseX = mousePoint.mouseX
+      state.mousePointShadowMap.mouseY = mousePoint.mouseY
+      state.mousePointShadowMap.width = mousePoint.width
+      state.mousePointShadowMap.height = mousePoint.height
+    },
+    deleteComponentsWithCanvasId(state, canvasId) {
+      if (canvasId && canvasId.length > 10) {
+        for (let index = 0; index < state.componentData.length; index++) {
+          const element = state.componentData[index]
+          if (element.canvasId && element.canvasId.includes(canvasId)) {
+            state.componentData.splice(index, 1)
+          }
+        }
+      }
+    },
+    // 清除相同sourceViewId 的 联动条件
+    clearViewLinkage(state, viewId) {
+      state.componentData.forEach(item => {
+        if (item.linkageFilters && item.linkageFilters.length > 0) {
+          const newList = item.linkageFilters.filter(linkage => linkage.sourceViewId !== viewId)
+          item.linkageFilters.splice(0, item.linkageFilters.length)
+          // 重新push 可保证数组指针不变 可以watch到
+          if (newList.length > 0) {
+            newList.forEach(newLinkage => {
+              item.linkageFilters.push(newLinkage)
+            })
+          }
+        }
+      })
+
+      bus.$emit('clear_panel_linkage', { viewId: viewId })
     }
   },
   modules: {

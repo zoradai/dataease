@@ -1,5 +1,6 @@
 package io.dataease.provider.query.oracle;
 
+import com.alibaba.fastjson.JSONArray;
 import com.google.gson.Gson;
 import io.dataease.dto.datasource.OracleConfiguration;
 import io.dataease.plugins.common.base.domain.ChartViewWithBLOBs;
@@ -18,7 +19,9 @@ import io.dataease.plugins.common.dto.sqlObj.SQLObj;
 import io.dataease.plugins.common.request.chart.ChartExtFilterRequest;
 import io.dataease.plugins.common.request.permission.DataSetRowPermissionsTreeDTO;
 import io.dataease.plugins.common.request.permission.DatasetRowPermissionsTreeItem;
+import io.dataease.plugins.datasource.entity.Dateformat;
 import io.dataease.plugins.datasource.entity.JdbcConfiguration;
+import io.dataease.plugins.datasource.entity.PageInfo;
 import io.dataease.plugins.datasource.query.QueryProvider;
 import io.dataease.plugins.datasource.query.Utils;
 import org.apache.commons.collections4.CollectionUtils;
@@ -402,7 +405,42 @@ public class OracleQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String getSQLTableInfo(String table, List<ChartViewFieldDTO> xAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
+    public String getSQLWithPage(boolean isTable, String table, List<ChartViewFieldDTO> orgXAxis, List<ChartFieldCustomFilterDTO> OrgFieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view, PageInfo pageInfo) {
+        List<ChartViewFieldDTO> xAxis = new ArrayList<>();
+        orgXAxis.forEach(chartViewFieldDTO -> {
+            xAxis.add(chartViewFieldDTO);
+        });
+        ChartViewFieldDTO chartViewFieldDTO = new ChartViewFieldDTO();
+        chartViewFieldDTO.setOriginName("ROWNUM");
+        xAxis.add(chartViewFieldDTO);
+
+
+        List<ChartFieldCustomFilterDTO> fieldCustomFilter = new ArrayList<>();
+        for (ChartFieldCustomFilterDTO chartFieldCustomFilterDTO : OrgFieldCustomFilter) {
+            fieldCustomFilter.add(chartFieldCustomFilterDTO);
+        }
+        ChartFieldCustomFilterDTO chartFieldCustomFilterDTO = new ChartFieldCustomFilterDTO();
+        DatasetTableField datasetTableField = new DatasetTableField();
+        datasetTableField.setOriginName("ROWNUM");
+        datasetTableField.setDeType(0);
+        chartFieldCustomFilterDTO.setField(datasetTableField);
+
+        List<ChartCustomFilterItemDTO> filterItemDTOS = new ArrayList<>();
+        ChartCustomFilterItemDTO itemDTO = new ChartCustomFilterItemDTO();
+        itemDTO.setTerm("le");
+        itemDTO.setValue(String.valueOf(pageInfo.getGoPage() * pageInfo.getPageSize()));
+        filterItemDTOS.add(itemDTO);
+        chartFieldCustomFilterDTO.setFilter(filterItemDTOS);
+        fieldCustomFilter.add(chartFieldCustomFilterDTO);
+
+        if (isTable) {
+            return "SELECT * FROM (" + sqlFix(originalTableInfo(table, xAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, ds, view)) + ") DE_RESULT_TMP " + " WHERE DE_ROWNUM >= " + (pageInfo.getGoPage() - 1) * pageInfo.getPageSize();
+        } else {
+            return "SELECT * FROM (" + sqlFix(originalTableInfo("(" + sqlFix(table) + ")", xAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, ds, view)) + ") DE_RESULT_TMP " + " WHERE DE_ROWNUM >= " + (pageInfo.getGoPage() - 1) * pageInfo.getPageSize();
+        }
+    }
+
+    private String originalTableInfo(String table, List<ChartViewFieldDTO> xAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
         SQLObj tableObj = SQLObj.builder()
                 .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(OracleConstants.KEYWORD_TABLE, table))
                 .tableAlias(String.format(OracleConstants.ALIAS_FIX, String.format(TABLE_ALIAS_PREFIX, 0)))
@@ -413,6 +451,13 @@ public class OracleQueryProvider extends QueryProvider {
         if (CollectionUtils.isNotEmpty(xAxis)) {
             for (int i = 0; i < xAxis.size(); i++) {
                 ChartViewFieldDTO x = xAxis.get(i);
+                if (x.getOriginName().equalsIgnoreCase("ROWNUM")) {
+                    xFields.add(SQLObj.builder()
+                            .fieldName(x.getOriginName())
+                            .fieldAlias("DE_ROWNUM")
+                            .build());
+                    continue;
+                }
                 String originField;
                 if (ObjectUtils.isNotEmpty(x.getExtField()) && x.getExtField() == 2) {
                     // 解析origin name中有关联的字段生成sql表达式
@@ -474,7 +519,12 @@ public class OracleQueryProvider extends QueryProvider {
                 .build();
         if (CollectionUtils.isNotEmpty(orders)) st.add("orders", orders);
         if (ObjectUtils.isNotEmpty(tableSQL)) st.add("table", tableSQL);
-        return sqlLimit(st.render(), view);
+        return st.render();
+    }
+
+    @Override
+    public String getSQLTableInfo(String table, List<ChartViewFieldDTO> xAxis, List<ChartFieldCustomFilterDTO> fieldCustomFilter, List<DataSetRowPermissionsTreeDTO> rowPermissionsTree, List<ChartExtFilterRequest> extFilterRequestList, Datasource ds, ChartViewWithBLOBs view) {
+        return sqlLimit(originalTableInfo(table, xAxis, fieldCustomFilter, rowPermissionsTree, extFilterRequestList, ds, view), view);
     }
 
     @Override
@@ -810,25 +860,94 @@ public class OracleQueryProvider extends QueryProvider {
         return tmpSql;
     }
 
+    public String getTotalCount(boolean isTable, String sql, Datasource ds) {
+        if (isTable) {
+            String schema = new Gson().fromJson(ds.getConfiguration(), OracleConfiguration.class).getSchema();
+            schema = String.format(OracleConstants.KEYWORD_TABLE, schema);
+            return "SELECT COUNT(*) from " + schema + "." + String.format(OracleConstants.KEYWORD_TABLE, sql);
+        } else {
+            return "SELECT COUNT(*) from ( " + sqlFix(sql) + " ) DE_COUNT_TEMP";
+        }
+    }
+
     @Override
     public String createRawQuerySQL(String table, List<DatasetTableField> fields, Datasource ds) {
-        String[] array = fields.stream().map(f -> {
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append(" \"").append(f.getOriginName()).append("\"");
-            return stringBuilder.toString();
-        }).toArray(String[]::new);
-        OracleConfiguration oracleConfiguration = new Gson().fromJson(ds.getConfiguration(), OracleConfiguration.class);
-        return MessageFormat.format("SELECT {0} FROM {1}", StringUtils.join(array, ","), oracleConfiguration.getSchema() + ".\"" + table + "\"");
+        List<ChartViewFieldDTO> xAxis = new ArrayList<>();
+        ChartViewFieldDTO chartViewFieldDTO = new ChartViewFieldDTO();
+        chartViewFieldDTO.setOriginName("ROWNUM");
+        xAxis.add(chartViewFieldDTO);
+        fields.forEach(datasetTableField -> {
+            ChartViewFieldDTO f = new ChartViewFieldDTO();
+            f.setOriginName(datasetTableField.getOriginName());
+            f.setDeType(0);
+            xAxis.add(f);
+        });
+
+        List<ChartFieldCustomFilterDTO> fieldCustomFilter = new ArrayList<>();
+        ChartFieldCustomFilterDTO chartFieldCustomFilterDTO = new ChartFieldCustomFilterDTO();
+        DatasetTableField datasetTableField = new DatasetTableField();
+        datasetTableField.setOriginName("ROWNUM");
+        datasetTableField.setDeType(0);
+        chartFieldCustomFilterDTO.setField(datasetTableField);
+
+        List<ChartCustomFilterItemDTO> filterItemDTOS = new ArrayList<>();
+        ChartCustomFilterItemDTO itemDTO = new ChartCustomFilterItemDTO();
+        itemDTO.setTerm("le");
+        itemDTO.setValue("DE_ALL");
+        filterItemDTOS.add(itemDTO);
+        chartFieldCustomFilterDTO.setFilter(filterItemDTOS);
+        fieldCustomFilter.add(chartFieldCustomFilterDTO);
+
+
+        SQLObj tableObj = SQLObj.builder()
+                .tableName((table.startsWith("(") && table.endsWith(")")) ? table : String.format(OracleConstants.KEYWORD_TABLE, table))
+                .tableAlias(String.format(OracleConstants.ALIAS_FIX, String.format(TABLE_ALIAS_PREFIX, 0)))
+                .build();
+        setSchema(tableObj, ds);
+        List<SQLObj> xFields = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(xAxis)) {
+            for (int i = 0; i < xAxis.size(); i++) {
+                ChartViewFieldDTO x = xAxis.get(i);
+                if (x.getOriginName().equalsIgnoreCase("ROWNUM")) {
+                    xFields.add(SQLObj.builder()
+                            .fieldName(x.getOriginName())
+                            .fieldAlias("DE_ROWNUM")
+                            .build());
+                    continue;
+                }
+                String originField = String.format(OracleConstants.KEYWORD_FIX, tableObj.getTableAlias(), x.getOriginName());
+                String fieldAlias = String.format(OracleConstants.KEYWORD_TABLE, x.getOriginName());
+                xFields.add(getXFields(x, originField, fieldAlias));
+            }
+        }
+
+        String customWheres = transCustomFilterList(tableObj, fieldCustomFilter);
+
+        List<String> wheres = new ArrayList<>();
+        if (customWheres != null) wheres.add(customWheres);
+
+        STGroup stg = new STGroupFile(SQLConstants.SQL_TEMPLATE);
+        ST st_sql = stg.getInstanceOf("previewSql");
+        st_sql.add("isGroup", false);
+        if (CollectionUtils.isNotEmpty(xFields)) st_sql.add("groups", xFields);
+        if (CollectionUtils.isNotEmpty(wheres)) st_sql.add("filters", wheres);
+        if (ObjectUtils.isNotEmpty(tableObj)) st_sql.add("table", tableObj);
+        String sql = st_sql.render();
+
+        ST st = stg.getInstanceOf("previewSql");
+        st.add("isGroup", false);
+        SQLObj tableSQL = SQLObj.builder()
+                .tableName(String.format(OracleConstants.BRACKETS, sql))
+                .tableAlias(String.format(TABLE_ALIAS_PREFIX, 1))
+                .build();
+        if (ObjectUtils.isNotEmpty(tableSQL)) st.add("table", tableSQL);
+
+        return "SELECT * FROM (" + sqlFix(st.render()) + ") DE_RESULT_TMP " + " WHERE DE_ROWNUM >= DE_OFFSET";
     }
 
     @Override
     public String createRawQuerySQLAsTmp(String sql, List<DatasetTableField> fields) {
-        String[] array = fields.stream().map(f -> {
-            StringBuilder stringBuilder = new StringBuilder();
-            stringBuilder.append(" \"").append(f.getOriginName()).append("\"");
-            return stringBuilder.toString();
-        }).toArray(String[]::new);
-        return MessageFormat.format("SELECT {0} FROM {1}", StringUtils.join(array, ","), " (" + sqlFix(sql) + ") DE_TMP ");
+        return createRawQuerySQL("(" + sqlFix(sql) + ")", fields, null);
     }
 
     @Override
@@ -851,7 +970,7 @@ public class OracleQueryProvider extends QueryProvider {
 
         if (field.getDeType() == 1) {
             if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
-                whereName = String.format(OracleConstants.TO_DATE, originName, OracleConstants.DEFAULT_DATE_FORMAT);
+                whereName = String.format(OracleConstants.TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
             }
             if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
                 String cast = String.format(OracleConstants.CAST, originName, OracleConstants.DEFAULT_INT_FORMAT) + "/1000";
@@ -897,7 +1016,7 @@ public class OracleQueryProvider extends QueryProvider {
                 whereValue = "'%" + value + "%'";
             } else {
                 if (field.getDeType() == 1) {
-                    whereValue = String.format(OracleConstants.TO_DATE, "'" + value + "'", OracleConstants.DEFAULT_DATE_FORMAT);
+                    whereValue = String.format(OracleConstants.TO_DATE, "'" + value + "'", StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
                 } else {
                     whereValue = String.format(OracleConstants.WHERE_VALUE_VALUE, value);
                 }
@@ -974,13 +1093,15 @@ public class OracleQueryProvider extends QueryProvider {
                 originName = calcFieldRegex(field.getOriginName(), tableObj);
             } else if (ObjectUtils.isNotEmpty(field.getExtField()) && field.getExtField() == 1) {
                 originName = String.format(OracleConstants.KEYWORD_FIX, tableObj.getTableAlias(), field.getOriginName());
+            } else if (field.getOriginName().equalsIgnoreCase("ROWNUM")) {
+                originName = field.getOriginName();
             } else {
                 originName = String.format(OracleConstants.KEYWORD_FIX, tableObj.getTableAlias(), field.getOriginName());
             }
 
             if (field.getDeType() == 1) {
                 if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
-                    whereName = String.format(OracleConstants.TO_DATE, originName, OracleConstants.DEFAULT_DATE_FORMAT);
+                    whereName = String.format(OracleConstants.TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
                 }
                 if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
                     String cast = String.format(OracleConstants.CAST, originName, OracleConstants.DEFAULT_INT_FORMAT) + "/1000";
@@ -1028,7 +1149,7 @@ public class OracleQueryProvider extends QueryProvider {
                         whereValue = "'%" + value + "%'";
                     } else {
                         if (field.getDeType() == 1) {
-                            whereValue = String.format(OracleConstants.TO_DATE, "'" + value + "'", OracleConstants.DEFAULT_DATE_FORMAT);
+                            whereValue = String.format(OracleConstants.TO_DATE, "'" + value + "'", StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
                         } else {
                             whereValue = String.format(OracleConstants.WHERE_VALUE_VALUE, value);
                         }
@@ -1083,7 +1204,7 @@ public class OracleQueryProvider extends QueryProvider {
 
                 if (field.getDeType() == 1) {
                     if (field.getDeExtractType() == 0 || field.getDeExtractType() == 5) {
-                        whereName = String.format(OracleConstants.TO_DATE, originName, OracleConstants.DEFAULT_DATE_FORMAT);
+                        whereName = String.format(OracleConstants.TO_DATE, originName, StringUtils.isNotEmpty(field.getDateFormat()) ? field.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
                     }
                     if (field.getDeExtractType() == 2 || field.getDeExtractType() == 3 || field.getDeExtractType() == 4) {
                         String cast = String.format(OracleConstants.CAST, originName, OracleConstants.DEFAULT_INT_FORMAT) + "/1000";
@@ -1213,7 +1334,7 @@ public class OracleQueryProvider extends QueryProvider {
             if (x.getDeType() == TIME) {
                 String format = transDateFormat(x.getDateStyle(), x.getDatePattern());
                 if (x.getDeExtractType() == STRING) { //字符串转时间
-                    String toDate = String.format(OracleConstants.TO_DATE, originField, OracleConstants.DEFAULT_DATE_FORMAT);
+                    String toDate = String.format(OracleConstants.TO_DATE, originField, StringUtils.isNotEmpty(x.getDateFormat()) ? x.getDateFormat() : OracleConstants.DEFAULT_DATE_FORMAT);
                     fieldName = String.format(OracleConstants.TO_CHAR, toDate, format);
                 } else {                            //数值转时间
                     String date = originField + "/(1000 * 60 * 60 * 24)+" + String.format(OracleConstants.TO_DATE, OracleConstants.DEFAULT_START_DATE, OracleConstants.DEFAULT_DATE_FORMAT);
@@ -1372,9 +1493,20 @@ public class OracleQueryProvider extends QueryProvider {
     }
 
     @Override
-    public String sqlForPreview(String table, Datasource ds){
+    public String sqlForPreview(String table, Datasource ds) {
         String schema = new Gson().fromJson(ds.getConfiguration(), JdbcConfiguration.class).getSchema();
         schema = String.format(OracleConstants.KEYWORD_TABLE, schema);
-       return "SELECT * FROM " + schema + "." + String.format(OracleConstants.KEYWORD_TABLE, table);
+        return "SELECT * FROM " + schema + "." + String.format(OracleConstants.KEYWORD_TABLE, table);
+    }
+
+    public List<Dateformat> dateformat() {
+        return JSONArray.parseArray("[\n" +
+                "{\"dateformat\": \"YYYY-MM-DD\"},\n" +
+                "{\"dateformat\": \"YYYY/MM/DD\"},\n" +
+                "{\"dateformat\": \"YYYYMMDD\"},\n" +
+                "{\"dateformat\": \"YYYY-MM-DD HH24:MI:SS\"},\n" +
+                "{\"dateformat\": \"YYYY/MM/DD HH24:MI:SS\"},\n" +
+                "{\"dateformat\": \"YYYYMMDD HH24:MI:SS\"}\n" +
+                "]", Dateformat.class);
     }
 }

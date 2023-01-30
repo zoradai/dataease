@@ -8,9 +8,11 @@ import {
   getYAxis,
   getPadding,
   getSlider,
-  getAnalyse
+  getAnalyse,
+  setGradientColor
 } from '@/views/chart/chart/common/common_antv'
-import { antVCustomColor } from '@/views/chart/chart/util'
+import { antVCustomColor, handleEmptyDataStrategy } from '@/views/chart/chart/util'
+import _ from 'lodash'
 
 export function baseBarOptionAntV(plot, container, chart, action, isGroup, isStack) {
   // theme
@@ -23,7 +25,7 @@ export function baseBarOptionAntV(plot, container, chart, action, isGroup, isSta
   const xAxis = getXAxis(chart)
   const yAxis = getYAxis(chart)
   // data
-  const data = chart.data.datas
+  const data = _.cloneDeep(chart.data.data)
   // config
   const slider = getSlider(chart)
   const analyse = getAnalyse(chart)
@@ -93,10 +95,29 @@ export function baseBarOptionAntV(plot, container, chart, action, isGroup, isSta
   } else {
     delete options.isStack
   }
+
+  if (chart.type === 'bar-group-stack') {
+    options.groupField = 'group'
+  } else {
+    delete options.groupField
+  }
   // 目前只有百分比堆叠柱状图需要这个属性，先直接在这边判断而不作为参数传过来
   options.isPercent = chart.type === 'percentage-bar-stack'
   // custom color
   options.color = antVCustomColor(chart)
+  if (customAttr.color.gradient) {
+    options.color = options.color.map((ele) => {
+      return setGradientColor(ele, customAttr.color.gradient, 270)
+    })
+  }
+  // 处理空值
+  if (chart.senior) {
+    let emptyDataStrategy = JSON.parse(chart.senior)?.functionCfg?.emptyDataStrategy
+    if (!emptyDataStrategy) {
+      emptyDataStrategy = 'breakLine'
+    }
+    handleEmptyDataStrategy(emptyDataStrategy, chart, data, options)
+  }
 
   // 开始渲染
   if (plot) {
@@ -121,7 +142,7 @@ export function hBaseBarOptionAntV(plot, container, chart, action, isGroup, isSt
   const xAxis = getXAxis(chart)
   const yAxis = getYAxis(chart)
   // data
-  const data = chart.data.datas
+  const data = _.cloneDeep(chart.data.data)
   // config
   const slider = getSlider(chart)
   const analyse = getAnalyse(chart)
@@ -191,8 +212,22 @@ export function hBaseBarOptionAntV(plot, container, chart, action, isGroup, isSt
   } else {
     delete options.isStack
   }
+  options.isPercent = chart.type.includes('percentage')
   // custom color
   options.color = antVCustomColor(chart)
+  if (customAttr.color.gradient) {
+    options.color = options.color.map((ele) => {
+      return setGradientColor(ele, customAttr.color.gradient)
+    })
+  }
+  // 处理空值
+  if (chart.senior) {
+    let emptyDataStrategy = JSON.parse(chart.senior)?.functionCfg?.emptyDataStrategy
+    if (!emptyDataStrategy) {
+      emptyDataStrategy = 'breakLine'
+    }
+    handleEmptyDataStrategy(emptyDataStrategy, chart, data, options)
+  }
 
   // 开始渲染
   if (plot) {

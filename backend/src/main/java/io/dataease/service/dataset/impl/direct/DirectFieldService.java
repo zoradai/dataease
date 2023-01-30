@@ -1,5 +1,6 @@
 package io.dataease.service.dataset.impl.direct;
 
+import cn.hutool.core.collection.CollectionUtil;
 import com.google.gson.Gson;
 import io.dataease.commons.exception.DEException;
 import io.dataease.commons.model.BaseTreeNode;
@@ -19,6 +20,7 @@ import io.dataease.plugins.common.request.datasource.DatasourceRequest;
 import io.dataease.plugins.common.request.permission.DataSetRowPermissionsTreeDTO;
 import io.dataease.plugins.datasource.provider.Provider;
 import io.dataease.plugins.datasource.query.QueryProvider;
+import io.dataease.plugins.xpack.auth.dto.request.ColumnPermissionItem;
 import io.dataease.provider.ProviderFactory;
 import io.dataease.service.dataset.*;
 import io.dataease.service.datasource.DatasourceService;
@@ -31,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.text.Collator;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -77,6 +80,26 @@ public class DirectFieldService implements DataSetFieldService {
     }
 
     @Override
+    public List<Object> chineseSort(List<Object> list, DeSortDTO sortDTO) throws Exception {
+        if (ObjectUtils.isEmpty(sortDTO) || CollectionUtil.isEmpty(list)) return list;
+        String sort = sortDTO.getSort();
+        if (!StringUtils.equals(sort, "chinese")) {
+            return list;
+        }
+        String id = sortDTO.getId();
+        String sortStr = StringUtils.equalsIgnoreCase("chineseDesc", id) ? "desc" : "asc";
+        List<Object> result = CollectionUtil.sort(list, (v1, v2) -> {
+            Collator instance = Collator.getInstance(Locale.CHINESE);
+            if (StringUtils.equals("desc", sortStr)) {
+                return instance.compare(v2, v1);
+            }
+            return instance.compare(v1, v2);
+        });
+
+        return result;
+    }
+
+    @Override
     public List<Object> fieldValues(List<String> fieldIds, DeSortDTO sortDTO, Long userId, Boolean userPermissions, Boolean needMapping, Boolean rowAndColumnMgm) throws Exception {
         String fieldId = fieldIds.get(0);
         DatasetTableField field = dataSetTableFieldsService.selectByPrimaryKey(fieldId);
@@ -103,16 +126,16 @@ public class DirectFieldService implements DataSetFieldService {
         List<DataSetRowPermissionsTreeDTO> rowPermissionsTree = new ArrayList<>();
         if (userPermissions) {
             //列权限
-            List<String> desensitizationList = new ArrayList<>();
-            fields = permissionService.filterColumnPermissons(fields, desensitizationList, datasetTable.getId(), userId);
+            Map<String, ColumnPermissionItem> desensitizationList = new HashMap<>();
+            fields = permissionService.filterColumnPermissions(fields, desensitizationList, datasetTable.getId(), userId);
             Map<String, DatasetTableField> fieldMap = fields.stream().collect(Collectors.toMap(DatasetTableField::getId, node -> node));
             permissionFields = fieldIds.stream().map(fieldMap::get).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(permissionFields) || permissionFields.get(0) == null) {
                 return new ArrayList<>();
             }
-            if (CollectionUtils.isNotEmpty(desensitizationList) && desensitizationList.contains(field.getDataeaseName())) {
+            if (CollectionUtils.isNotEmpty(desensitizationList.keySet()) && desensitizationList.keySet().contains(field.getDataeaseName())) {
                 List<Object> results = new ArrayList<>();
-                results.add(ColumnPermissionConstants.Desensitization_desc);
+                results.add(ColumnPermissionItem.CompleteDesensitization);
                 return results;
             }
             //行权限
@@ -145,7 +168,7 @@ public class DirectFieldService implements DataSetFieldService {
                 datasourceRequest.setQuery(qp.createQuerySQL(dataTableInfoDTO.getTable(), permissionFields, !needSort, ds, customFilter, rowPermissionsTree, deSortFields));
             } else if (StringUtils.equalsIgnoreCase(datasetTable.getType(), DatasetType.SQL.toString())) {
                 String sql = dataTableInfoDTO.getSql();
-                if(dataTableInfoDTO.isBase64Encryption()){
+                if (dataTableInfoDTO.isBase64Encryption()) {
                     sql = new String(java.util.Base64.getDecoder().decode(sql));
                 }
                 sql = dataSetTableService.removeVariables(sql, ds.getType());

@@ -1,10 +1,12 @@
 package io.dataease.service.panel;
 
+import cn.hutool.core.util.ArrayUtil;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import io.dataease.auth.annotation.DeCleaner;
+import io.dataease.auth.api.dto.CurrentUserDto;
 import io.dataease.commons.constants.*;
 import io.dataease.commons.utils.*;
 import io.dataease.controller.request.authModel.VAuthModelRequest;
@@ -18,6 +20,7 @@ import io.dataease.dto.chart.ChartViewDTO;
 import io.dataease.dto.dataset.DataSetGroupDTO;
 import io.dataease.dto.dataset.DataSetTableDTO;
 import io.dataease.dto.dataset.DataSetTaskDTO;
+import io.dataease.dto.dataset.DataTableInfoDTO;
 import io.dataease.dto.panel.PanelExport2App;
 import io.dataease.dto.panel.PanelGroupDTO;
 import io.dataease.dto.panel.PanelTemplateFileDTO;
@@ -29,7 +32,6 @@ import io.dataease.listener.util.CacheUtils;
 import io.dataease.plugins.common.base.domain.*;
 import io.dataease.plugins.common.base.mapper.*;
 import io.dataease.plugins.common.constants.DeTypeConstants;
-import io.dataease.service.chart.ChartGroupService;
 import io.dataease.service.chart.ChartViewService;
 import io.dataease.service.dataset.DataSetGroupService;
 import io.dataease.service.dataset.DataSetTableService;
@@ -38,8 +40,11 @@ import io.dataease.service.sys.SysAuthService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.poi.hssf.usermodel.*;
+import org.apache.poi.hssf.usermodel.HSSFClientAnchor;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.pentaho.di.core.util.UUIDUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -127,9 +132,14 @@ public class PanelGroupService {
     @Resource
     private PanelAppTemplateLogService appTemplateLogService;
     @Resource
-    private ChartGroupService chartGroupService;
-    @Resource
     private DataSetGroupService dataSetGroupService;
+    @Resource
+    private DatasetGroupMapper datasetGroupMapper;
+    @Resource
+    private PanelWatermarkMapper panelWatermarkMapper;
+
+    @Resource
+    private DatasourceMapper datasourceMapper;
 
     public List<PanelGroupDTO> tree(PanelGroupRequest panelGroupRequest) {
         String userId = String.valueOf(AuthUtils.getUser().getUserId());
@@ -145,6 +155,17 @@ public class PanelGroupService {
         panelGroupRequest.setIsAdmin(AuthUtils.getUser().getIsAdmin());
         List<PanelGroupDTO> panelGroupDTOList = extPanelGroupMapper.panelGroupListDefault(panelGroupRequest);
         return TreeUtils.mergeTree(panelGroupDTOList, "default_panel");
+    }
+
+    public List<PanelGroup> list() {
+        CurrentUserDto user = AuthUtils.getUser();
+        if (user.getIsAdmin()) {
+            PanelGroupExample example = new PanelGroupExample();
+            example.setOrderByClause("name");
+            example.createCriteria().andNodeTypeEqualTo("panel");
+            return panelGroupMapper.selectByExample(example);
+        }
+        return extPanelGroupMapper.listPanelByUser(user.getUserId());
     }
 
     @DeCleaner(value = DePermissionType.PANEL, key = "pid")
@@ -216,6 +237,10 @@ public class PanelGroupService {
 
         } else {
             // 更新
+            if (StringUtils.isBlank(request.getPid())) {
+                PanelGroupWithBLOBs panel = panelGroupMapper.selectByPrimaryKey(request.getId());
+                request.setPid(panel.getPid());
+            }
             if (StringUtils.isNotEmpty(request.getName())) {
                 checkPanelName(request.getName(), request.getPid(), PanelConstants.OPT_TYPE_UPDATE, request.getId(), request.getNodeType());
             }
@@ -230,6 +255,25 @@ public class PanelGroupService {
         }
         this.removePanelAllCache(panelId);
         return panelId;
+    }
+
+    public void move(PanelGroupRequest request) {
+        PanelGroupWithBLOBs panelInfo = panelGroupMapper.selectByPrimaryKey(request.getId());
+        if (panelInfo.getPid().equalsIgnoreCase(request.getPid())) {
+            DataEaseException.throwException(Translator.get("i18n_select_diff_folder"));
+        }
+        // 移动校验
+        if (StringUtils.isNotEmpty(request.getName())) {
+            checkPanelName(request.getName(), request.getPid(), PanelConstants.OPT_TYPE_INSERT, request.getId(), panelInfo.getNodeType());
+        }
+        PanelGroupWithBLOBs record = new PanelGroupWithBLOBs();
+        record.setName(request.getName());
+        record.setId(request.getId());
+        record.setPid(request.getPid());
+        record.setUpdateTime(request.getUpdateTime());
+        record.setUpdateBy(request.getUpdateBy());
+        panelGroupMapper.updateByPrimaryKeySelective(record);
+        DeLogUtils.save(SysLogConstants.OPERATE_TYPE.MODIFY, sourceType, request.getId(), panelInfo.getPid(), request.getPid(), sourceType);
     }
 
 
@@ -283,6 +327,9 @@ public class PanelGroupService {
             panelGroup.setPanelData(sourcePanel.getPanelData());
             panelGroup.setPanelStyle(sourcePanel.getPanelStyle());
             panelGroup.setSourcePanelName(sourcePanel.getName());
+        }
+        if (panelGroup != null) {
+            panelGroup.setWatermarkInfo(panelWatermarkMapper.selectByPrimaryKey("system_default"));
         }
         return panelGroup;
     }
@@ -400,14 +447,15 @@ public class PanelGroupService {
         panelGroupMapper.insertSelective(newPanel);
         return newPanelId;
     }
+
     @Transactional(rollbackFor = Exception.class)
-    public String newPanelFromApp(PanelGroupRequest request,Map<String,String> chartViewsRelaMap){
+    public String newPanelFromApp(PanelGroupRequest request, Map<String, String> chartViewsRealMap) {
         String newPanelId = request.getId();
         String templateData = request.getPanelData();
         String staticResource = request.getStaticResource();
-        Boolean mobileLayout = panelViewService.havaMobileLayout(templateData);
-        for(Map.Entry<String,String> entry:chartViewsRelaMap.entrySet()){
-            templateData =  templateData.replaceAll(entry.getKey(),entry.getValue());
+        Boolean mobileLayout = panelViewService.haveMobileLayout(templateData);
+        for (Map.Entry<String, String> entry : chartViewsRealMap.entrySet()) {
+            templateData = templateData.replaceAll(entry.getKey(), entry.getValue());
         }
         request.setMobileLayout(mobileLayout);
         request.setPanelData(templateData);
@@ -439,13 +487,13 @@ public class PanelGroupService {
                 templateStyle = panelTemplate.getTemplateStyle();
                 templateData = panelTemplate.getTemplateData();
                 dynamicData = panelTemplate.getDynamicData();
-                mobileLayout = panelViewService.havaMobileLayout(templateData);
+                mobileLayout = panelViewService.haveMobileLayout(templateData);
             } else if (PanelConstants.NEW_PANEL_FROM.NEW_OUTER_TEMPLATE.equals(newFrom)) {
                 templateStyle = request.getPanelStyle();
                 templateData = request.getPanelData();
                 dynamicData = request.getDynamicData();
                 staticResource = request.getStaticResource();
-                mobileLayout = panelViewService.havaMobileLayout(templateData);
+                mobileLayout = panelViewService.haveMobileLayout(templateData);
             } else if (PanelConstants.NEW_PANEL_FROM.NEW_MARKET_TEMPLATE.equals(newFrom)) {
                 PanelTemplateFileDTO templateFileInfo = getTemplateFromMarket(request.getTemplateUrl());
                 if (templateFileInfo == null) {
@@ -455,7 +503,7 @@ public class PanelGroupService {
                 templateData = templateFileInfo.getPanelData();
                 dynamicData = templateFileInfo.getDynamicData();
                 staticResource = templateFileInfo.getStaticResource();
-                mobileLayout = panelViewService.havaMobileLayout(templateData);
+                mobileLayout = panelViewService.haveMobileLayout(templateData);
             }
             Map<String, String> dynamicDataMap = gson.fromJson(dynamicData, Map.class);
             if (dynamicDataMap == null) {
@@ -599,12 +647,14 @@ public class PanelGroupService {
         OutputStream outputStream = response.getOutputStream();
         try {
             String snapshot = request.getSnapshot();
-            List<String[]> details = request.getDetails();
+            List<Object[]> details = request.getDetails();
             Integer[] excelTypes = request.getExcelTypes();
             details.add(0, request.getHeader());
-            HSSFWorkbook wb = new HSSFWorkbook();
+
+            Workbook wb = new XSSFWorkbook();
             //明细sheet
-            HSSFSheet detailsSheet = wb.createSheet("数据");
+            Sheet detailsSheet = wb.createSheet("数据");
+
 
             //给单元格设置样式
             CellStyle cellStyle = wb.createCellStyle();
@@ -620,51 +670,126 @@ public class PanelGroupService {
             //设置单元格填充样式(使用纯色背景颜色填充)
             cellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            if (CollectionUtils.isNotEmpty(details)) {
-                for (int i = 0; i < details.size(); i++) {
-                    HSSFRow row = detailsSheet.createRow(i);
-                    String[] rowData = details.get(i);
+
+            Boolean mergeHead = false;
+            ViewDetailField[] detailFields = request.getDetailFields();
+            if (ArrayUtil.isNotEmpty(detailFields)) {
+                cellStyle.setBorderTop(BorderStyle.THIN);
+                cellStyle.setBorderRight(BorderStyle.THIN);
+                cellStyle.setBorderBottom(BorderStyle.THIN);
+                cellStyle.setBorderLeft(BorderStyle.THIN);
+                String[] detailField = Arrays.stream(detailFields).map(field -> field.getName()).collect(Collectors.toList()).toArray(new String[detailFields.length]);
+                Object[] header = request.getHeader();
+                Row row = detailsSheet.createRow(0);
+                int headLen = header.length;
+                int detailFieldLen = detailField.length;
+                for (int i = 0; i < headLen; i++) {
+                    Cell cell = row.createCell(i);
+                    cell.setCellValue(header[i].toString());
+                    if (i < headLen - 1) {
+                        CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 1, i, i);
+                        detailsSheet.addMergedRegion(cellRangeAddress);
+                    } else {
+                        for (int j = i + 1; j < detailFieldLen + i; j++) {
+                            row.createCell(j).setCellStyle(cellStyle);
+                        }
+                        CellRangeAddress cellRangeAddress = new CellRangeAddress(0, 0, i, i + detailFieldLen - 1);
+                        detailsSheet.addMergedRegion(cellRangeAddress);
+                    }
+                    cell.setCellStyle(cellStyle);
+                    detailsSheet.setColumnWidth(i, 255 * 20);
+                }
+
+                Row detailRow = detailsSheet.createRow(1);
+                for (int i = 0; i < headLen - 1; i++) {
+                    Cell cell = detailRow.createCell(i);
+                    cell.setCellStyle(cellStyle);
+                }
+                for (int i = 0; i < detailFieldLen; i++) {
+                    int colIndex = headLen - 1 + i;
+                    Cell cell = detailRow.createCell(colIndex);
+                    cell.setCellValue(detailField[i]);
+                    cell.setCellStyle(cellStyle);
+                    detailsSheet.setColumnWidth(colIndex, 255 * 20);
+                }
+                details.add(1, detailField);
+                mergeHead = true;
+            }
+            if (CollectionUtils.isNotEmpty(details) && (!mergeHead || details.size() > 2)) {
+                int realDetailRowIndex = 2;
+                for (int i = (mergeHead ? 2 : 0); i < details.size(); i++) {
+                    Row row = detailsSheet.createRow(realDetailRowIndex > 2 ? realDetailRowIndex : i);
+                    Object[] rowData = details.get(i);
                     if (rowData != null) {
                         for (int j = 0; j < rowData.length; j++) {
-                            HSSFCell cell = row.createCell(j);
+                            Object cellValObj = rowData[j];
+                            if (mergeHead && j == rowData.length - 1 && (cellValObj.getClass().isArray() || cellValObj instanceof ArrayList)) {
+                                Object[] detailRowArray = ((List<Object>) cellValObj).toArray(new Object[((List<?>) cellValObj).size()]);
+                                int detailRowArrayLen = detailRowArray.length;
+                                int temlJ = j;
+                                while (detailRowArrayLen > 1 && temlJ-- > 0) {
+                                    CellRangeAddress cellRangeAddress = new CellRangeAddress(realDetailRowIndex, realDetailRowIndex + detailRowArrayLen - 1, temlJ, temlJ);
+                                    detailsSheet.addMergedRegion(cellRangeAddress);
+                                }
+
+                                for (int k = 0; k < detailRowArrayLen; k++) {
+                                    List<Object> detailRows = (List<Object>) detailRowArray[k];
+                                    Row curRow = row;
+                                    if (k > 0) {
+                                        curRow = detailsSheet.createRow(realDetailRowIndex + k);
+                                    }
+
+                                    for (int l = 0; l < detailRows.size(); l++) {
+                                        Object col = detailRows.get(l);
+                                        Cell cell = curRow.createCell(j + l);
+                                        cell.setCellValue(col.toString());
+                                    }
+                                }
+                                realDetailRowIndex += detailRowArrayLen;
+                                break;
+                            }
+
+                            Cell cell = row.createCell(j);
                             if (i == 0) {// 头部
-                                cell.setCellValue(rowData[j]);
+                                cell.setCellValue(cellValObj.toString());
                                 cell.setCellStyle(cellStyle);
                                 //设置列的宽度
                                 detailsSheet.setColumnWidth(j, 255 * 20);
-                            } else {
-                                // with DataType
-                                if ((excelTypes[j] == DeTypeConstants.DE_INT || excelTypes[j] == DeTypeConstants.DE_FLOAT) && StringUtils.isNotEmpty(rowData[j])) {
-                                    try {
-                                        cell.setCellValue(Double.valueOf(rowData[j]));
-                                    } catch (Exception e) {
-                                        LogUtil.warn("export excel data transform error");
+                            } else if (cellValObj != null) {
+                                try {
+                                    // with DataType
+                                    if ((excelTypes[j] == DeTypeConstants.DE_INT || excelTypes[j] == DeTypeConstants.DE_FLOAT) && StringUtils.isNotEmpty(cellValObj.toString())) {
+                                        cell.setCellValue(Double.valueOf(cellValObj.toString()));
+                                    } else {
+                                        cell.setCellValue(cellValObj.toString());
                                     }
-                                } else {
-                                    cell.setCellValue(rowData[j]);
+                                } catch (Exception e) {
+                                    LogUtil.warn("export excel data transform error");
                                 }
                             }
+
+
                         }
                     }
                 }
             }
             if (StringUtils.isNotEmpty(snapshot)) {
                 //截图sheet 1px ≈ 2.33dx ≈ 0.48 dy  8*24 个单元格
-                HSSFSheet snapshotSheet = wb.createSheet("图表");
+                Sheet snapshotSheet = wb.createSheet("图表");
                 short reDefaultRowHeight = (short) Math.round(request.getSnapshotHeight() * 3.5 / 8);
                 int reDefaultColumnWidth = (int) Math.round(request.getSnapshotWidth() * 0.25 / 24);
                 snapshotSheet.setDefaultColumnWidth(reDefaultColumnWidth);
                 snapshotSheet.setDefaultRowHeight(reDefaultRowHeight);
 
                 //画图的顶级管理器，一个sheet只能获取一个（一定要注意这点）i
-                HSSFPatriarch patriarch = snapshotSheet.createDrawingPatriarch();
+                Drawing patriarch = snapshotSheet.createDrawingPatriarch();
                 HSSFClientAnchor anchor = new HSSFClientAnchor(0, 0, reDefaultColumnWidth, reDefaultColumnWidth, (short) 0, 0, (short) 8, 24);
                 anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_DO_RESIZE);
                 patriarch.createPicture(anchor, wb.addPicture(Base64Utils.decodeFromString(snapshot.replace(DATA_URL_TITLE, "")), HSSFWorkbook.PICTURE_TYPE_JPEG));
             }
             response.setContentType("application/vnd.ms-excel");
             //文件名称
-            response.setHeader("Content-disposition", "attachment;filename=" + request.getViewName() + ".xls");
+            response.setHeader("Content-disposition", "attachment;filename=" + request.getViewName() + ".xlsx");
             wb.write(outputStream);
             outputStream.flush();
             outputStream.close();
@@ -729,7 +854,9 @@ public class PanelGroupService {
         if (cache == null) {
             return null;
         } else {
-            return (PanelGroupRequest) cache;
+            PanelGroupDTO result = (PanelGroupRequest) cache;
+            result.setWatermarkInfo(panelWatermarkMapper.selectByPrimaryKey("system_default"));
+            return result;
         }
     }
 
@@ -775,48 +902,65 @@ public class PanelGroupService {
         List<ChartViewField> chartViewFieldsInfo = extChartViewFieldMapper.findByPanelId(panelId);
         //3.获取所有数据集信息
         List<DatasetTable> datasetTablesInfo = extDataSetTableMapper.findByPanelId(panelId);
+        // dataset check
+        if (CollectionUtils.isEmpty(datasetTablesInfo)) {
+            return new PanelExport2App(Translator.get("I18N_APP_NO_DATASET_ERROR"));
+        } else if (datasetTablesInfo.stream().filter(datasetTable -> datasetTable.getType().equals("excel") || datasetTable.getType().equals("api")).collect(Collectors.toList()).size() > 0) {
+            return new PanelExport2App(Translator.get("I18N_APP_ERROR_DATASET"));
+        }
+        List<String> allTableIds = datasetTablesInfo.stream().map(DatasetTable::getId).collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(datasetTablesInfo)) {
+            for (DatasetTable datasetTable : datasetTablesInfo) {
+                if ("union".equals(datasetTable.getType()) && StringUtils.isNotEmpty(datasetTable.getInfo())) {
+                    DataTableInfoDTO dt = gson.fromJson(datasetTable.getInfo(), DataTableInfoDTO.class);
+                    DatasetUtils.getUnionTable(allTableIds, dt.getUnion());
+                } else if ("custom".equals(datasetTable.getType()) && StringUtils.isNotEmpty(datasetTable.getInfo())) {
+                    Map result = gson.fromJson(datasetTable.getInfo(), Map.class);
+                    List<Map> list = (List<Map>) result.get("list");
+                    if (CollectionUtils.isNotEmpty(list)) {
+                        for (Map details : list) {
+                            allTableIds.add(String.valueOf(details.get("tableId")));
+                        }
+                    }
+                }
+            }
+        }
+        datasetTablesInfo = extDataSetTableMapper.findByTableIds(allTableIds);
         //4.获取所有数据集字段信息
-        List<DatasetTableField> datasetTableFieldsInfo = extDataSetTableFieldMapper.findByPanelId(panelId);
+        List<DatasetTableField> datasetTableFieldsInfo = extDataSetTableFieldMapper.findByTableIds(allTableIds);
         //5.获取所有任务信息
-        List<DataSetTaskDTO> dataSetTasksInfo = extDataSetTaskMapper.findByPanelId(panelId);
+        List<DataSetTaskDTO> dataSetTasksInfo = extDataSetTaskMapper.findByTableIds(allTableIds);
         //6.获取所有数据源信息
-        List<DatasourceDTO> datasourceDTOS = extDataSourceMapper.findByPanelId(panelId);
+        List<DatasourceDTO> datasourceDTOS = extDataSourceMapper.findByTableIds(allTableIds);
 
         List<PanelView> panelViews = panelViewService.findPanelViewsByPanelId(panelId);
 
         //校验标准 1.存在视图且所有视图的数据来源必须是dataset 2.存在数据集且没有excel数据集 3.存在数据源且是单数据源
         //1.view check
         if (CollectionUtils.isEmpty(chartViewsInfo)) {
-            return new PanelExport2App("this panel don't have views");
+            return new PanelExport2App(Translator.get("I18N_APP_NO_VIEW_ERROR"));
         } else if (chartViewsInfo.stream().filter(chartView -> chartView.getDataFrom().equals("template")).collect(Collectors.toList()).size() > 0) {
-            return new PanelExport2App("this panel have view from template");
-        }
-
-        // dataset check
-        if (CollectionUtils.isEmpty(datasetTablesInfo)) {
-            return new PanelExport2App("this panel don't have dataset");
-        } else if (datasetTablesInfo.stream().filter(datasetTable -> datasetTable.getType().equals("excel")).collect(Collectors.toList()).size() > 0) {
-            return new PanelExport2App("this panel have dataset witch type is excel");
+            return new PanelExport2App(Translator.get("I18N_APP_TEMPLATE_VIEW_ERROR"));
         }
 
         //datasource check
         if (CollectionUtils.isEmpty(datasourceDTOS)) {
-            return new PanelExport2App("this panel don't have datasource");
+            return new PanelExport2App(Translator.get("I18N_APP_NO_DATASOURCE"));
         } else if (datasourceDTOS.size() > 1) {
-            return new PanelExport2App("this panel should hava only one dataset");
+            return new PanelExport2App(Translator.get("I18N_APP_ONE_DATASOURCE_TIPS"));
         }
-        return new PanelExport2App(chartViewsInfo, chartViewFieldsInfo, datasetTablesInfo, datasetTableFieldsInfo, dataSetTasksInfo, datasourceDTOS,panelViews);
+        return new PanelExport2App(chartViewsInfo, chartViewFieldsInfo, datasetTablesInfo, datasetTableFieldsInfo, dataSetTasksInfo, datasourceDTOS, panelViews);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public String appApply(PanelAppTemplateApplyRequest request) throws Exception{
+    public String appApply(PanelAppTemplateApplyRequest request) throws Exception {
         //仪表板名称校验，数据集分组名称校验，数据源名称校验
-        panelAppTemplateService.nameCheck(request);
+        panelAppTemplateService.nameCheck(request, "add");
 
         String newPanelId = UUIDUtil.getUUIDAsString();
         // 新建数据集分组
         DatasetGroup newDatasetGroup = new DatasetGroup();
-        newDatasetGroup.setPid(request.getDatasetGroupId());
+        newDatasetGroup.setPid(request.getDatasetGroupPid());
         newDatasetGroup.setName(request.getDatasetGroupName());
         newDatasetGroup.setType("group");
         DataSetGroupDTO resultDatasetGroup = dataSetGroupService.save(newDatasetGroup);
@@ -825,52 +969,120 @@ public class PanelGroupService {
         //查询应用信息
         PanelAppTemplateWithBLOBs appInfo = panelAppTemplateMapper.selectByPrimaryKey(request.getAppTemplateId());
         //1.获取所有视图信息
-        List<ChartViewWithBLOBs> chartViewsInfo = gson.fromJson(appInfo.getChartViewsInfo(), new TypeToken<List<ChartViewWithBLOBs>>(){}.getType());
+        List<ChartViewWithBLOBs> chartViewsInfo = gson.fromJson(appInfo.getChartViewsInfo(), new TypeToken<List<ChartViewWithBLOBs>>() {
+        }.getType());
         //2.获取视图扩展字段信息
-        List<ChartViewField> chartViewFieldsInfo = gson.fromJson(appInfo.getChartViewFieldsInfo(), new TypeToken<List<ChartViewField>>(){}.getType());
+        List<ChartViewField> chartViewFieldsInfo = gson.fromJson(appInfo.getChartViewFieldsInfo(), new TypeToken<List<ChartViewField>>() {
+        }.getType());
         //3.获取所有数据集信息
-        List<DatasetTable> datasetTablesInfo  = gson.fromJson(appInfo.getDatasetTablesInfo(), new TypeToken<List<DatasetTable>>(){}.getType());
+        List<DatasetTable> datasetTablesInfo = gson.fromJson(appInfo.getDatasetTablesInfo(), new TypeToken<List<DatasetTable>>() {
+        }.getType());
         //4.获取所有数据集字段信息
-        List<DatasetTableField> datasetTableFieldsInfo = gson.fromJson(appInfo.getDatasetTableFieldsInfo(), new TypeToken<List<DatasetTableField>>(){}.getType());
+        List<DatasetTableField> datasetTableFieldsInfo = gson.fromJson(appInfo.getDatasetTableFieldsInfo(), new TypeToken<List<DatasetTableField>>() {
+        }.getType());
         //5.获取所有任务信息
-        List<DataSetTaskDTO> dataSetTasksInfo = gson.fromJson(appInfo.getDatasetTasksInfo(), new TypeToken<List<DataSetTaskDTO>>(){}.getType());
+        List<DataSetTaskDTO> dataSetTasksInfo = gson.fromJson(appInfo.getDatasetTasksInfo(), new TypeToken<List<DataSetTaskDTO>>() {
+        }.getType());
         //6.获取所有数据源信息
-        List<Datasource> oldDatasourceInfo = gson.fromJson(appInfo.getDatasourceInfo(), new TypeToken<List<Datasource>>(){}.getType());
+        List<Datasource> oldDatasourceInfo = gson.fromJson(appInfo.getDatasourceInfo(), new TypeToken<List<Datasource>>() {
+        }.getType());
         //获取仪表板信息
-        PanelGroupRequest  panelInfo = gson.fromJson(appInfo.getPanelInfo(),PanelGroupRequest.class);
+        PanelGroupRequest panelInfo = gson.fromJson(appInfo.getPanelInfo(), PanelGroupRequest.class);
         //获取仪表板视图信息
-        List<PanelView> panelViewsInfo = gson.fromJson(appInfo.getPanelViewsInfo(), new TypeToken<List<PanelView>>(){}.getType());
+        List<PanelView> panelViewsInfo = gson.fromJson(appInfo.getPanelViewsInfo(), new TypeToken<List<PanelView>>() {
+        }.getType());
 
-        Map<String,String> datasourceRelaMap = panelAppTemplateService.applyDatasource(oldDatasourceInfo,request.getDatasourceList());
+        Map<String, String> datasourceRealMap = panelAppTemplateService.applyDatasource(oldDatasourceInfo, request);
 
-        Map<String,String> datasetsRelaMap = panelAppTemplateService.applyDataset(datasetTablesInfo,datasourceRelaMap,asideDatasetGroupId);
+        Map<String, String> datasetsRealMap = panelAppTemplateService.applyDataset(datasetTablesInfo, datasourceRealMap, asideDatasetGroupId);
 
-        Map<String,String> datasetFieldsRelaMap = panelAppTemplateService.applyDatasetField(datasetTableFieldsInfo,datasetsRelaMap);
+        Map<String, String> datasetTypeRealMap = datasetTablesInfo.stream().collect(Collectors.toMap(DatasetTable::getId, DatasetTable::getType));
 
-        panelAppTemplateService.resetCustomAndUnionDataset(datasetTablesInfo,datasetsRelaMap,datasetFieldsRelaMap);
+        Map<String, String> datasetFieldsMd5FormatRealMap = new HashMap<>();
 
-        Map<String,String> chartViewsRelaMap = panelAppTemplateService.applyViews(chartViewsInfo,datasetsRelaMap,datasetFieldsRelaMap,newPanelId);
+        Map<String, String> datasetFieldsRealMap = panelAppTemplateService.applyDatasetField(datasetTableFieldsInfo, datasetsRealMap, datasetTypeRealMap, datasetFieldsMd5FormatRealMap);
 
-        panelAppTemplateService.applyViewsField(chartViewFieldsInfo,chartViewsRelaMap,datasetsRelaMap,datasetFieldsRelaMap);
+        panelAppTemplateService.createDorisTable(datasetTablesInfo);
 
-        panelAppTemplateService.applyPanel(panelInfo,chartViewsRelaMap,newPanelId, request.getPanelName(), request.getPanelId());
+        panelAppTemplateService.resetCustomAndUnionDataset(datasetTablesInfo, datasetsRealMap, datasetFieldsRealMap);
 
-        panelAppTemplateService.applyPanelView(panelViewsInfo,chartViewsRelaMap,newPanelId);
+        Map<String, String> chartViewsRealMap = panelAppTemplateService.applyViews(chartViewsInfo, datasetsRealMap, datasetFieldsRealMap, datasetFieldsMd5FormatRealMap, newPanelId);
 
-        String newDatasourceId =datasourceRelaMap.entrySet().stream().findFirst().get().getValue();
+        panelAppTemplateService.applyViewsField(chartViewFieldsInfo, chartViewsRealMap, datasetsRealMap, datasetFieldsRealMap);
 
-        String newDatasourceName = request.getDatasourceList().get(0).getName();
+        panelAppTemplateService.applyPanel(panelInfo, chartViewsRealMap, datasetsRealMap, datasetFieldsRealMap, newPanelId, request.getPanelName(), request.getPanelGroupPid());
+
+        panelAppTemplateService.applyPanelView(panelViewsInfo, chartViewsRealMap, newPanelId);
+
+        String newDatasourceId = datasourceRealMap.entrySet().stream().findFirst().get().getValue();
+
 
         PanelAppTemplateLog templateLog = new PanelAppTemplateLog();
         templateLog.setPanelId(newPanelId);
         templateLog.setSourcePanelName(request.getPanelName());
         templateLog.setDatasourceId(newDatasourceId);
-        templateLog.setSourceDatasourceName(newDatasourceName);
+        if (PanelConstants.APP_DATASOURCE_FROM.NEW.equals(request.getDatasourceFrom())) {
+            templateLog.setSourceDatasourceName(request.getDatasourceList().get(0).getName());
+        } else {
+            Datasource applyDatasourceInfo = datasourceMapper.selectByPrimaryKey(newDatasourceId);
+            templateLog.setSourceDatasourceName(applyDatasourceInfo.getName());
+        }
         templateLog.setDatasetGroupId(asideDatasetGroupId);
         templateLog.setSourceDatasetGroupName(request.getDatasetGroupName());
         templateLog.setAppTemplateId(appInfo.getId());
         templateLog.setAppTemplateName(appInfo.getName());
+        templateLog.setDatasourceFrom(request.getDatasourceFrom());
         appTemplateLogService.newAppApplyLog(templateLog);
         return newPanelId;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void appEdit(PanelAppTemplateApplyRequest request) throws Exception {
+        long currentTime = System.currentTimeMillis();
+        String userName = AuthUtils.getUser().getUsername();
+        //名称校验，数据集分组名称校验，数据源名称校验
+        panelAppTemplateService.nameCheck(request, "update");
+        //仪表板移动更新名称
+        PanelGroup panelHistoryInfo = panelGroupMapper.selectByPrimaryKey(request.getPanelId());
+        String panelHistoryPid = panelHistoryInfo.getPid();
+        if (panelHistoryPid.equals(request.getPanelGroupPid())) {
+            // 未移动
+            checkPanelName(request.getPanelName(), request.getPanelGroupPid(), PanelConstants.OPT_TYPE_UPDATE, request.getPanelId(), "panel");
+        } else {
+            checkPanelName(request.getPanelName(), request.getPanelGroupPid(), PanelConstants.OPT_TYPE_INSERT, null, "panel");
+        }
+        panelHistoryInfo.setName(request.getPanelName());
+        panelHistoryInfo.setPid(request.getPanelGroupPid());
+        panelHistoryInfo.setUpdateBy(userName);
+        panelHistoryInfo.setUpdateTime(currentTime);
+        panelGroupMapper.updateByPrimaryKey(panelHistoryInfo);
+
+        //数据集分组移动,变更
+        DatasetGroup datasetGroupHistoryInfo = datasetGroupMapper.selectByPrimaryKey(request.getDatasetGroupId());
+        DatasetGroup datasetGroup = new DatasetGroup();
+        datasetGroup.setName(request.getDatasetGroupName());
+        datasetGroup.setId(request.getDatasetGroupId());
+        if (datasetGroupHistoryInfo.getPid().equals(request.getDatasetGroupPid())) {
+            datasetGroup.setPid(request.getDatasetGroupPid());
+        }
+        dataSetGroupService.checkName(datasetGroup);
+        datasetGroupHistoryInfo.setName(request.getDatasetGroupName());
+        datasetGroupHistoryInfo.setPid(request.getDatasetGroupPid());
+        datasetGroupMapper.updateByPrimaryKey(datasetGroupHistoryInfo);
+        if ("new".equals(request.getDatasourceFrom())) {
+            //数据源变更
+            panelAppTemplateService.editDatasource(request.getDatasourceList());
+        }
+    }
+
+    public void toTop(String panelId) {
+        Long time = System.currentTimeMillis();
+        PanelGroupWithBLOBs request = new PanelGroupWithBLOBs();
+        request.setId(panelId);
+        request.setPanelSort(time);
+        request.setUpdateTime(time);
+        request.setUpdateBy(AuthUtils.getUser().getUsername());
+        panelGroupMapper.updateByPrimaryKeySelective(request);
+
     }
 }

@@ -1,4 +1,7 @@
 import store from '@/store'
+import eventBus from '@/components/canvas/utils/eventBus'
+import { $warning } from '@/utils/message'
+import i18n from '@/lang'
 
 const ctrlKey = 17
 const commandKey = 91 // mac command
@@ -13,27 +16,24 @@ const gKey = 71 // 组合
 const bKey = 66 // 拆分
 
 const lKey = 76 // 锁定
-const uKey = 85 // 解锁
+
+const dKey = 68 // 复制并粘贴
+
+const deleteKey = 46 // 删除
 
 const sKey = 83 // 保存
-const pKey = 80 // 预览
-const dKey = 68 // 删除
-const deleteKey = 46 // 删除
-const eKey = 69 // 清空画布
+
+const enlargeKey = 190 // command + .
 
 export const keycodes = [66, 67, 68, 69, 71, 76, 80, 83, 85, 86, 88, 89, 90]
+
+const ignoreComponent = ['de-button', 'de-reset-button']
 
 // 与组件状态无关的操作
 const basemap = {
   [vKey]: paste,
   [yKey]: redo,
   [zKey]: undo
-}
-
-// 组件锁定状态下可以执行的操作
-const lockMap = {
-  ...basemap,
-  [uKey]: unlock
 }
 
 // 组件未锁定状态下可以执行的操作
@@ -43,12 +43,15 @@ const unlockMap = {
   [xKey]: cut,
   [gKey]: compose,
   [bKey]: decompose,
-  [dKey]: deleteComponent,
+  [dKey]: copyAndPast,
   [deleteKey]: deleteComponent,
-  [lKey]: lock
+  [lKey]: lock,
+  [sKey]: save,
+  [enlargeKey]: viewEnlarge
 }
 
 let isCtrlOrCommandDown = false
+
 // Monitor key operations globally and execute corresponding commands
 export function listenGlobalKeyDown() {
   window.onkeydown = (e) => {
@@ -57,8 +60,35 @@ export function listenGlobalKeyDown() {
     if (keyCode === ctrlKey || keyCode === commandKey) {
       isCtrlOrCommandDown = true
     } else if (isCtrlOrCommandDown) {
-      if (keyCode === zKey || keyCode === yKey) {
+      if (keyCode === zKey || keyCode === yKey || keyCode === dKey || keyCode === sKey || keyCode === enlargeKey) {
         e.preventDefault()
+        e.stopPropagation()
+        unlockMap[keyCode]()
+      }
+    }
+  }
+
+  window.onkeyup = (e) => {
+    if (e.keyCode === ctrlKey || e.keyCode === commandKey) {
+      isCtrlOrCommandDown = false
+    }
+  }
+}
+
+export function removeKeyListen() {
+  // window.onkeydown = null
+  // window.onkeyup = null
+}
+
+export function listenGlobalKeyDownPreview() {
+  window.onkeydown = (e) => {
+    const { keyCode } = e
+    if (keyCode === ctrlKey || keyCode === commandKey) {
+      isCtrlOrCommandDown = true
+    } else if (isCtrlOrCommandDown) {
+      if (keyCode === enlargeKey) {
+        e.preventDefault()
+        e.stopPropagation()
         unlockMap[keyCode]()
       }
     }
@@ -72,12 +102,11 @@ export function listenGlobalKeyDown() {
 }
 
 function copy() {
-  store.commit('copy')
+  store.commit('copyToClipboard')
 }
 
 function paste() {
-  store.commit('paste')
-  store.commit('recordSnapshot')
+
 }
 
 function cut() {
@@ -107,6 +136,18 @@ function decompose() {
   }
 }
 
+function copyAndPast() {
+  if (store.state.curComponent) {
+    if (ignoreComponent.includes(store.state.curComponent.component)) {
+      $warning(i18n.t('panel.forbidden_copy'))
+    } else {
+      store.commit('copy')
+      store.commit('paste', false)
+      store.commit('recordSnapshot', 'copyAndPast')
+    }
+  }
+}
+
 function deleteComponent() {
   if (store.state.curComponent) {
     store.commit('deleteComponent')
@@ -118,6 +159,10 @@ function lock() {
   store.commit('lock')
 }
 
-function unlock() {
-  store.commit('unlock')
+function save() {
+  eventBus.$emit('checkAndSave')
+}
+
+function viewEnlarge() {
+  eventBus.$emit('viewEnlarge')
 }

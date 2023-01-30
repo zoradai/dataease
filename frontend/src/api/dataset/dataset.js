@@ -86,6 +86,23 @@ export function listDatasource() {
   })
 }
 
+export function getDatasetList() {
+  return request({
+    url: 'dataset/table/list',
+    loading: false,
+    method: 'post',
+    data: {}
+  })
+}
+
+export function getPanelGroupList() {
+  return request({
+    url: '/panel/group/list',
+    loading: false,
+    method: 'get'
+  })
+}
+
 export function listApiDatasource() {
   return request({
     url: '/datasource/list/api',
@@ -128,9 +145,25 @@ export function fieldListWithPermission(id, showLoading = true) {
   })
 }
 
+export function datasetParams(id, type, showLoading = true) {
+  return request({
+    url: '/dataset/table/params/' + id + '/' + type,
+    loading: showLoading,
+    method: 'post'
+  })
+}
+
 export function fieldListDQ(id, showLoading = true) {
   return request({
     url: '/dataset/field/listByDQ/' + id,
+    loading: showLoading,
+    method: 'post'
+  })
+}
+
+export function dateformats(id, showLoading = true) {
+  return request({
+    url: '/dataset/field/dateformats/' + id,
     loading: showLoading,
     method: 'post'
   })
@@ -177,7 +210,7 @@ export function multFieldValues(data) {
   return request({
     url: '/dataset/field/multFieldValues',
     method: 'post',
-    loading: true,
+    loading: false,
     data
   })
 }
@@ -233,6 +266,7 @@ export function checkCustomDs() {
     loading: true
   })
 }
+
 export function exportExcel(data) {
   return request({
     url: '/dataset/taskLog/export',
@@ -246,7 +280,19 @@ export function exportExcel(data) {
 export function dsTable(page, size, id) {
   return request({
     url: '/datasource/getTables/' + id + '/' + page + '/' + size,
-    method: 'post',
+    method: 'post'
   })
 }
-export default { loadTable, getScene, addGroup, delGroup, addTable, delTable, groupTree, checkCustomDs }
+
+export function exportDataset(data) {
+  // 初始化仪表板视图缓存
+  return request({
+    url: 'dataset/table/exportDataset',
+    method: 'post',
+    data: data,
+    loading: true,
+    responseType: 'blob'
+  })
+}
+
+export default { loadTable, getScene, addGroup, delGroup, addTable, delTable, groupTree, checkCustomDs, exportDataset }

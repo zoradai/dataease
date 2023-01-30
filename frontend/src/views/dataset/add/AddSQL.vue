@@ -1,5 +1,9 @@
 <template>
-  <div v-loading="loading" class="dataset-sql" @mouseup="mouseupDrag">
+  <div
+    v-loading="loading"
+    class="dataset-sql"
+    @mouseup="mouseupDrag"
+  >
     <div class="sql-editer">
       <el-row>
         <el-col :span="12">
@@ -26,10 +30,14 @@
             :placeholder="$t('dataset.connect_mode')"
             size="small"
           >
-            <el-option :label="$t('dataset.direct_connect')" value="0" />
+            <el-option
+              :label="$t('dataset.direct_connect')"
+              value="0"
+            />
             <el-option
               :label="$t('dataset.sync_data')"
               value="1"
+              v-if="engineMode !== 'simple'"
               :disabled="disabledSync"
             />
           </el-select>
@@ -46,10 +54,16 @@
               value="sync_now"
               :disabled="engineMode === 'simple'"
             />
-            <el-option :label="$t('dataset.sync_latter')" value="sync_latter" />
+            <el-option
+              :label="$t('dataset.sync_latter')"
+              value="sync_latter"
+            />
           </el-select>
         </el-col>
-        <el-col style="text-align: right" :span="12">
+        <el-col
+          style="text-align: right"
+          :span="12"
+        >
           <el-button
             type="text"
             size="small"
@@ -82,8 +96,11 @@
         </el-col>
       </el-row>
     </div>
-    <div class="refrence-sql-table">
-      <div v-if="dataReference" class="data-reference">
+    <div class="reference-sql-table">
+      <div
+        v-if="dataReference"
+        class="data-reference"
+      >
         <div class="table-database-name">
           <p>
             <span
@@ -92,6 +109,7 @@
               @click="
                 showTable = false
                 dataTable = ''
+                ;keywords = ''
               "
             ><i class="el-icon-arrow-left" /> {{ $t('chart.back') }}</span>
             <span v-else>{{ $t('deDataset.data_reference') }}</span>
@@ -105,8 +123,14 @@
               "
             />
           </p>
-          <p v-if="dataSource" style="margin-top: 16px">
-            <span>
+          <p
+            v-if="dataSource"
+            style="margin-top: 16px"
+          >
+            <span
+              :title="(showTable && dataTable) || selectedDatasource.name"
+              class="grey-name"
+            >
               <svg-icon icon-class="db-de" />
               {{ (showTable && dataTable) || selectedDatasource.name }}
             </span>
@@ -118,31 +142,69 @@
             </span>
           </p>
         </div>
-        <span v-if="!dataSource" class="no-select-datasource">{{
+        <span
+          v-if="!dataSource"
+          class="no-select-datasource"
+        >{{
           $t('deDataset.to_start_using')
         }}</span>
-        <div v-else-if="dataSource && !dataTable" v-loading="tableLoading" class="item-list">
+        <template v-else>
+          <el-input :placeholder="$t('fu.search_bar.please_input')" style="padding: 5px" size="small" v-model="keywords"></el-input>
           <div
-            v-for="ele in tableData"
+          v-if="dataSource && !dataTable"
+          v-loading="tableLoading"
+          class="item-list"
+        >
+          <div
+            v-for="ele in tableDataCopy"
             :key="ele.name"
             class="table-or-field"
             @click="typeSwitch(ele)"
           >
-            {{ ele.name }}
+            <span
+              :title="ele.remark"
+              class="name"
+            >{{ ele.name }}</span>
+            <i
+              v-clipboard:copy="ele.name"
+              v-clipboard:success="onCopy"
+              v-clipboard:error="onError"
+              class="el-icon-document-copy"
+              @click.stop
+            />
           </div>
         </div>
-        <div v-else-if="dataSource && dataTable" class="item-list">
+        <div
+          v-else-if="dataSource && dataTable"
+          v-loading="tableLoading"
+          class="item-list"
+        >
           <div
-            v-for="ele in fieldData"
+            v-for="ele in fieldDataCopy"
             :key="ele.fieldName"
-            class="table-or-field"
+            class="table-or-field field"
           >
-            {{ ele.fieldName }}
+            <span
+              :title="ele.remarks"
+              class="name"
+            >{{ ele.fieldName }}</span>
+            <i
+              v-clipboard:copy="ele.fieldName"
+              v-clipboard:success="onCopy"
+              v-clipboard:error="onError"
+              class="el-icon-document-copy"
+              @click.stop
+            />
           </div>
         </div>
+        </template>
+        
       </div>
       <div class="sql-table">
-        <div class="code-container" :style="{ height: sqlHeight + 'px' }">
+        <div
+          class="code-container"
+          :style="{ height: sqlHeight + 'px' }"
+        >
           <codemirror
             ref="myCm"
             v-model="sql"
@@ -156,20 +218,48 @@
 
         <div class="sql-result">
           <div class="sql-title">
-            {{ $t('deDataset.running_results') }}
-            <span class="result-num">{{
+            {{
+              $t(
+                tabActive === 'result'
+                  ? 'deDataset.running_results'
+                  : 'dataset.task.record'
+              )
+            }}
+            <span
+              v-if="tabActive === 'result'"
+              class="result-num"
+            >{{
               `(${$t('dataset.preview_show')} 1000 ${$t(
                 'dataset.preview_item'
               )})`
             }}</span>
 
-            <span class="drag" @mousedown="mousedownDrag" />
+            <span
+              class="drag"
+              @mousedown="mousedownDrag"
+            />
           </div>
-          <div class="table-sql">
+          <el-tabs
+            v-model="tabActive"
+            class="padding-24"
+          >
+            <el-tab-pane
+              :label="$t('deDataset.running_results')"
+              name="result"
+            />
+            <el-tab-pane
+              :label="$t('dataset.task.record')"
+              name="execLog"
+            />
+          </el-tabs>
+          <div
+            v-show="tabActive === 'result'"
+            class="table-sql"
+          >
             <el-empty
               v-if="initFlag"
               :image-size="125"
-              style="margin-top: 80px"
+              style="margin-top: 22px"
               :image="initImg"
               :description="$t('deDataset.to_run_query')"
             >{{ $t('deDataset.the_running_results') }}
@@ -180,31 +270,98 @@
               :image="errImg"
               :description="$t('deDataset.run_failed')"
             >{{ errMsgCont }}</el-empty>
-            <ux-grid
+            <el-table
               v-else
-              ref="plxTable"
+              :data="plxTableData"
               size="mini"
-              style="width: 100%"
-              :height="height"
-              :checkbox-config="{ highlight: true }"
-              :width-resize="true"
+              border
+              style="width: 100%; height: 100%;overflow-y: auto;"
             >
-              <ux-table-column
+              <el-table-column
                 v-for="field in fields"
                 :key="field.fieldName"
                 min-width="200px"
-                :field="field.fieldName"
-                :title="field.remarks"
-                :resizable="true"
+                :prop="field.fieldName"
+                :label="field.remarks"
+                resizable
               />
-            </ux-grid>
+            </el-table>
+          </div>
+          <div
+            v-show="tabActive === 'execLog'"
+            class="table-container"
+          >
+            <grid-table
+              v-loading="loading"
+              :table-data="sqlData"
+              :show-pagination="!!param.tableId"
+              :columns="[]"
+              :pagination="paginationConfig"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+            >
+              <el-table-column
+                key="startTimeTable"
+                min-width="100px"
+                prop="startTime"
+                :label="$t('dataset.start_time')"
+              >
+                <template slot-scope="scope">
+                  <span>{{ scope.row.startTime | timestampFormatDate }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column
+                key="sql"
+                prop="sql"
+                show-overflow-tooltip
+                :label="$t('dataset.sql')"
+              />
+              <el-table-column
+                key="spend"
+                prop="spend"
+                :formatter="formatter"
+                :label="$t('dataset.spend_time')"
+              />
+              <el-table-column
+                key="status"
+                prop="status"
+                :label="$t('dataset.sql_result')"
+              >
+                <template slot-scope="scope">
+                  <span
+                    v-if="scope.row.status"
+                    :class="[`de-${scope.row.status}-pre`, 'de-status']"
+                  >{{ $t(`dataset.${scope.row.status.toLocaleLowerCase()}`) }}
+                  </span>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column
+                slot="__operation"
+                key="__operation"
+                :label="$t('commons.operating')"
+                fixed="right"
+                width="100"
+              >
+                <template slot-scope="scope">
+                  <el-button
+                    class="de-text-btn mar3 mar6"
+                    type="text"
+                    @click="copy(scope.row.sql)"
+                  >
+                    {{ $t('commons.copy') }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </grid-table>
           </div>
           <el-drawer
             v-closePress
             :title="dialogTitle"
             :visible.sync="showVariableMgm"
-            custom-class="user-drawer sql-dataset-drawer"
-            size="840px"
+            custom-class="de-user-drawer sql-dataset-drawer"
+            size="870px"
             direction="rtl"
           >
             <div class="content">
@@ -229,31 +386,31 @@
                     :options="fieldOptions"
                     @change="variableTypeChange(scope.row)"
                   >
-                  <template slot-scope="{ data }">
-                    <svg-icon
-                      v-if="data.value === 'TEXT'"
-                      icon-class="field_text"
-                      class="field-icon-text"
-                    />
-                    <svg-icon
-                      v-if="
-                        [
-                          'DATETIME-YEAR',
-                          'DATETIME-YEAR-MONTH',
-                          'DATETIME',
-                          'DATETIME-YEAR-MONTH-DAY'
-                        ].includes(data.value)
-                      "
-                      icon-class="field_time"
-                      class="field-icon-time"
-                    />
-                    <svg-icon
-                      v-if="['LONG', 'DOUBLE'].includes(data.value)"
-                      icon-class="field_value"
-                      class="field-icon-value"
-                    />
-                    <span>{{ data.label }}</span>
-                  </template>
+                    <template slot-scope="{ data }">
+                      <svg-icon
+                        v-if="data.value === 'TEXT'"
+                        icon-class="field_text"
+                        class="field-icon-text"
+                      />
+                      <svg-icon
+                        v-if="
+                          [
+                            'DATETIME-YEAR',
+                            'DATETIME-YEAR-MONTH',
+                            'DATETIME',
+                            'DATETIME-YEAR-MONTH-DAY'
+                          ].includes(data.value)
+                        "
+                        icon-class="field_time"
+                        class="field-icon-time"
+                      />
+                      <svg-icon
+                        v-if="['LONG', 'DOUBLE'].includes(data.value)"
+                        icon-class="field_value"
+                        class="field-icon-value"
+                      />
+                      <span>{{ data.label }}</span>
+                    </template>
                   </el-cascader>
                   <span class="select-svg-icon">
                     <svg-icon
@@ -286,6 +443,17 @@
                 prop="defaultValue"
                 :label="$t('commons.params_value')"
               >
+                <template #header>
+                  {{ $t('commons.params_value') }}
+                  <el-tooltip
+                    class="item"
+                    effect="dark"
+                    :content="$t('commons.parameter_effect')"
+                    placement="top"
+                  >
+                    <i class="el-icon-warning" />
+                  </el-tooltip>
+                </template>
                 <template slot-scope="scope">
                   <el-input
                     v-if="scope.row.type[0] === 'TEXT'"
@@ -347,10 +515,16 @@
               </el-table-column>
             </el-table>
             <div class="de-foot">
-              <deBtn secondary @click="closeVariableMgm">{{
+              <deBtn
+                secondary
+                @click="closeVariableMgm"
+              >{{
                 $t('dataset.cancel')
               }}</deBtn>
-              <deBtn type="primary" @click="saveVariable()">{{
+              <deBtn
+                type="primary"
+                @click="saveVariable()"
+              >{{
                 $t('dataset.confirm')
               }}</deBtn>
             </div>
@@ -391,10 +565,12 @@ import 'codemirror/addon/hint/show-hint'
 import { engineMode } from '@/api/system/engine'
 import msgCfm from '@/components/msgCfm/index'
 import cancelMix from './cancelMix'
+import { pySort } from './util'
 import _ from 'lodash'
+import GridTable from '@/components/gridTable/index.vue'
 export default {
   name: 'AddSQL',
-  components: { codemirror },
+  components: { codemirror, GridTable },
   mixins: [msgCfm, cancelMix],
   props: {
     param: {
@@ -404,6 +580,14 @@ export default {
   },
   data() {
     return {
+      tabActive: 'result',
+      paginationConfig: {
+        currentPage: 1,
+        pageSize: 10,
+        total: 0
+      },
+      keywords: '',
+      sqlData: [],
       dataSource: '',
       loading: false,
       dataTable: '',
@@ -415,7 +599,8 @@ export default {
       errMsgCont: '',
       options: [],
       sql: '',
-      dataReference: false,
+      dataReference: true,
+      plxTableData: [],
       sqlOption: {
         tabSize: 2,
         styleActiveLine: true,
@@ -428,7 +613,8 @@ export default {
           completeSingle: false // 当匹配只有一项的时候是否自动补全
         }
       },
-      data: [],
+      tableDataCopy: [],
+      fieldDataCopy: [],
       errImg: require('@/assets/error.png'),
       initImg: require('@/assets/None.png'),
       sqlHeight: 248,
@@ -502,20 +688,35 @@ export default {
   computed: {
     codemirror() {
       return this.$refs.myCm.codemirror
-    },
-    dataSourceDetail() {}
+    }
   },
   watch: {
     sqlHeight: {
       handler: function() {
         this.calHeight()
       }
+    },
+    keywords(val) {
+      if (!val) {
+        this.tableDataCopy = this.arrSort([...this.tableData], 'name')
+        this.fieldDataCopy = this.arrSort([...this.fieldData])
+        return
+      }
+
+      if (this.dataSource && !this.dataTable) {
+        this.tableDataCopy = this.arrSort(this.tableData.filter(ele => ele.name.includes(val)), 'name')
+      }
+
+      if (this.dataSource && this.dataTable) {
+        this.fieldDataCopy = this.arrSort(this.fieldData.filter(ele => ele.fieldName.includes(val)))
+      }
     }
   },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.calHeight)
+  },
   async mounted() {
-    window.onresize = () => {
-      this.calHeight()
-    }
+    window.addEventListener('resize', this.calHeight)
     this.calHeight()
     await this.initDataSource()
     this.$refs.myCm.codemirror.on('keypress', () => {
@@ -530,30 +731,58 @@ export default {
     })
   },
   methods: {
+    copy(text) {
+      this.$copyText(text).then(
+        (e) => {
+          this.openMessageSuccess('commons.copy_success')
+        },
+        (e) => {
+          this.openMessageSuccess('commons.copy_success')
+        }
+      )
+    },
+    formatter(row, column, cellValue) {
+      return cellValue ? `${cellValue} ${this.$t(`commons.millisecond`)}` : '-'
+    },
+    handleSizeChange(pageSize) {
+      this.paginationConfig.currentPage = 1
+      this.paginationConfig.pageSize = pageSize
+      this.listSqlLog()
+    },
+    handleCurrentChange(currentPage) {
+      this.paginationConfig.currentPage = currentPage
+      this.listSqlLog()
+    },
     getField(name) {
+      this.tableLoading = true
       post('/dataset/table/getFields', {
         dataSourceId: this.dataSource,
         info: JSON.stringify({ table: name })
       }).then((res) => {
         this.fieldData = res.data
+        this.fieldDataCopy = this.arrSort([...this.fieldData])
       })
+      .finally(() => {
+          this.tableLoading = false
+        })
     },
     typeSwitch({ name }) {
       this.showTable = true
       this.dataTable = name
+      this.keywords = ''
       this.getField(name)
     },
     mousedownDrag() {
       document
         .querySelector('.dataset-sql')
-        .addEventListener('mousemove', this.caculateHeight)
+        .addEventListener('mousemove', this.calculateHeight)
     },
     mouseupDrag() {
       document
         .querySelector('.dataset-sql')
-        .removeEventListener('mousemove', this.caculateHeight)
+        .removeEventListener('mousemove', this.calculateHeight)
     },
-    caculateHeight(e) {
+    calculateHeight(e) {
       if (e.pageY - 120 < 248) {
         this.sqlHeight = 248
         return
@@ -570,6 +799,7 @@ export default {
       })
     },
     changeDatasource() {
+      this.keywords = ''
       for (let i = 0; i < this.options.length; i++) {
         if (this.options[i].id === this.dataSource) {
           this.selectedDatasource = this.options[i]
@@ -589,19 +819,27 @@ export default {
       post('/datasource/getTables/' + this.dataSource, {})
         .then((response) => {
           this.tableData = response.data
+          this.tableDataCopy = this.arrSort([...this.tableData], 'name')
         })
         .finally(() => {
           this.tableLoading = false
         })
     },
-    calHeight: _.debounce(function () {
+    arrSort(arr = [], field = 'fieldName') {
+      arr.sort((a, b) => {
+            return a[field][0].toLowerCase().charCodeAt() - b[field][0].toLowerCase().charCodeAt()
+          })
+
+      return arr
+    },
+    calHeight: _.debounce(function() {
       const sqlHeight = Math.max(this.sqlHeight, 248)
       const currentHeight = document.documentElement.clientHeight
       this.height = currentHeight - sqlHeight - 56 - 54 - 36 - 64
     }, 200),
     initDataSource() {
       return listDatasource().then((response) => {
-        this.options = response.data.filter((item) => item.type !== 'api')
+        this.options = pySort(response.data.filter((item) => item.type !== 'api'))
       })
     },
 
@@ -625,7 +863,6 @@ export default {
         })
       }
     },
-
     getSQLPreview() {
       this.errMsg = false
       this.errMsgCont = ''
@@ -636,30 +873,67 @@ export default {
       }
       this.parseVariable()
       this.fields = []
-      this.$refs.plxTable?.reloadData([])
-      post('/dataset/table/sqlPreview', {
-        dataSourceId: this.dataSource,
-        type: 'sql',
-        sqlVariableDetails: JSON.stringify(this.variables),
-        info: JSON.stringify({
-          sql: Base64.encode(this.sql.trim()),
-          isBase64Encryption: true
-        })
-      }, true, 60000, true)
-        .then((response) => {
-          this.fields = response.data.fields
-          this.data = response.data.data
-          const datas = this.data
-          this.$nextTick(() => {
-            this.$refs.plxTable?.reloadData(datas)
+      this.plxTableData = []
+      post(
+        '/dataset/table/sqlPreview',
+        {
+          id: this.param.tableId,
+          dataSourceId: this.dataSource,
+          type: 'sql',
+          mode: parseInt(this.mode),
+          sqlVariableDetails: JSON.stringify(this.variables),
+          info: JSON.stringify({
+            sql: Base64.encode(this.sql.trim()),
+            isBase64Encryption: true
           })
+        },
+        true,
+        60000,
+        true
+      )
+        .then((response) => {
+          if (response.success) {
+            this.fields = response.data.fields
+            this.plxTableData = response.data.data || []
+            if (!this.param.tableId) {
+              this.sqlData.unshift(response.data.log)
+            } else {
+              this.listSqlLog()
+            }
+          } else {
+            this.errMsgCont = response.message
+            this.errMsg = true
+            if (!this.param.tableId) {
+              this.sqlData.unshift(response.data)
+            } else {
+              this.listSqlLog()
+            }
+          }
         })
-        .catch((err, msg) => {
+        .catch((err, msg, response) => {
           this.errMsgCont = err
           this.errMsg = true
+          if (!this.param.tableId) {
+            this.sqlData.unshift(response.data)
+          } else {
+            this.listSqlLog()
+          }
         })
     },
-
+    listSqlLog() {
+      post(
+        '/dataset/table/sqlLog/' +
+          this.paginationConfig.currentPage +
+          '/' +
+          this.paginationConfig.pageSize,
+        { id: this.param.tableId, dataSourceId: this.dataSource }
+      )
+        .then((response) => {
+          this.sqlData = response.data.listObject
+          this.paginationConfig.total = response.data.itemCount
+        })
+        .catch(() => {})
+    },
     save() {
       if (!this.dataSource || this.datasource === '') {
         this.openMessageSuccess('dataset.pls_slc_data_source', 'error')
@@ -698,6 +972,10 @@ export default {
           this.loading = false
         })
     },
+    onCopy(e) {
+      this.openMessageSuccess('commons.copy_success')
+    },
+    onError(e) {},
     showSQL(val) {
       this.sql = val || ''
     },
@@ -724,6 +1002,7 @@ export default {
           var name = match[index].substring(2, match[index].length - 1)
           if (names.indexOf(name) < 0) {
             names.push(name)
+            // eslint-disable-next-line
             var obj = undefined
             for (let i = 0; i < this.variables.length; i++) {
               if (this.variables[i].variableName === name) {
@@ -802,11 +1081,11 @@ export default {
   }
   .content {
     height: 62px;
-    width: 792px;
+    width: 822px;
     border-radius: 4px;
     background: #e1eaff;
     position: relative;
-    padding: 9px 19px 9px 40px;
+    padding: 9px 0 9px 40px;
     font-family: PingFang SC;
     font-size: 14px;
     font-weight: 400;
@@ -831,7 +1110,7 @@ export default {
     padding: 16px 24px;
   }
 
-  .refrence-sql-table {
+  .reference-sql-table {
     flex: 1;
     display: flex;
     flex-direction: row-reverse;
@@ -864,9 +1143,13 @@ export default {
           margin: 0;
         }
 
-        :nth-child(2)p {
-          margin-top: 16px;
+        .grey-name {
+          max-width: 80%;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          overflow: hidden;
         }
+
         .grey {
           font-size: 14px;
           font-weight: 400;
@@ -876,7 +1159,7 @@ export default {
 
       .item-list {
         padding: 16px 8px;
-        height: calc(100vh - 200px);
+        height: calc(100vh - 242px);
         overflow: auto;
         .table-or-field {
           height: 40px;
@@ -890,6 +1173,23 @@ export default {
           display: flex;
           align-items: center;
           padding-left: 4px;
+          padding-right: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+
+          i {
+            display: none;
+            cursor: pointer;
+          }
+
+          .name {
+            cursor: pointer;
+            width: 90%;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          }
 
           &.field {
             color: var(--deTextPrimary, #1f2329);
@@ -900,6 +1200,9 @@ export default {
           }
 
           &:hover {
+            i {
+              display: block;
+            }
             background: rgba(31, 35, 41, 0.1);
           }
         }
@@ -957,9 +1260,15 @@ export default {
       }
     }
 
+    .padding-24 {
+      .el-tabs__nav-scroll {
+        padding-left: 24px;
+      }
+    }
+
     .table-sql {
-      height: calc(100% - 64px);
-      padding: 18px 25px;
+      height: calc(100% - 110px);
+      padding: 0 25px 18px 25px;
       overflow-y: auto;
       box-sizing: border-box;
       .el-empty__bottom,
@@ -971,6 +1280,19 @@ export default {
         color: var(--deTextSecondary, #646a73);
       }
     }
+  }
+  .table-container {
+    height: calc(100% - 125px);
+    padding: 0 24px;
+    .mar6 {
+      margin-right: 6px;
+    }
+    .mar3 {
+      margin-left: -3px;
+    }
+  }
+  .table-container-filter {
+    height: calc(100% - 110px);
   }
 }
 </style>

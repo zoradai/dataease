@@ -1,26 +1,39 @@
 <template>
   <el-col>
     <div class="table-count">
-      <span class="title-text" style="width: 100px"
-        >{{ $t('deDataset.display') }} {{ form.row }}
-        {{ $t('deDataset.row') }}</span
-      >
+      <span
+        class="title-text"
+        style="width: 100px"
+      >{{ $t('deDataset.display') }} {{ form.row }}
+        {{ $t('deDataset.row') }}</span>
       <el-popover
+        ref="setCount"
         popper-class="de-set-count de-card-dropdown"
         placement="right-start"
         width="306"
-        ref="setCount"
         trigger="click"
       >
         {{ $t('deDataset.show_rows') }}
-        <el-input size="small" v-model="rowNum"> </el-input>
+        <el-input
+          v-model="rowNum"
+          size="small"
+        />
         <div class="foot">
-          <deBtn @click="cancel" secondary>{{ $t('commons.cancel') }} </deBtn>
-          <deBtn type="primary" @click="searchRow">
+          <deBtn
+            secondary
+            @click="cancel"
+          >{{ $t('commons.cancel') }} </deBtn>
+          <deBtn
+            type="primary"
+            @click="searchRow"
+          >
             {{ $t('commons.confirm') }}
           </deBtn>
         </div>
-        <i slot="reference" class="el-icon-edit"></i>
+        <i
+          slot="reference"
+          class="el-icon-edit"
+        />
       </el-popover>
     </div>
     <ux-grid
@@ -67,6 +80,7 @@
 </template>
 
 <script>
+import _ from 'lodash'
 export default {
   name: 'TabDataPreview',
   props: {
@@ -108,8 +122,8 @@ export default {
   },
   watch: {
     data() {
-      const datas = this.data
-      this.$refs.plxTable.reloadData(datas)
+      const data = this.data
+      this.$refs.plxTable.reloadData(data)
     },
     page() {
       if (this.page.total < parseInt(this.form.row)) {
@@ -121,6 +135,10 @@ export default {
   },
   mounted() {
     this.init()
+    window.addEventListener('resize', this.calHeight)
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.calHeight)
   },
   methods: {
     searchRow() {
@@ -133,13 +151,10 @@ export default {
     cancel() {
       this.$refs.setCount.doClose()
     },
-    calHeight() {
-      const that = this
-      setTimeout(function () {
-        const currentHeight = document.documentElement.clientHeight
-        that.height = currentHeight - 215
-      }, 10)
-    },
+    calHeight: _.debounce(function() {
+      const currentHeight = document.documentElement.clientHeight
+      this.height = currentHeight - 215
+    }, 200),
     reSearch() {
       if (
         !this.form.row ||
@@ -159,6 +174,7 @@ export default {
       this.currentPage.show = parseInt(this.form.row)
       this.currentPage.pageSize = parseInt(this.form.row)
       this.currentPage.page = 1
+      this.$refs.setCount?.doClose()
       this.$emit('reSearch', { form: this.form, page: this.currentPage })
     },
     pageChange(val) {

@@ -1,34 +1,91 @@
 <template>
-  <div ref="chartContainer" style="padding: 0;width: 100%;height: 100%;overflow: hidden;" :style="bg_class">
-    <view-track-bar ref="viewTrack" :track-menu="trackMenu" class="track-bar" :style="trackBarStyleTime" @trackClick="trackClick" />
-    <span v-if="chart.type" v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
-      <div style="padding:6px 4px 0;margin: 0;">
-        <p style="overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
-        <title-remark v-if="remarkCfg.show" style="text-shadow: none!important;" :remark-cfg="remarkCfg" />
+  <div
+    ref="chartContainer"
+    style="padding: 0;width: 100%;height: 100%;overflow: hidden;"
+    :style="bg_class"
+  >
+    <view-track-bar
+      ref="viewTrack"
+      :track-menu="trackMenu"
+      class="track-bar"
+      :style="trackBarStyleTime"
+      @trackClick="trackClick"
+    />
+    <span
+      v-if="chart.type"
+      v-show="title_show"
+      ref="title"
+      :style="title_class"
+      style="cursor: default;display: block;"
+    >
+      <div style="padding:4px 4px 0;margin: 0;">
+        <chart-title-update
+          :title-class="title_class"
+          :chart-info="chartInfo"
+        />
+        <title-remark
+          v-if="remarkCfg.show"
+          style="text-shadow: none!important;margin-left: 4px;"
+          :remark-cfg="remarkCfg"
+        />
       </div>
     </span>
-    <div ref="tableContainer" style="width: 100%;overflow: hidden;" :style="{background:container_bg_class.background}">
-      <div v-if="chart.type === 'table-normal'" :id="chartId" style="width: 100%;overflow: hidden;" :class="chart.drill ? 'table-dom-normal-drill' : 'table-dom-normal'" />
-      <div v-if="chart.type === 'table-info'" :id="chartId" style="width: 100%;overflow: hidden;" :class="chart.drill ? (showPage ? 'table-dom-info-drill' : 'table-dom-info-drill-pull') : (showPage ? 'table-dom-info' : 'table-dom-info-pull')" />
-      <div v-if="chart.type === 'table-pivot'" :id="chartId" style="width: 100%;overflow: hidden;" class="table-dom-normal" />
-      <el-row v-show="showPage" class="table-page">
-        <span class="total-style">
-          {{ $t('chart.total') }}
-          <span>{{ (chart.data && chart.data.tableRow)?chart.data.tableRow.length:0 }}</span>
-          {{ $t('chart.items') }}
-        </span>
-        <el-pagination
-          small
-          :current-page="currentPage.page"
-          :page-sizes="[10,20,50,100]"
-          :page-size="currentPage.pageSize"
-          :pager-count="5"
-          layout="prev, pager, next"
-          :total="currentPage.show"
-          class="page-style"
-          @current-change="pageClick"
-          @size-change="pageChange"
-        />
+    <div
+      ref="tableContainer"
+      style="width: 100%;overflow: hidden;"
+      :style="{background:container_bg_class.background}"
+    >
+      <div
+        v-if="chart.type === 'table-normal'"
+        :id="chartId"
+        style="width: 100%;overflow: hidden;"
+        :class="chart.drill ? 'table-dom-normal-drill' : 'table-dom-normal'"
+      />
+      <div
+        v-if="chart.type === 'table-info'"
+        :id="chartId"
+        style="width: 100%;overflow: hidden;"
+        :class="chart.drill ? (showPage ? 'table-dom-info-drill' : 'table-dom-info-drill-pull') : (showPage ? 'table-dom-info' : 'table-dom-info-pull')"
+      />
+      <div
+        v-if="chart.type === 'table-pivot'"
+        :id="chartId"
+        style="width: 100%;overflow: hidden;"
+        class="table-dom-normal"
+      />
+      <el-row
+        v-show="showPage"
+        style="position: relative;"
+      >
+        <el-row
+          class="table-page"
+          :style="autoStyle"
+        >
+          <span
+            class="total-style"
+            :style="totalStyle"
+          >
+            {{ $t('chart.total') }}
+            <span>{{
+              (chart.datasetMode === 0 && !not_support_page_dataset.includes(chart.datasourceType)) ? chart.totalItems : ((chart.data && chart.data.tableRow) ? chart.data.tableRow.length : 0)
+            }}</span>
+            {{ $t('chart.items') }}
+          </span>
+          <de-pagination
+            small
+            :current-page="currentPage.page"
+            :page-size="currentPage.pageSize"
+            :pager-count="5"
+            :custom-style="{
+              color: title_class.color
+            }"
+            layout="prev, pager, next"
+            :total="currentPage.show"
+            class="page-style"
+            @current-change="pageClick"
+            @size-change="pageChange"
+          />
+        </el-row>
       </el-row>
     </div>
   </div>
@@ -36,16 +93,23 @@
 
 <script>
 import { uuid } from 'vue-uuid'
-import ViewTrackBar from '@/components/canvas/components/Editor/ViewTrackBar'
+import ViewTrackBar from '@/components/canvas/components/editor/ViewTrackBar'
 import { getRemark, hexColorToRGBA } from '@/views/chart/chart/util'
 import { baseTableInfo, baseTableNormal, baseTablePivot } from '@/views/chart/chart/table/table-info'
 import TitleRemark from '@/views/chart/view/TitleRemark'
-import { DEFAULT_TITLE_STYLE } from '@/views/chart/chart/chart'
+import { DEFAULT_TITLE_STYLE, NOT_SUPPORT_PAGE_DATASET } from '@/views/chart/chart/chart'
+import ChartTitleUpdate from './ChartTitleUpdate.vue'
+import { mapState } from 'vuex'
+import DePagination from '@/components/deCustomCm/pagination.js'
 
 export default {
   name: 'ChartComponentS2',
-  components: { TitleRemark, ViewTrackBar },
+  components: { TitleRemark, ViewTrackBar, ChartTitleUpdate, DePagination },
   props: {
+    terminalType: {
+      type: String,
+      default: 'pc'
+    },
     chart: {
       type: Object,
       required: true
@@ -111,11 +175,31 @@ export default {
       remarkCfg: {
         show: false,
         content: ''
-      }
+      },
+      totalStyle: {
+        color: '#606266'
+      },
+      not_support_page_dataset: NOT_SUPPORT_PAGE_DATASET
     }
   },
 
   computed: {
+    scale() {
+      return this.previewCanvasScale.scalePointWidth
+    },
+    autoStyle() {
+      if (this.terminalType === 'pc') {
+        return {
+          height: (100 / this.scale) + '%!important',
+          width: (100 / this.scale) + '%!important',
+          left: 50 * (1 - 1 / this.scale) + '%', // 放大余量 除以 2
+          top: 50 * (1 - 1 / this.scale) + '%', // 放大余量 除以 2
+          transform: 'scale(' + this.scale + ')'
+        }
+      } else {
+        return {}
+      }
+    },
     trackBarStyleTime() {
       return this.trackBarStyle
     },
@@ -123,7 +207,14 @@ export default {
       return {
         borderRadius: this.borderRadius
       }
-    }
+    },
+    chartInfo() {
+      const { id, title } = this.chart
+      return { id, title }
+    },
+    ...mapState([
+      'previewCanvasScale'
+    ])
   },
   watch: {
     chart: {
@@ -131,7 +222,9 @@ export default {
         this.initData()
         this.initTitle()
         this.calcHeightDelay()
-        new Promise((resolve) => { resolve() }).then(() => {
+        new Promise((resolve) => {
+          resolve()
+        }).then(() => {
           this.drawView()
         })
       },
@@ -146,56 +239,63 @@ export default {
   },
   beforeDestroy() {
     clearInterval(this.scrollTimer)
+    window.removeEventListener('resize', this.onResize)
+    this.myChart.destroy()
+    this.myChart = null
   },
   methods: {
     initData() {
-      let datas = []
+      let data = []
       this.showPage = false
       if (this.chart.data && this.chart.data.fields) {
         this.fields = JSON.parse(JSON.stringify(this.chart.data.fields))
         const attr = JSON.parse(this.chart.customAttr)
         this.currentPage.pageSize = parseInt(attr.size.tablePageSize ? attr.size.tablePageSize : 20)
-        datas = JSON.parse(JSON.stringify(this.chart.data.tableRow))
-        if (this.chart.type === 'table-info' && (attr.size.tablePageMode === 'page' || !attr.size.tablePageMode) && datas.length > this.currentPage.pageSize) {
-          // 计算分页
-          this.currentPage.show = datas.length
-          const pageStart = (this.currentPage.page - 1) * this.currentPage.pageSize
-          const pageEnd = pageStart + this.currentPage.pageSize
-          datas = datas.slice(pageStart, pageEnd)
-          this.showPage = true
+        data = JSON.parse(JSON.stringify(this.chart.data.tableRow))
+        if (this.chart.datasetMode === 0 && !NOT_SUPPORT_PAGE_DATASET.includes(this.chart.datasourceType)) {
+          if (this.chart.type === 'table-info' && (attr.size.tablePageMode === 'page' || !attr.size.tablePageMode) && this.chart.totalItems > this.currentPage.pageSize) {
+            this.currentPage.show = this.chart.totalItems
+            this.showPage = true
+          }
+        } else {
+          if (this.chart.type === 'table-info' && (attr.size.tablePageMode === 'page' || !attr.size.tablePageMode) && data.length > this.currentPage.pageSize) {
+            // 计算分页
+            this.currentPage.show = data.length
+            const pageStart = (this.currentPage.page - 1) * this.currentPage.pageSize
+            const pageEnd = pageStart + this.currentPage.pageSize
+            data = data.slice(pageStart, pageEnd)
+            this.showPage = true
+          }
         }
       } else {
         this.fields = []
-        datas = []
+        data = []
         this.resetPage()
       }
-      this.tableData = datas
+      this.tableData = data
     },
     preDraw() {
+      this.onResize()
+      window.addEventListener('resize', this.onResize)
+    },
+    onResize() {
       this.initData()
       this.initTitle()
       this.calcHeightDelay()
-      new Promise((resolve) => { resolve() }).then(() => {
+      new Promise((resolve) => {
+        resolve()
+      }).then(() => {
         this.drawView()
       })
-      const that = this
-      window.onresize = function() {
-        that.initData()
-        that.initTitle()
-        that.calcHeightDelay()
-        new Promise((resolve) => { resolve() }).then(() => {
-          that.drawView()
-        })
-      }
     },
     drawView() {
       const chart = this.chart
       // type
       // if (chart.data) {
       this.antVRenderStatus = true
-      if (!chart.data || (!chart.data.datas && !chart.data.series)) {
+      if (!chart.data || (!chart.data.data && !chart.data.series)) {
         chart.data = {
-          datas: [{}],
+          data: [{}],
           series: [
             {
               data: [0]
@@ -204,11 +304,11 @@ export default {
         }
       }
       if (chart.type === 'table-info') {
-        this.myChart = baseTableInfo(this.myChart, this.chartId, chart, this.antVAction, this.tableData)
+        this.myChart = baseTableInfo(this.myChart, this.chartId, chart, this.antVAction, this.tableData, this.currentPage)
       } else if (chart.type === 'table-normal') {
         this.myChart = baseTableNormal(this.myChart, this.chartId, chart, this.antVAction, this.tableData)
       } else if (chart.type === 'table-pivot') {
-        this.myChart = baseTablePivot(this.myChart, this.chartId, chart, this.antVAction, this.tableData)
+        this.myChart = baseTablePivot(this.myChart, this.chartId, chart, this.antVAction, this.tableHeaderClick, this.tableData)
       } else {
         if (this.myChart) {
           this.antVRenderStatus = false
@@ -247,16 +347,19 @@ export default {
       }
       const dimensionList = []
       for (const key in rowData) {
-        if(meta.fieldValue === rowData[key]){
+        if (nameIdMap[key]) {
           dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
         }
       }
-
+      this.antVActionPost(dimensionList, nameIdMap[meta.valueField] || 'null', param)
+    },
+    antVActionPost(dimensionList, name, param) {
       this.pointParam = {
         data: {
           dimensionList: dimensionList,
           quotaList: [],
-          name: meta.fieldValue||'null'
+          name: name,
+          sourceType: this.chart.type
         }
       }
 
@@ -267,6 +370,22 @@ export default {
         this.trackBarStyle.top = (param.y + 10) + 'px'
         this.$refs.viewTrack.trackButtonClick()
       }
+    },
+    tableHeaderClick(param) {
+      const cell = this.myChart.getCell(param.target)
+      const meta = cell.getMeta()
+      const rowData = meta.query
+      const nameIdMap = this.chart.data.fields.reduce((pre, next) => {
+        pre[next['dataeaseName']] = next['id']
+        return pre
+      }, {})
+      const dimensionList = []
+      for (const key in rowData) {
+        if (nameIdMap[key]) {
+          dimensionList.push({ id: nameIdMap[key], value: rowData[key] })
+        }
+      }
+      this.antVActionPost(dimensionList, nameIdMap[meta.field] || 'null', param)
     },
     setBackGroundBorder() {
       if (this.chart.customStyle) {
@@ -280,7 +399,9 @@ export default {
       this.initData()
       this.initTitle()
       this.calcHeightDelay()
-      new Promise((resolve) => { resolve() }).then(() => {
+      new Promise((resolve) => {
+        resolve()
+      }).then(() => {
         this.drawView()
       })
     },
@@ -305,7 +426,8 @@ export default {
         name: this.pointParam.data.name,
         viewId: this.chart.id,
         dimensionList: this.pointParam.data.dimensionList,
-        quotaList: this.pointParam.data.quotaList
+        quotaList: this.pointParam.data.quotaList,
+        sourceType: this.pointParam.data.sourceType
       }
       switch (trackAction) {
         case 'drill':
@@ -340,6 +462,8 @@ export default {
           this.title_class.fontFamily = customStyle.text.fontFamily ? customStyle.text.fontFamily : DEFAULT_TITLE_STYLE.fontFamily
           this.title_class.letterSpacing = (customStyle.text.letterSpace ? customStyle.text.letterSpace : DEFAULT_TITLE_STYLE.letterSpace) + 'px'
           this.title_class.textShadow = customStyle.text.fontShadow ? '2px 2px 4px' : 'none'
+          // 表格总计与分页颜色，取标题颜色
+          this.totalStyle.color = customStyle.text.color
         }
         if (customStyle.background) {
           this.title_class.background = hexColorToRGBA(customStyle.background.color, customStyle.background.alpha)
@@ -369,17 +493,24 @@ export default {
         this.calcHeightRightNow()
       }, 100)
     },
-
     pageChange(val) {
       this.currentPage.pageSize = val
-      this.initData()
-      this.drawView()
+      if (this.chart.datasetMode === 0 && !NOT_SUPPORT_PAGE_DATASET.includes(this.chart.datasourceType)) {
+        this.$emit('onPageChange', this.currentPage)
+      } else {
+        this.initData()
+        this.drawView()
+      }
     },
 
     pageClick(val) {
       this.currentPage.page = val
-      this.initData()
-      this.drawView()
+      if (this.chart.datasetMode === 0 && !NOT_SUPPORT_PAGE_DATASET.includes(this.chart.datasourceType)) {
+        this.$emit('onPageChange', this.currentPage)
+      } else {
+        this.initData()
+        this.drawView()
+      }
     },
 
     resetPage() {
@@ -425,25 +556,31 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.table-dom-info{
-  height:calc(100% - 36px);
+.table-dom-info {
+  height: calc(100% - 36px);
 }
-.table-dom-info-pull{
-  height:calc(100%);
+
+.table-dom-info-pull {
+  height: calc(100%);
 }
-.table-dom-normal{
-  height:100%;
+
+.table-dom-normal {
+  height: 100%;
 }
-.table-dom-info-drill{
-  height:calc(100% - 36px - 12px);
+
+.table-dom-info-drill {
+  height: calc(100% - 36px - 24px);
 }
-.table-dom-info-drill-pull{
-  height:calc(100% - 12px);
+
+.table-dom-info-drill-pull {
+  height: calc(100% - 24px);
 }
-.table-dom-normal-drill{
-  height:calc(100% - 12px);
+
+.table-dom-normal-drill {
+  height: calc(100% - 24px);
 }
-.table-page{
+
+.table-page {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -451,22 +588,28 @@ export default {
   overflow: hidden;
   margin-top: 8px;
 }
-.page-style{
+
+.page-style {
   margin-right: auto;
 }
-.total-style{
+
+.total-style {
   flex: 1;
   font-size: 12px;
   color: #606266;
-  white-space:nowrap;
+  white-space: nowrap;
+  padding-left: 8px;
 }
-.page-style ::v-deep .el-input__inner{
+
+.page-style ::v-deep .el-input__inner {
   height: 24px;
 }
-.page-style ::v-deep button{
-  background: transparent!important;
+
+.page-style ::v-deep button {
+  background: transparent !important;
 }
-.page-style ::v-deep li{
-  background: transparent!important;
+
+.page-style ::v-deep li {
+  background: transparent !important;
 }
 </style>

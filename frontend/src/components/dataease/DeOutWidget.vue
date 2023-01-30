@@ -1,7 +1,20 @@
 <template>
-  <div ref="myContainer" class="my-container">
-    <div ref="conditionMain" :style="outsideStyle" class="condition-main">
-      <div v-if="element.options.attrs.showTitle && element.options.attrs.title" ref="deTitleContainer" :style="titleStyle" class="condition-title">
+  <div
+    ref="myContainer"
+    class="my-container"
+    :style="inScreen?autoStyle:''"
+  >
+    <div
+      ref="conditionMain"
+      :style="outsideStyle"
+      class="condition-main"
+    >
+      <div
+        v-if="element.options.attrs.showTitle && element.options.attrs.title"
+        ref="deTitleContainer"
+        :style="titleStyle"
+        class="condition-title"
+      >
         <div class="condition-title-absolute">
           <div class="first-title">
             <div class="span-container">
@@ -18,9 +31,9 @@
         <div class="condition-content-container">
           <div class="first-element">
             <div
-              :class="element.component === 'de-select-grid' ? 'first-element-grid-contaner': ''"
+              :class="element.component === 'de-select-grid' ? 'first-element-grid-container': ''"
               :style="deSelectGridBg"
-              class="first-element-contaner"
+              class="first-element-container"
             >
 
               <component
@@ -28,13 +41,13 @@
                 v-if="element.type==='custom'"
                 :id="'component' + element.id"
                 ref="deOutWidget"
+                :canvas-id="canvasId"
                 class="component-custom"
                 :out-style="element.style"
                 :is-relation="isRelation"
                 :element="element"
                 :in-draw="inDraw"
                 :in-screen="inScreen"
-                :size="sizeInfo"
               />
             </div>
           </div>
@@ -46,15 +59,21 @@
 </template>
 
 <script>
+import inputStyleMixin from '@/components/widget/deWidget/inputStyleMixin'
 import { mapState } from 'vuex'
-import inputStyleMixin from '@/components/widget/DeWidget/inputStyleMixin'
+
 export default {
   name: 'DeOutWidget',
   mixins: [inputStyleMixin],
   props: {
+    canvasId: {
+      type: String,
+      required: true
+    },
     element: {
       type: Object,
-      default: () => {}
+      default: () => {
+      }
     },
     inDraw: {
       type: Boolean,
@@ -77,10 +96,16 @@ export default {
     isRelation: {
       type: Boolean,
       default: false
+    },
+    searchCount: {
+      type: Number,
+      required: false,
+      default: 0
     }
   },
   data() {
     return {
+      needRefreshComponents: ['de-select', 'de-select-grid', 'de-select-tree'],
       inputMaxSize: 46,
       inputLargeSize: 42,
       inputSmallSize: 38,
@@ -95,20 +120,18 @@ export default {
     }
   },
   computed: {
-    sizeInfo() {
-      let size
-      if (this.duHeight > this.inputLargeSize) {
-        size = 'medium'
-      } else if (this.duHeight > this.inputSmallSize) {
-        size = 'small'
-      } else {
-        size = 'mini'
-      }
-      return size
+    scale() {
+      return this.previewCanvasScale.scalePointHeight
     },
-    ...mapState([
-      'curCanvasScale'
-    ]),
+    autoStyle() {
+      return {
+        height: (100 / this.scale) + '%!important',
+        width: (100 / this.scale) + '%!important',
+        left: 50 * (1 - 1 / this.scale) + '%', // 放大余量 除以 2
+        top: 50 * (1 - 1 / this.scale) + '%', // 放大余量 除以 2
+        transform: 'scale(' + this.scale + ')'
+      }
+    },
     deSelectGridBg() {
       if (this.element.component !== 'de-select-grid') return null
       const { backgroundColorSelect, color } = this.element.commonBackground
@@ -119,7 +142,11 @@ export default {
     },
     isFilterComponent() {
       return ['de-select', 'de-select-grid', 'de-date', 'de-input-search', 'de-number-range', 'de-select-tree'].includes(this.element.component)
-    }
+    },
+    ...mapState([
+      'curComponent',
+      'previewCanvasScale'
+    ])
   },
   watch: {
     'element.style': {
@@ -128,6 +155,13 @@ export default {
       },
       deep: true,
       immediate: true
+    },
+    // 监听外部计时器变化
+    searchCount: function(val1) {
+      // 正在操作的组件不进行刷新
+      if (val1 > 0 && this.needRefreshComponents.includes(this.element.component) && (!this.curComponent || this.curComponent.id !== this.element.id)) {
+        this.$refs['deOutWidget'].refreshLoad()
+      }
     }
   },
   mounted() {
@@ -148,14 +182,20 @@ export default {
         textAlign: horizontal
       }
       this.outsideStyle = {
-        flexWrap: 'wrap'
+        flexDirection: 'column'
       }
+
+      
       if (vertical !== 'top' && this.element.component !== 'de-select-grid') {
         this.titleStyle = null
         this.outsideStyle = {
           flexDirection: horizontal === 'right' ? 'row-reverse' : '',
           alignItems: 'center'
         }
+      }
+
+      if (this.element.component === 'de-select-grid') {
+        this.$set(this.outsideStyle, 'flexDirection', 'column')
       }
 
       if (vertical !== 'top' && this.element.component === 'de-number-range') {
@@ -181,77 +221,93 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-  .my-container {
-    position: relative;
-    overflow: auto !important;
-    top: 0px;
-    right: 0px;
-    bottom: 0px;
-    left: 0px;
-  }
-  .ccondition-main {
-    position: absolute;
-    overflow: auto;
-    top: 0px;
-    right: 0px;
-    bottom: 0px;
-    left: 0px;
-    display: flex;
-  }
-  .condition-title {
-    height: 2em;
-    cursor: -webkit-grab;
-    line-height: 2em;
-    white-space: nowrap;
-  }
-  .span-container {
-    overflow: hidden auto;
-    position: relative;
-    padding: 0 5px;
-  }
-  .condition-content {
-    overflow: auto hidden;
-    letter-spacing: 0px !important;
+.my-container {
+  position: relative;
+  overflow: auto !important;
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+  left: 0px;
+}
+
+.condition-main {
+  position: absolute;
+  overflow: hidden;
+  top: 0px;
+  right: 0px;
+  bottom: 0px;
+  left: 0px;
+  display: flex;
+}
+
+.condition-title {
+  height: 2em;
+  cursor: -webkit-grab;
+  line-height: 2em;
+  white-space: nowrap;
+}
+
+.span-container {
+  overflow: hidden auto;
+  position: relative;
+  padding: 0 5px;
+}
+
+.condition-content {
+  overflow: auto hidden;
+  letter-spacing: 0px !important;
+  width: 100%;
+}
+
+.condition-content-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  white-space: nowrap;
+}
+
+.first-element {
+  position: relative;
+  margin: 0px;
+  padding: 0px;
+  height: 100%;
+}
+
+.first-element-container {
+  width: calc(100% - 10px);
+  background: initial;
+  margin: 0 4px;
+
+  div {
     width: 100%;
   }
-  .condition-content-container {
-    position: relative;
-    display: table;
-    width: 100%;
-    height: 100%;
-    white-space: nowrap;
-  }
-  .first-element {
-    position: relative;
-    display: table-cell;
-    vertical-align: middle;
-    margin: 0px;
-    padding: 0px;
-    height: 100%;
-  }
-  .first-element-contaner {
-    width: calc(100% - 10px);
-    background: initial;
-    margin: 0 4px;
-    div {
-      width: 100%;
-    }
-    display: flex;
-    align-items: flex-end;
-  }
-  .first-element-grid-contaner {
-    background: #fff;
-    border: 1px solid #d7dae2;
-    top: 5px;
-  }
-  .condition-main-line {
-    height: 40px !important;
-  }
-  .condition-main {
-    display: flex;
-    padding-top: 5px;
-  }
-  .condition-content-default {
-    inset: 0px 0px 0px !important;
-  }
+
+  display: flex;
+  align-items: flex-end;
+}
+
+.first-element-container ::v-deep .el-input__inner {
+  height: 40px !important;
+  line-height: 40px !important;
+}
+
+.first-element-grid-container {
+  background: #fff;
+  border: 1px solid #d7dae2;
+  top: 5px;
+  height: 100%;
+}
+
+.condition-main-line {
+  height: 40px !important;
+}
+
+.condition-main {
+  display: flex;
+  padding-top: 5px;
+}
+
+.condition-content-default {
+  inset: 0px 0px 0px !important;
+}
 </style>

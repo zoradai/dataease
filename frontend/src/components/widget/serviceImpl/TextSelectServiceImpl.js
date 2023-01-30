@@ -13,7 +13,7 @@ const dialogPanel = {
       placeholder: 'detextselect.placeholder',
       viewIds: [],
       parameters: [],
-      datas: [],
+      data: [],
       key: 'id',
       label: 'text',
       value: 'id',
@@ -77,9 +77,9 @@ class TextSelectServiceImpl extends WidgetService {
     })
   }
 
-  optionDatas(datas) {
-    if (!datas) return null
-    return datas.filter(item => !!item).map(item => {
+  optionData(data) {
+    if (!data) return null
+    return data.filter(item => !!item).map(item => {
       return {
         id: item,
         text: item
@@ -99,7 +99,15 @@ class TextSelectServiceImpl extends WidgetService {
   isSortWidget() {
     return true
   }
-
+  isCustomSortWidget() {
+    return true
+  }
+  isParamWidget() {
+    return true
+  }
+  isChinesSortWidget() {
+    return true
+  }
   fillValueDerfault(element) {
     const defaultV = element.options.value === null ? '' : element.options.value.toString()
     if (element.options.attrs.multiple) {

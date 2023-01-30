@@ -1,8 +1,11 @@
 <template>
-  <el-col class="tree-style de-dataset-search">
+  <el-col class="de-dataset-search">
     <!-- group -->
     <el-col>
-      <div style="margin: 6px 0 16px 0" class="title-css">
+      <div
+        style="margin: 6px 0 16px 0"
+        class="title-css"
+      >
         <span class="title-text">
           {{ $t('dataset.datalist') }}
         </span>
@@ -12,37 +15,61 @@
           @command="(type) => clickAddData(type)"
         >
           <span class="el-dropdown-link">
-            <i class="el-icon-plus" @click.stop />
+            <i
+              class="el-icon-plus"
+              @click.stop
+            />
           </span>
           <el-dropdown-menu
             slot="dropdown"
             class="de-dataset-dropdown de-card-dropdown"
           >
             <el-dropdown-item command="db">
-              <svg-icon icon-class="ds-db" class="ds-icon-db" />
+              <svg-icon
+                icon-class="ds-db"
+                class="ds-icon-db"
+              />
               {{ $t('dataset.db_data') }}
             </el-dropdown-item>
             <el-dropdown-item command="sql">
-              <svg-icon icon-class="ds-sql" class="ds-icon-sql" />
+              <svg-icon
+                icon-class="ds-sql"
+                class="ds-icon-sql"
+              />
               {{ $t('dataset.sql_data') }}
             </el-dropdown-item>
             <el-dropdown-item
               command="excel"
               :disabled="!kettleRunning && engineMode !== 'simple'"
             >
-              <svg-icon icon-class="ds-excel" class="ds-icon-excel" />
+              <svg-icon
+                icon-class="ds-excel"
+                class="ds-icon-excel"
+              />
               {{ $t('dataset.excel_data') }}
             </el-dropdown-item>
             <el-dropdown-item command="union">
-              <svg-icon icon-class="ds-union" class="ds-icon-union" />
+              <svg-icon
+                icon-class="ds-union"
+                class="ds-icon-union"
+              />
               {{ $t('dataset.union_data') }}
             </el-dropdown-item>
             <el-dropdown-item command="api">
-              <svg-icon icon-class="ds-api" class="ds-icon-api" />
+              <svg-icon
+                icon-class="ds-api"
+                class="ds-icon-api"
+              />
               {{ $t('dataset.api_data') }}
             </el-dropdown-item>
-            <el-dropdown-item class="de-top-border" command="group">
-              <svg-icon icon-class="scene" class="ds-icon-db" />
+            <el-dropdown-item
+              class="de-top-border"
+              command="group"
+            >
+              <svg-icon
+                icon-class="scene"
+                class="ds-icon-db"
+              />
               {{ $t('deDataset.new_folder') }}
             </el-dropdown-item>
           </el-dropdown-menu>
@@ -62,16 +89,28 @@
             v-model="searchType"
             :placeholder="searchMap[searchType]"
           >
-            <el-option :label="$t('commons.all')" value="all" />
-            <el-option :label="$t('commons.folder')" value="folder" />
+            <el-option
+              :label="$t('commons.all')"
+              value="all"
+            />
+            <el-option
+              :label="$t('commons.folder')"
+              value="folder"
+            />
           </el-select>
         </el-input>
       </el-row>
       <el-col class="custom-tree-container de-tree">
         <div class="block">
-          <div v-if="!tData.length && !treeLoading" class="no-tdata">
+          <div
+            v-if="!tData.length && !treeLoading"
+            class="no-tdata"
+          >
             {{ $t('deDataset.no_dataset_click') }}
-            <span class="no-tdata-new" @click="() => clickAdd()">{{
+            <span
+              class="no-tdata-new"
+              @click="() => clickAdd()"
+            >{{
               $t('deDataset.create')
             }}</span>
           </div>
@@ -111,50 +150,80 @@
                 v-if="hasDataPermission('manage', data.privileges)"
                 class="child"
               >
-                <span v-if="data.modelInnerType === 'group'" @click.stop>
+                <span
+                  v-if="data.modelInnerType === 'group'"
+                  @click.stop
+                >
                   <el-dropdown
                     size="small"
                     placement="bottom-start"
                     @command="(type) => clickAddData(type, data)"
                   >
                     <span class="el-dropdown-link">
-                      <i class="el-icon-plus" @click.stop />
+                      <i
+                        class="el-icon-plus"
+                        @click.stop
+                      />
                     </span>
                     <el-dropdown-menu
                       slot="dropdown"
                       class="de-dataset-dropdown de-card-dropdown"
                     >
                       <el-dropdown-item command="db">
-                        <svg-icon icon-class="ds-db" class="ds-icon-db" />
+                        <svg-icon
+                          icon-class="ds-db"
+                          class="ds-icon-db"
+                        />
                         {{ $t('dataset.db_data') }}
                       </el-dropdown-item>
                       <el-dropdown-item command="sql">
-                        <svg-icon icon-class="ds-sql" class="ds-icon-sql" />
+                        <svg-icon
+                          icon-class="ds-sql"
+                          class="ds-icon-sql"
+                        />
                         {{ $t('dataset.sql_data') }}
                       </el-dropdown-item>
                       <el-dropdown-item
                         command="excel"
                         :disabled="!kettleRunning && engineMode !== 'simple'"
                       >
-                        <svg-icon icon-class="ds-excel" class="ds-icon-excel" />
+                        <svg-icon
+                          icon-class="ds-excel"
+                          class="ds-icon-excel"
+                        />
                         {{ $t('dataset.excel_data') }}
                       </el-dropdown-item>
                       <el-dropdown-item command="union">
-                        <svg-icon icon-class="ds-union" class="ds-icon-union" />
+                        <svg-icon
+                          icon-class="ds-union"
+                          class="ds-icon-union"
+                        />
                         {{ $t('dataset.union_data') }}
                       </el-dropdown-item>
                       <el-dropdown-item command="api">
-                        <svg-icon icon-class="ds-api" class="ds-icon-api" />
+                        <svg-icon
+                          icon-class="ds-api"
+                          class="ds-icon-api"
+                        />
                         {{ $t('dataset.api_data') }}
                       </el-dropdown-item>
-                      <el-dropdown-item class="de-top-border" command="group">
-                        <svg-icon icon-class="scene" class="ds-icon-db" />
+                      <el-dropdown-item
+                        class="de-top-border"
+                        command="group"
+                      >
+                        <svg-icon
+                          icon-class="scene"
+                          class="ds-icon-db"
+                        />
                         {{ $t('deDataset.new_folder') }}
                       </el-dropdown-item>
                     </el-dropdown-menu>
                   </el-dropdown>
                 </span>
-                <span style="margin-left: 12px" @click.stop>
+                <span
+                  style="margin-left: 12px"
+                  @click.stop
+                >
                   <el-dropdown
                     trigger="click"
                     size="small"
@@ -162,9 +231,16 @@
                     @command="(type) => clickMore(type, data, node)"
                   >
                     <span class="el-dropdown-link">
-                      <el-button icon="el-icon-more" type="text" size="small" />
+                      <el-button
+                        icon="el-icon-more"
+                        type="text"
+                        size="small"
+                      />
                     </span>
-                    <el-dropdown-menu class="de-card-dropdown" slot="dropdown">
+                    <el-dropdown-menu
+                      slot="dropdown"
+                      class="de-card-dropdown"
+                    >
                       <el-dropdown-item command="rename">
                         <svg-icon icon-class="de-ds-rename" />
                         {{ $t('dataset.rename') }}
@@ -255,7 +331,10 @@
                 v-if="hasDataPermission('manage', data.privileges)"
                 class="child"
               >
-                <span style="margin-left: 12px" @click.stop>
+                <span
+                  style="margin-left: 12px"
+                  @click.stop
+                >
                   <el-dropdown
                     trigger="click"
                     size="small"
@@ -263,9 +342,16 @@
                     @command="(type) => clickMore(type, data, node)"
                   >
                     <span class="el-dropdown-link">
-                      <el-button icon="el-icon-more" type="text" size="small" />
+                      <el-button
+                        icon="el-icon-more"
+                        type="text"
+                        size="small"
+                      />
                     </span>
-                    <el-dropdown-menu class="de-card-dropdown" slot="dropdown">
+                    <el-dropdown-menu
+                      slot="dropdown"
+                      class="de-card-dropdown"
+                    >
                       <el-dropdown-item command="editTable">
                         <svg-icon icon-class="de-ds-rename" />
                         {{ $t('dataset.rename') }}
@@ -302,12 +388,24 @@
           @submit.native.prevent
           @keypress.enter.native="saveGroup(groupForm)"
         >
-          <el-form-item :label="$t('deDataset.folder_name')" prop="name">
-            <el-input v-model.trim="groupForm.name" placeholder="请输入文件夹名称" />
+          <el-form-item
+            :label="$t('deDataset.folder_name')"
+            prop="name"
+          >
+            <el-input
+              v-model.trim="groupForm.name"
+              placeholder="请输入文件夹名称"
+            />
           </el-form-item>
         </el-form>
-        <div slot="footer" class="dialog-footer">
-          <deBtn secondary @click="close()">{{ $t('dataset.cancel') }}</deBtn>
+        <div
+          slot="footer"
+          class="dialog-footer"
+        >
+          <deBtn
+            secondary
+            @click="close()"
+          >{{ $t('dataset.cancel') }}</deBtn>
           <deBtn
             type="primary"
             @click="saveGroup(groupForm)"
@@ -331,12 +429,21 @@
         @submit.native.prevent
         @keypress.enter.native="saveTable(tableForm)"
       >
-        <el-form-item :label="$t('dataset.name')" prop="name">
+        <el-form-item
+          :label="$t('dataset.name')"
+          prop="name"
+        >
           <el-input v-model="tableForm.name" />
         </el-form-item>
       </el-form>
-      <div slot="footer" class="dialog-footer">
-        <deBtn secondary @click="closeTable()">{{
+      <div
+        slot="footer"
+        class="dialog-footer"
+      >
+        <deBtn
+          secondary
+          @click="closeTable()"
+        >{{
           $t('dataset.cancel')
         }}</deBtn>
         <deBtn
@@ -350,13 +457,16 @@
     <!--移动分组-->
     <el-drawer
       :visible.sync="moveGroup"
-      custom-class="user-drawer sql-dataset-drawer"
+      custom-class="de-user-drawer sql-dataset-drawer"
       size="600px"
       direction="rtl"
     >
       <template slot="title">
         {{ $t('dataset.m1') }}
-        <span :title="moveDialogTitle" class="text-overflow">{{
+        <span
+          :title="moveDialogTitle"
+          class="text-overflow"
+        >{{
           moveDialogTitle
         }}</span>
         {{ $t('dataset.m2') }}
@@ -367,7 +477,10 @@
         @targetGroup="targetGroup"
       />
       <div class="de-foot">
-        <deBtn secondary @click="closeMoveGroup()">{{
+        <deBtn
+          secondary
+          @click="closeMoveGroup()"
+        >{{
           $t('dataset.cancel')
         }}</deBtn>
         <deBtn
@@ -382,20 +495,29 @@
     <!--移动数据集-->
     <el-drawer
       :visible.sync="moveDs"
-      custom-class="user-drawer sql-dataset-drawer"
+      custom-class="de-user-drawer sql-dataset-drawer"
       size="600px"
       direction="rtl"
     >
       <template slot="title">
         {{ $t('dataset.m1') }}
-        <span :title="moveDialogTitle" class="text-overflow">{{
+        <span
+          :title="moveDialogTitle"
+          class="text-overflow"
+        >{{
           moveDialogTitle
         }}</span>
         {{ $t('dataset.m2') }}
       </template>
-      <group-move-selector :item="groupForm" @targetGroup="targetDs" />
+      <group-move-selector
+        :item="groupForm"
+        @targetGroup="targetDs"
+      />
       <div class="de-foot">
-        <deBtn secondary @click="closeMoveDs()">{{
+        <deBtn
+          secondary
+          @click="closeMoveDs()"
+        >{{
           $t('dataset.cancel')
         }}</deBtn>
         <deBtn
@@ -423,12 +545,16 @@ import {
   isKettleRunning,
   alter
 } from '@/api/dataset/dataset'
+import { getDatasetRelationship } from '@/api/chart/chart.js'
+
+import msgContent from '@/views/system/datasource/MsgContent.vue'
 import GroupMoveSelector from './GroupMoveSelector'
 import CreatDsGroup from './CreatDsGroup'
 import { queryAuthModel } from '@/api/authModel/authModel'
 import { engineMode } from '@/api/system/engine'
 import _ from 'lodash'
 import msgCfm from '@/components/msgCfm/index'
+import { checkPermission } from '@/utils/permission'
 
 export default {
   name: 'Group',
@@ -509,6 +635,7 @@ export default {
           { required: true, trigger: 'blur', validator: this.filedValidator }
         ]
       },
+      treeData: [],
       moveGroup: false,
       tGroup: {},
       moveDs: false,
@@ -589,6 +716,26 @@ export default {
     sessionStorage.setItem('dataset-current-node', this.currentNodeId)
   },
   methods: {
+    getDatasetRelationship({ queryType, label, id }) {
+      return getDatasetRelationship(id).then((res) => {
+        const arr = res.data ? [res.data] : []
+        this.treeData = []
+        this.dfsTree(arr, { queryType, label })
+      })
+    },
+    dfsTree(arr = [], { queryType, label }, item) {
+      arr.forEach((ele) => {
+        const { name, type, subRelation = [] } = ele
+        const obj = {}
+        obj[type] = name
+        obj[queryType] = label
+        if (subRelation.length) {
+          this.dfsTree(subRelation, { queryType: type, label: name }, obj)
+        } else {
+          this.treeData.push({ ...item, ...obj })
+        }
+      })
+    },
     dfsTableData(arr, id) {
       arr.some((ele) => {
         if (ele.id === id) {
@@ -655,7 +802,7 @@ export default {
       switch (type) {
         case 'rename':
           this.originName = data.label
-          this.dialogTitle = this.$t('编辑文件夹')
+          this.dialogTitle = this.$t('datasource.edit_folder')
           this.dfsTdata(this.tData, data.id)
           this.add(data.modelInnerType)
           this.groupForm = JSON.parse(JSON.stringify(data))
@@ -754,7 +901,7 @@ export default {
         .catch(() => {})
     },
 
-    deleteTable(data) {
+    async deleteTable(data) {
       let confirm_delete_msg = ''
       if (data.modelInnerType === 'union' || data.modelInnerType === 'custom') {
         confirm_delete_msg = this.$t('dataset.confirm_delete')
@@ -762,7 +909,7 @@ export default {
         confirm_delete_msg = this.$t('dataset.confirm_delete_msg')
       }
       const options = {
-        title: '确定删除该数据集吗？',
+        title: 'datasource.delete_this_dataset',
         content: confirm_delete_msg,
         type: 'primary',
         confirmButtonText: this.$t('commons.confirm'),
@@ -775,7 +922,34 @@ export default {
           })
         }
       }
+
+      const { queryType = 'dataset', id, name } = data
+      if (checkPermission(['relationship:read'])) {
+        let hasSubRelation = false
+        await getDatasetRelationship(id).then((res) => {
+          if (res.data.subRelation?.length) {
+            hasSubRelation = true
+          }
+        })
+        if (hasSubRelation) {
+          options.title = this.$t('datasource.delete_this_dataset')
+          options.link = this.$t('datasource.click_to_check')
+          options.content = this.$t('datasource.cannot_be_deleted_dataset')
+          options.templateDel = msgContent
+          options.confirmButtonText = undefined
+          options.type = 'danger'
+          options.linkTo = this.linkTo.bind(this, { queryType, id, name })
+          this.withLink(options, this.$t('commons.delete'))
+          return
+        }
+      }
       this.handlerConfirm(options)
+    },
+    linkTo(query) {
+      window.open(this.$router.resolve({
+        path: '/system/relationship',
+        query
+      }).href, '_blank')
     },
 
     close() {
@@ -1119,14 +1293,12 @@ export default {
   align-items: center;
   width: 100%;
 }
-.tree-style {
-  padding: 10px 15px;
-  height: 100%;
-  overflow-y: auto;
-}
 </style>
 <style lang="scss">
 .de-dataset-search {
+  padding: 10px 24px;
+  height: 100%;
+  overflow-y: auto;
   .main-area-input {
     .el-input-group__append {
       width: 70px;
@@ -1179,6 +1351,11 @@ export default {
     &:hover {
       background: rgba(31, 35, 41, 0.1);
       color: var(--deTextPrimary, #1f2329);
+    }
+
+    &.is-disabled {
+      background: #BBBFC4;
+      color: #fff;
     }
   }
   .de-top-border {

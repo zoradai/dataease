@@ -9,6 +9,8 @@ import io.dataease.commons.exception.DEException;
 import io.dataease.commons.utils.DeLogUtils;
 import io.dataease.commons.utils.LogUtil;
 import io.dataease.commons.utils.ServletUtils;
+import io.dataease.exception.DataEaseException;
+import io.dataease.i18n.Translator;
 import io.dataease.plugins.common.base.domain.SysUserAssist;
 import io.dataease.plugins.config.SpringContextUtil;
 import io.dataease.plugins.xpack.dingtalk.dto.response.DingQrResult;
@@ -78,8 +80,7 @@ public class XDingtalkServer {
         return dingtalkXpackService.getQrParam();
     }
 
-    @GetMapping("/callBack")
-    public ModelAndView callBack(@RequestParam("code") String code, @RequestParam("state") String state) {
+    private ModelAndView privateCallBack(String code, Boolean withoutLogin) {
         ModelAndView modelAndView = new ModelAndView("redirect:/");
         HttpServletResponse response = ServletUtils.response();
         DingtalkXpackService dingtalkXpackService = null;
@@ -93,14 +94,18 @@ public class XDingtalkServer {
             if (!isOpen) {
                 DEException.throwException("未开启钉钉");
             }
-            DingUserEntity dingUserEntity = dingtalkXpackService.userInfo(code);
+            DingUserEntity dingUserEntity = withoutLogin ? dingtalkXpackService.userInfoWithoutLogin(code) : dingtalkXpackService.userInfo(code);
             String username = dingUserEntity.getUserid();
             SysUserEntity sysUserEntity = authUserService.getUserByDingtalkId(username);
             if (null == sysUserEntity) {
+                if (authUserService.checkScanCreateLimit())
+                    DEException.throwException(Translator.get("I18N_PROHIBIT_SCANNING_TO_CREATE_USER"));
                 String email = StringUtils.isNotBlank(dingUserEntity.getOrg_email()) ? dingUserEntity.getOrg_email() : StringUtils.isNotBlank(dingUserEntity.getEmail()) ? dingUserEntity.getEmail() : (username + "@dingtalk.work");
                 sysUserService.validateExistUser(username, dingUserEntity.getName(), email);
                 sysUserService.saveDingtalkCUser(dingUserEntity, email);
                 sysUserEntity = authUserService.getUserByDingtalkId(username);
+            } else if (sysUserEntity.getEnabled() == 0) {
+                DataEaseException.throwException(Translator.get("i18n_user_is_disable"));
             }
             TokenInfo tokenInfo = TokenInfo.builder().userId(sysUserEntity.getUserId()).username(sysUserEntity.getUsername()).build();
             String realPwd = sysUserEntity.getPassword();
@@ -110,6 +115,11 @@ public class XDingtalkServer {
             DeLogUtils.save(SysLogConstants.OPERATE_TYPE.LOGIN, SysLogConstants.SOURCE_TYPE.USER, sysUserEntity.getUserId(), null, null, null);
 
             Cookie cookie_token = new Cookie("Authorization", token);
+            if (withoutLogin) {
+                Cookie platformCookie = new Cookie("inOtherPlatform", "true");
+                platformCookie.setPath("/");
+                response.addCookie(platformCookie);
+            }
             cookie_token.setPath("/");
 
             response.addCookie(cookie_token);
@@ -131,6 +141,16 @@ public class XDingtalkServer {
             }
         }
         return modelAndView;
+    }
+
+    @GetMapping("/callBackWithoutLogin")
+    public ModelAndView callBackWithoutLogin(@RequestParam("code") String code) {
+        return privateCallBack(code, true);
+    }
+
+    @GetMapping("/callBack")
+    public ModelAndView callBack(@RequestParam("code") String code, @RequestParam("state") String state) {
+        return privateCallBack(code, false);
     }
 
     private void bindError(HttpServletResponse response, String url, String errorMsg) {
@@ -185,7 +205,7 @@ public class XDingtalkServer {
                 sysUserAssist.setUserId(Long.parseLong(state));
             }
             sysUserAssist.setDingtalkId(userId);
-            sysUserService.saveAssist(sysUserAssist.getUserId(), sysUserAssist.getWecomId(), sysUserAssist.getDingtalkId(), sysUserAssist.getLarkId());
+            sysUserService.saveAssist(sysUserAssist.getUserId(), sysUserAssist.getWecomId(), sysUserAssist.getDingtalkId(), sysUserAssist.getLarkId(), sysUserAssist.getLarksuiteId());
             response.sendRedirect(url);
         } catch (Exception e) {
 

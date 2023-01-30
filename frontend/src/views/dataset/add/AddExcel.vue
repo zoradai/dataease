@@ -1,21 +1,36 @@
 <template>
-  <div v-loading="loading" class="dataset-excel">
-    <p v-show="!showLeft" class="arrow-right" @click="showLeft = true">
+  <div
+    v-loading="loading"
+    class="dataset-excel"
+  >
+    <p
+      v-show="!showLeft"
+      class="arrow-right"
+      @click="showLeft = true"
+    >
       <i class="el-icon-d-arrow-right" />
     </p>
-    <div v-show="showLeft" class="table-list">
+    <div
+      v-show="showLeft"
+      class="table-list"
+    >
       <p class="select-ds">
-        <span
-          >{{ $t('deDataset.select_data_table ') }}
-          <el-tooltip class="item" effect="dark" placement="right">
+        <span>{{ $t('deDataset.select_data_table ') }}
+          <el-tooltip
+            class="item"
+            effect="dark"
+            placement="right"
+          >
             <div slot="content">
-              {{ $t('dataset.excel_info_1') }}<br />
-              {{ $t('dataset.excel_info_2') }}<br />
+              {{ $t('dataset.excel_info_1') }}<br>
+              {{ $t('dataset.excel_info_2') }}<br>
               {{ $t('dataset.excel_info_3') }}
             </div>
-            <i class="el-icon-warning-outline" /> </el-tooltip
-        ></span>
-        <i class="el-icon-d-arrow-left" @click="showLeft = false" />
+            <i class="el-icon-warning-outline" /> </el-tooltip></span>
+        <i
+          class="el-icon-d-arrow-left"
+          @click="showLeft = false"
+        />
       </p>
       <el-upload
         :action="baseUrl + 'dataset/table/excel/upload'"
@@ -36,7 +51,7 @@
           :loading="uploading"
           secondary
           :disabled="uploading"
-          >{{ $t('deDataset.upload_data') }}
+        >{{ $t('deDataset.upload_data') }}
         </deBtn>
       </el-upload>
       <div class="table-checkbox-list">
@@ -54,20 +69,23 @@
           @check-change="handleCheckChange"
         >
           <span
-            :title="data.excelLable"
             slot-scope="{ data }"
+            :title="data.excelLabel"
             class="custom-tree-node"
           >
-            {{ data.excelLable }}
+            <span class="label">{{ data.excelLabel }}</span>
             <span
               v-if="
-                (data.nameExsit && !param.tableId) ||
-                data.empty ||
-                data.overLength
+                (data.nameExist && !param.tableId) ||
+                  data.empty ||
+                  data.overLength
               "
-              class="error-name-exsit"
+              class="error-name-exist"
             >
-              <svg-icon icon-class="exclamationmark" class="ds-icon-scene" />
+              <svg-icon
+                icon-class="exclamationmark"
+                class="ds-icon-scene"
+              />
             </span>
           </span>
         </el-tree>
@@ -92,20 +110,20 @@
           />
           <div
             v-if="
-              (sheetObj.nameExsit && !param.tableId) ||
-              sheetObj.empty ||
-              sheetObj.overLength
+              (sheetObj.nameExist && !param.tableId) ||
+                sheetObj.empty ||
+                sheetObj.overLength
             "
             style="left: 107px; top: 52px"
             class="el-form-item__error"
           >
             {{
               $t(
-                sheetObj.nameExsit
+                sheetObj.nameExist
                   ? 'deDataset.already_exists'
                   : sheetObj.overLength
-                  ? 'dataset.char_can_not_more_50'
-                  : 'dataset.pls_input_name'
+                    ? 'dataset.char_can_not_more_50'
+                    : 'dataset.pls_input_name'
               )
             }}
           </div>
@@ -127,36 +145,41 @@
           >
             <ux-table-column
               v-for="field in sheetObj.fields"
-              :key="field.fieldName + field.fieldType"
+              :key="field.fieldName + sheetObj.id"
+              :column-key="field.fieldName + sheetObj.id"
               min-width="200px"
               :field="field.fieldName"
               :title="field.remarks"
+              :fieldType="field.fieldType"
               :resizable="true"
             >
-              <template slot="header">
+              <template #header>
                 <el-dropdown
                   placement="bottom-start"
                   trigger="click"
+                  :key="field.fieldName + field.fieldType"
                   @command="(type) => handleCommand(type, field)"
                 >
-                  <span class="type-switch">
+                  <span  class="type-switch">
                     <svg-icon
                       v-if="field.fieldType === 'TEXT'"
                       icon-class="field_text"
-                      class="field-icon-text" />
+                      class="field-icon-text"
+                    />
                     <svg-icon
                       v-if="field.fieldType === 'DATETIME'"
                       icon-class="field_time"
-                      class="field-icon-time" />
+                      class="field-icon-time"
+                    />
                     <svg-icon
                       v-if="
                         field.fieldType === 'LONG' ||
-                        field.fieldType === 'DOUBLE'
+                          field.fieldType === 'DOUBLE'
                       "
                       icon-class="field_value"
-                      class="field-icon-value" />
-                    <i class="el-icon-arrow-down el-icon--right"
-                  /></span>
+                      class="field-icon-value"
+                    />
+                    <i class="el-icon-arrow-down el-icon--right" /></span>
                   <el-dropdown-menu
                     slot="dropdown"
                     style="width: 178px"
@@ -166,34 +189,32 @@
                       v-for="item in fieldOptions"
                       :key="item.value"
                       :command="item.value"
-                      ><span>
-                        <svg-icon
-                          v-if="item.value === 'TEXT'"
-                          icon-class="field_text"
-                          class="field-icon-text"
-                        />
-                        <svg-icon
-                          v-if="item.value === 'DATETIME'"
-                          icon-class="field_time"
-                          class="field-icon-time"
-                        />
-                        <svg-icon
-                          v-if="
-                            item.value === 'LONG' || item.value === 'DOUBLE'
-                          "
-                          icon-class="field_value"
-                          class="field-icon-value"
-                        />
-                      </span>
+                    ><span>
+                       <svg-icon
+                         v-if="item.value === 'TEXT'"
+                         icon-class="field_text"
+                         class="field-icon-text"
+                       />
+                       <svg-icon
+                         v-if="item.value === 'DATETIME'"
+                         icon-class="field_time"
+                         class="field-icon-time"
+                       />
+                       <svg-icon
+                         v-if="
+                           item.value === 'LONG' || item.value === 'DOUBLE'
+                         "
+                         icon-class="field_value"
+                         class="field-icon-value"
+                       />
+                     </span>
                       <span
                         style="
                           color: #8492a6;
                           font-size: 14px;
                           margin-left: 10px;
                         "
-                        >{{ item.label }}</span
-                      ></el-dropdown-item
-                    >
+                      >{{ item.label }}</span></el-dropdown-item>
                   </el-dropdown-menu>
                 </el-dropdown>
                 <span style="font-size: 14px; margin-left: 10px">
@@ -212,7 +233,7 @@
 import { post } from '@/api/dataset/dataset'
 import { getToken } from '@/utils/auth'
 import i18n from '@/lang'
-import { $alert, $confirm } from '@/utils/message'
+import { $alert } from '@/utils/message'
 import store from '@/store'
 import msgCfm from '@/components/msgCfm/index'
 import cancelMix from './cancelMix'
@@ -251,7 +272,6 @@ export default {
       errImg: require('@/assets/None_Select_ds.png'),
       sheetObj: { datasetName: ' ', fields: [] },
       sheets: [],
-      data: [],
       mode: '1',
       height: 600,
       fileList: [],
@@ -273,7 +293,7 @@ export default {
         }
       ],
       props: {
-        label: 'excelLable',
+        label: 'excelLabel',
         children: 'sheets'
       },
       count: 1,
@@ -287,10 +307,11 @@ export default {
       return this.nameList.filter((ele) => ele !== this.originName)
     }
   },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.calHeight)
+  },
   mounted() {
-    window.onresize = () => {
-      this.calHeight()
-    }
+    window.addEventListener('resize', this.calHeight)
     this.calHeight()
   },
   created() {
@@ -308,7 +329,7 @@ export default {
         this.handleNodeClick(data)
       } else {
         var index = this.defaultCheckedKeys.findIndex((id) => {
-          if (id == data.id) {
+          if (id === data.id) {
             return true
           }
         })
@@ -322,10 +343,10 @@ export default {
         labelList.filter((ele) => !excelList.includes(ele)).length
       )
     },
-    nameExsitValidator(ele, checkList) {
+    nameExistValidator(ele, checkList) {
       this.$set(
         ele,
-        'nameExsit',
+        'nameExist',
         this.nameListCopy
           .concat(checkList)
           .filter((name) => name === ele.datasetName).length > 1
@@ -339,10 +360,10 @@ export default {
         .reduce((pre, next) => pre.concat(next.sheets), [])
         .forEach((ele, index) => {
           if (checkList.includes(ele.datasetName)) {
-            this.nameExsitValidator(ele, checkList)
+            this.nameExistValidator(ele, checkList)
             this.nameLengthValidator(ele)
           } else {
-            this.$set(ele, 'nameExsit', false)
+            this.$set(ele, 'nameExist', false)
             this.$set(ele, 'empty', false)
             this.$set(ele, 'overLength', false)
           }
@@ -357,8 +378,8 @@ export default {
         this.sheetObj = data
         this.fields = data.fields
         this.jsonArray = data.jsonArray
-        const datas = this.jsonArray
-        this.$refs.plxTable.reloadData(datas)
+        const dataList = this.jsonArray
+        this.$refs.plxTable.reloadData(dataList)
       }
     },
     handleCommand(type, field) {
@@ -367,9 +388,9 @@ export default {
     },
     changeDatasetName() {
       for (var i = 0; i < this.excelData.length; i++) {
-        if (this.excelData[i].excelId == this.sheetObj.sheetExcelId) {
+        if (this.excelData[i].excelId === this.sheetObj.sheetExcelId) {
           for (var j = 0; j < this.excelData[i].sheets.length; j++) {
-            if (this.excelData[i].sheets[j].excelId == this.sheetObj.sheetId) {
+            if (this.excelData[i].sheets[j].excelId === this.sheetObj.sheetId) {
               this.excelData[i].sheets[j] = this.sheetObj
             }
           }
@@ -379,7 +400,7 @@ export default {
     },
     calHeight() {
       const that = this
-      setTimeout(function () {
+      setTimeout(function() {
         const currentHeight = document.documentElement.clientHeight
         that.height = currentHeight - 56 - 30 - 26 - 25 - 35 - 10 - 37 - 20 - 10
       }, 10)
@@ -414,9 +435,7 @@ export default {
       this.path = ''
       this.fields = []
       this.sheets = []
-      this.data = []
-      const datas = this.data
-      this.$refs.plxTable?.reloadData(datas)
+      this.$refs.plxTable?.reloadData([])
       this.fileList = []
       this.uploading = false
       this.$message({
@@ -443,7 +462,7 @@ export default {
       var effectExtField = false
       var changeFiled = false
       var selectNode = this.$refs.tree.getCheckedNodes()
-      if (!this.param.tableId && selectNode.some((ele) => ele.nameExsit)) {
+      if (!this.param.tableId && selectNode.some((ele) => ele.nameExist)) {
         this.openMessageSuccess('deDataset.cannot_be_duplicate', 'error')
         return
       }
@@ -469,7 +488,7 @@ export default {
           sheetFileMd5.push(selectNode[i].fieldsMd5)
         }
       }
-      if (selectedSheet.length == 0) {
+      if (!selectedSheet.length) {
         this.openMessageSuccess('dataset.ple_select_excel', 'error')
         return
       }
@@ -650,11 +669,15 @@ export default {
       .custom-tree-node {
         position: relative;
         width: 80%;
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
+        display: flex;
+        .label {
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          width: 85%;
+        }
       }
-      .error-name-exsit {
+      .error-name-exist {
         position: absolute;
         top: 0;
         right: 0;
@@ -687,6 +710,7 @@ export default {
   .table-detail {
     font-family: PingFang SC;
     flex: 1;
+    overflow-x: auto;
 
     .dataset {
       padding: 21px 24px;

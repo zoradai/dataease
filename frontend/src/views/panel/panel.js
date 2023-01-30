@@ -1,12 +1,14 @@
 // eslint-disable-next-line no-unused-vars
 import { DEFAULT_COLOR_CASE, DEFAULT_TITLE_STYLE } from '@/views/chart/chart/chart'
 import { deepCopy } from '@/components/canvas/utils/utils'
-import { COMMON_BACKGROUND_BASE } from '@/components/canvas/custom-component/component-list'
+import { COMMON_BACKGROUND } from '@/components/canvas/customComponent/component-list'
+
 export const TAB_COMMON_STYLE = {
   headFontColor: '#000000',
   headFontActiveColor: '#000000',
-  headBorderColor: null,
-  headBorderActiveColor: null
+  headBorderColor: '#ffffff',
+  headBorderActiveColor: '#ffffff',
+  headPosition: 'left'
 }
 
 export const FILTER_COMMON_STYLE = {
@@ -27,7 +29,15 @@ export const FILTER_COMMON_STYLE_DARK = {
   innerBgColor: '#131E42'
 }
 
+export const MOBILE_SETTING = {
+  customSetting: false,
+  color: '#ffffff',
+  imageUrl: null,
+  backgroundType: 'image'
+}
+
 export const DEFAULT_PANEL_STYLE = {
+  mobileSetting: MOBILE_SETTING,
   themeColor: 'light',
   color: '#ffffff',
   imageUrl: null,
@@ -40,7 +50,7 @@ export const DEFAULT_PANEL_STYLE = {
 export const PANEL_CHART_INFO = {
   chartTitle: DEFAULT_TITLE_STYLE,
   chartColor: DEFAULT_COLOR_CASE,
-  chartCommonStyle: COMMON_BACKGROUND_BASE,
+  chartCommonStyle: COMMON_BACKGROUND,
   filterStyle: FILTER_COMMON_STYLE,
   tabStyle: TAB_COMMON_STYLE
 }
@@ -59,6 +69,11 @@ export const CANVAS_STYLE = {
     showGrid: false,
     matrixBase: 4 // 当前matrix的基数 （是pcMatrixCount的几倍）
   }, // 辅助设计
+  pdfPageLine: {
+    showPageLine: false,
+    proportion: null
+  },
+  refreshViewEnable: true, // 开启视图刷新（默认开启）
   refreshViewLoading: true, // 仪表板视图loading提示
   refreshUnit: 'minute', // 仪表板刷新时间带外 默认 分钟
   refreshTime: 5, // 仪表板刷新时间 默认5分钟
@@ -69,6 +84,11 @@ export const CANVAS_STYLE = {
 export const AIDED_DESIGN = {
   showGrid: false,
   matrixBase: 1 // 当前matrix的基数 （是pcMatrixCount的几倍）
+}
+
+export const PAGE_LINE_DESIGN = {
+  showPageLine: false,
+  proportion: null
 }
 
 export const DEFAULT_COMMON_CANVAS_STYLE_STRING = {

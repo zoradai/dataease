@@ -1,10 +1,32 @@
 <template>
-  <div ref="tableContainer" :style="bg_class" style="width: 100%;height: 100%;overflow: hidden;">
-    <view-track-bar ref="viewTrack" :track-menu="trackMenu" class="track-bar" :style="trackBarStyleTime" @trackClick="trackClick" />
-    <span v-show="title_show" ref="title" :style="title_class" style="cursor: default;display: block;">
+  <div
+    ref="tableContainer"
+    :style="bg_class"
+    style="padding: 4px;width: 100%;height: 100%;overflow: hidden;"
+  >
+    <view-track-bar
+      ref="viewTrack"
+      :track-menu="trackMenu"
+      class="track-bar"
+      :style="trackBarStyleTime"
+      @trackClick="trackClick"
+    />
+    <span
+      v-show="title_show"
+      ref="title"
+      :style="title_class"
+      style="cursor: default;display: block;"
+    >
       <div>
-        <p style="padding:6px 4px 0;margin: 0;overflow: hidden;white-space: pre;text-overflow: ellipsis;display: inline;">{{ chart.title }}</p>
-        <title-remark v-if="chart.render && chart.render === 'antv' && remarkCfg.show" style="text-shadow: none!important;" :remark-cfg="remarkCfg" />
+        <chart-title-update
+          :title-class="title_class"
+          :chart-info="chartInfo"
+        />
+        <title-remark
+          v-if="chart.render && chart.render === 'antv' && remarkCfg.show"
+          style="text-shadow: none!important;margin-left: 4px;"
+          :remark-cfg="remarkCfg"
+        />
       </div>
     </span>
     <div
@@ -13,11 +35,19 @@
       :style="content_class"
     >
       <span :style="label_class">
-        <p v-if="chart.data.series[0].data && chart.data.series[0].data.length > 0" ref="textData" :style="label_content_class" @click="textClick">
+        <p
+          v-if="chart.data.series[0].data && chart.data.series[0].data.length > 0"
+          ref="textData"
+          :style="label_content_class"
+          @click="textClick"
+        >
           {{ chart.data.series[0].data[0] }}
         </p>
       </span>
-      <span v-if="dimensionShow" :style="label_space">
+      <span
+        v-if="dimensionShow"
+        :style="label_space"
+      >
         <p :style="label_class">
           {{ chart.data.series[0].name }}
         </p>
@@ -29,13 +59,14 @@
 <script>
 import { getRemark, hexColorToRGBA } from '../../chart/util'
 import eventBus from '@/components/canvas/utils/eventBus'
-import ViewTrackBar from '@/components/canvas/components/Editor/ViewTrackBar'
+import ViewTrackBar from '@/components/canvas/components/editor/ViewTrackBar'
 import TitleRemark from '@/views/chart/view/TitleRemark'
 import { DEFAULT_SIZE, DEFAULT_TITLE_STYLE } from '@/views/chart/chart/chart'
+import ChartTitleUpdate from '../ChartTitleUpdate.vue'
 
 export default {
   name: 'LabelNormalText',
-  components: { TitleRemark, ViewTrackBar },
+  components: { TitleRemark, ViewTrackBar, ChartTitleUpdate },
   props: {
     chart: {
       type: Object,
@@ -110,13 +141,11 @@ export default {
   computed: {
     trackBarStyleTime() {
       return this.trackBarStyle
+    },
+    chartInfo() {
+      const { id, title } = this.chart
+      return { id, title }
     }
-    // bg_class() {
-    //   return {
-    //     background: hexColorToRGBA('#ffffff', 0),
-    //     borderRadius: this.borderRadius
-    //   }
-    // }
   },
   watch: {
     chart() {
@@ -132,14 +161,12 @@ export default {
   },
   beforeDestroy() {
     eventBus.$off('resizing', this.chartResize)
+    window.removeEventListener('resize', this.calcHeight)
   },
   methods: {
     init() {
-      const that = this
       this.initStyle()
-      window.onresize = function() {
-        that.calcHeight()
-      }
+      window.addEventListener('resize', this.calcHeight)
       this.setBackGroundBorder()
       this.initRemark()
     },
@@ -157,7 +184,7 @@ export default {
       this.$nextTick(function() {
         if (that.$refs.tableContainer) {
           const currentHeight = that.$refs.tableContainer.offsetHeight
-          const contentHeight = currentHeight - that.$refs.title.offsetHeight - 16
+          const contentHeight = currentHeight - that.$refs.title.offsetHeight - 8
           that.height = contentHeight + 'px'
           that.content_class.height = that.height
         }
@@ -168,7 +195,8 @@ export default {
         const customAttr = JSON.parse(this.chart.customAttr)
         if (customAttr.color) {
           this.label_class.color = customAttr.color.dimensionColor
-          this.label_content_class.color = customAttr.color.quotaColor
+          // color threshold
+          this.colorThreshold(customAttr.color.quotaColor)
         }
         if (customAttr.size) {
           this.dimensionShow = customAttr.size.dimensionShow
@@ -187,6 +215,9 @@ export default {
           this.label_content_class.fontStyle = customAttr.size.quotaFontIsItalic ? 'italic' : 'normal'
           this.label_content_class.letterSpacing = (customAttr.size.quotaLetterSpace ? customAttr.size.quotaLetterSpace : DEFAULT_SIZE.quotaLetterSpace) + 'px'
           this.label_content_class.textShadow = customAttr.size.quotaFontShadow ? '2px 2px 4px' : 'none'
+
+          this.content_class.alignItems = customAttr.size.hPosition ? customAttr.size.hPosition : DEFAULT_SIZE.hPosition
+          this.content_class.justifyContent = customAttr.size.vPosition ? customAttr.size.vPosition : DEFAULT_SIZE.vPosition
 
           if (!this.dimensionShow) {
             this.label_space.marginTop = '0px'
@@ -276,13 +307,64 @@ export default {
     },
     initRemark() {
       this.remarkCfg = getRemark(this.chart)
+    },
+    colorThreshold(valueColor) {
+      if (this.chart.senior) {
+        const senior = JSON.parse(this.chart.senior)
+        if (senior.threshold && senior.threshold.textLabelThreshold && senior.threshold.textLabelThreshold.length > 0) {
+          const value = this.chart.data.series[0].data[0]
+          for (let i = 0; i < senior.threshold.textLabelThreshold.length; i++) {
+            let flag = false
+            const t = senior.threshold.textLabelThreshold[i]
+            const tv = t.value
+            if (t.term === 'eq') {
+              if (value === tv) {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            } else if (t.term === 'not_eq') {
+              if (value !== tv) {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            } else if (t.term === 'like') {
+              if (value.includes(tv)) {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            } else if (t.term === 'not like') {
+              if (!value.includes(tv)) {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            } else if (t.term === 'null') {
+              if (value === null || value === undefined || value === '') {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            } else if (t.term === 'not_null') {
+              if (value !== null && value !== undefined && value !== '') {
+                this.label_content_class.color = t.color
+                flag = true
+              }
+            }
+            if (flag) {
+              break
+            } else if (i === senior.threshold.textLabelThreshold.length - 1) {
+              this.label_content_class.color = valueColor
+            }
+          }
+        } else {
+          this.label_content_class.color = valueColor
+        }
+      }
     }
   }
 }
 </script>
 
 <style scoped>
-.table-class ::v-deep .body--wrapper{
-  background: rgba(1,1,1,0);
+.table-class ::v-deep .body--wrapper {
+  background: rgba(1, 1, 1, 0);
 }
 </style>

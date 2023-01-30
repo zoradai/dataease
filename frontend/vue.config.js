@@ -94,12 +94,26 @@ module.exports = {
         deleteOriginalAssets: true // 删除源文件
       })) */
     }
+
+    config.module
+      .rule('icons')
+      .test(/\.svg$/)
+      .include.add(resolve('src/deicons'))
+      .end()
+      .use('svg-sprite-loader')
+      .loader('svg-sprite-loader')
+      .options({
+        symbolId: '[name]'
+      })
   },
   css: {
     loaderOptions: {
       sass: {
         prependData: `@import "@/style/index.scss"`
       }
+    },
+    extract: {
+      ignoreOrder: true
     }
   }
 

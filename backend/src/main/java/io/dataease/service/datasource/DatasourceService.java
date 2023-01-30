@@ -104,15 +104,13 @@ public class DatasourceService {
 
     @DeCleaner(DePermissionType.DATASOURCE)
     @Transactional(rollbackFor = Exception.class)
-    public Datasource addDatasource(Datasource datasource) throws Exception {
-        if (!types().stream().map(DataSourceType::getType).collect(Collectors.toList()).contains(datasource.getType())) {
-            throw new Exception("Datasource type not supported.");
-        }
+    public Datasource addDatasource(DatasourceDTO datasource) throws Exception {
+        preCheckDs(datasource);
+        return insert(datasource);
+    }
 
-        Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
-        datasourceProvider.checkConfiguration(datasource);
-
-        checkName(datasource.getName(), datasource.getType(), datasource.getId());
+    @DeCleaner(DePermissionType.DATASOURCE)
+    public DatasourceDTO insert(DatasourceDTO datasource) {
         long currentTimeMillis = System.currentTimeMillis();
         datasource.setId(UUID.randomUUID().toString());
         datasource.setUpdateTime(currentTimeMillis);
@@ -125,6 +123,17 @@ public class DatasourceService {
         return datasource;
     }
 
+    public void preCheckDs(DatasourceDTO datasource) throws Exception {
+        if (!types().stream().map(DataSourceType::getType).collect(Collectors.toList()).contains(datasource.getType())) {
+            throw new Exception("Datasource type not supported.");
+        }
+        if (datasource.isConfigurationEncryption()) {
+            datasource.setConfiguration(new String(java.util.Base64.getDecoder().decode(datasource.getConfiguration())));
+        }
+        Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
+        datasourceProvider.checkConfiguration(datasource);
+        checkName(datasource.getName(), datasource.getType(), datasource.getId());
+    }
 
     public void handleConnectionPool(String datasourceId, String type) {
         Datasource datasource = datasourceMapper.selectByPrimaryKey(datasourceId);
@@ -149,65 +158,91 @@ public class DatasourceService {
     }
 
     public List<DatasourceDTO> getDatasourceList(DatasourceUnionRequest request) throws Exception {
-        request.setSort("update_time desc");
         List<DatasourceDTO> datasourceDTOS = extDataSourceMapper.queryUnion(request);
-        datasourceDTOS.forEach(datasourceDTO -> {
-            types().forEach(dataSourceType -> {
-                if (dataSourceType.getType().equalsIgnoreCase(datasourceDTO.getType())) {
-                    datasourceDTO.setTypeDesc(dataSourceType.getName());
-                    datasourceDTO.setCalculationMode(dataSourceType.getCalculationMode());
+        datasourceDTOS.forEach(this::datasourceTrans);
+        if (StringUtils.isBlank(request.getSort())) {
+            datasourceDTOS.sort((o1,o2) -> {
+                int tmp = StringUtils.compareIgnoreCase(o1.getTypeDesc(), o2.getTypeDesc());
+                if (tmp == 0) {
+                    tmp = StringUtils.compareIgnoreCase(o1.getName(), o2.getName());
                 }
+                return tmp;
             });
-            if (!datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
-                JdbcConfiguration configuration = new Gson().fromJson(datasourceDTO.getConfiguration(), JdbcConfiguration.class);
-                if (StringUtils.isNotEmpty(configuration.getCustomDriver()) && !configuration.getCustomDriver().equalsIgnoreCase("default")) {
-                    datasourceDTO.setCalculationMode(DatasourceCalculationMode.DIRECT);
-                }
-                JSONObject jsonObject = JSONObject.parseObject(datasourceDTO.getConfiguration());
-                if (jsonObject.getString("queryTimeout") == null) {
-                    jsonObject.put("queryTimeout", 30);
-                    datasourceDTO.setConfiguration(jsonObject.toString());
-                }
-            }
+        }
+        return datasourceDTOS;
+    }
 
-            if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.mysql.toString())) {
-                MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasourceDTO.getConfiguration(), MysqlConfiguration.class);
-                datasourceDTO.setConfiguration(new Gson().toJson(mysqlConfiguration));
-            }
-            if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
-                List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasourceDTO.getConfiguration(), new TypeToken<ArrayList<ApiDefinition>>() {
-                }.getType());
-                List<ApiDefinition> apiDefinitionListWithStatus = new ArrayList<>();
-                int success = 0;
-                if (StringUtils.isNotEmpty(datasourceDTO.getStatus())) {
-                    JsonObject apiItemStatuses = JsonParser.parseString(datasourceDTO.getStatus()).getAsJsonObject();
-
-                    for (int i = 0; i < apiDefinitionList.size(); i++) {
-                        String status = null;
-                        if (apiItemStatuses.get(apiDefinitionList.get(i).getName()) != null) {
-                            status = apiItemStatuses.get(apiDefinitionList.get(i).getName()).getAsString();
-                        }
-                        apiDefinitionList.get(i).setStatus(status);
-                        apiDefinitionList.get(i).setSerialNumber(i);
-                        apiDefinitionListWithStatus.add(apiDefinitionList.get(i));
-                        if (StringUtils.isNotEmpty(status) && status.equalsIgnoreCase("Success")) {
-                            success++;
-                        }
-                    }
-                }
-                datasourceDTO.setApiConfiguration(apiDefinitionListWithStatus);
-                if (success == apiDefinitionList.size()) {
-                    datasourceDTO.setStatus("Success");
-                } else {
-                    if (success > 0 && success < apiDefinitionList.size()) {
-                        datasourceDTO.setStatus("Warning");
-                    } else {
-                        datasourceDTO.setStatus("Error");
-                    }
-                }
+    private void datasourceTrans(DatasourceDTO datasourceDTO) {
+        types().forEach(dataSourceType -> {
+            if (dataSourceType.getType().equalsIgnoreCase(datasourceDTO.getType())) {
+                datasourceDTO.setTypeDesc(dataSourceType.getName());
+                datasourceDTO.setCalculationMode(dataSourceType.getCalculationMode());
             }
         });
-        return datasourceDTOS;
+        if (!datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
+            JdbcConfiguration configuration = new Gson().fromJson(datasourceDTO.getConfiguration(), JdbcConfiguration.class);
+            if (StringUtils.isNotEmpty(configuration.getCustomDriver()) && !configuration.getCustomDriver().equalsIgnoreCase("default")) {
+                datasourceDTO.setCalculationMode(DatasourceCalculationMode.DIRECT);
+            }
+            JSONObject jsonObject = JSONObject.parseObject(datasourceDTO.getConfiguration());
+            if (jsonObject.getString("queryTimeout") == null) {
+                jsonObject.put("queryTimeout", 30);
+                datasourceDTO.setConfiguration(jsonObject.toString());
+            }
+        }
+
+        if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.mysql.toString())) {
+            MysqlConfiguration mysqlConfiguration = new Gson().fromJson(datasourceDTO.getConfiguration(), MysqlConfiguration.class);
+            datasourceDTO.setConfiguration(new Gson().toJson(mysqlConfiguration));
+        }
+        if (datasourceDTO.getType().equalsIgnoreCase(DatasourceTypes.api.toString())) {
+            List<ApiDefinition> apiDefinitionList = new Gson().fromJson(datasourceDTO.getConfiguration(), new TypeToken<ArrayList<ApiDefinition>>() {
+            }.getType());
+            List<ApiDefinition> apiDefinitionListWithStatus = new ArrayList<>();
+            int success = 0;
+            if (StringUtils.isNotEmpty(datasourceDTO.getStatus())) {
+                JsonObject apiItemStatuses = JsonParser.parseString(datasourceDTO.getStatus()).getAsJsonObject();
+
+                for (int i = 0; i < apiDefinitionList.size(); i++) {
+                    String status = null;
+                    if (apiItemStatuses.get(apiDefinitionList.get(i).getName()) != null) {
+                        status = apiItemStatuses.get(apiDefinitionList.get(i).getName()).getAsString();
+                    }
+                    apiDefinitionList.get(i).setStatus(status);
+                    apiDefinitionList.get(i).setSerialNumber(i);
+                    apiDefinitionListWithStatus.add(apiDefinitionList.get(i));
+                    if (StringUtils.isNotEmpty(status) && status.equalsIgnoreCase("Success")) {
+                        success++;
+                    }
+                }
+            }
+            datasourceDTO.setApiConfiguration(apiDefinitionListWithStatus);
+            if (success == apiDefinitionList.size()) {
+                datasourceDTO.setStatus("Success");
+            } else {
+                if (success > 0 && success < apiDefinitionList.size()) {
+                    datasourceDTO.setStatus("Warning");
+                } else {
+                    datasourceDTO.setStatus("Error");
+                }
+            }
+        }
+        if (StringUtils.isNotEmpty(datasourceDTO.getConfiguration())) {
+            datasourceDTO.setConfiguration(new String(java.util.Base64.getEncoder().encode(datasourceDTO.getConfiguration().getBytes())));
+        }
+        if (CollectionUtils.isNotEmpty(datasourceDTO.getApiConfiguration())) {
+            String config = new Gson().toJson(datasourceDTO.getApiConfiguration());
+            datasourceDTO.setApiConfigurationStr(new String(java.util.Base64.getEncoder().encode(config.getBytes())));
+            datasourceDTO.setApiConfiguration(null);
+        }
+    }
+
+    public DatasourceDTO getDataSourceDetails(String datasourceId) {
+        DatasourceDTO result = extDataSourceMapper.queryDetails(datasourceId, String.valueOf(AuthUtils.getUser().getUserId()));
+        if (result != null) {
+            this.datasourceTrans(result);
+        }
+        return result;
     }
 
     public List<DatasourceDTO> gridQuery(BaseGridRequest request) {
@@ -239,9 +274,6 @@ public class DatasourceService {
     }
 
     public void updateDatasource(UpdataDsRequest updataDsRequest) throws Exception {
-        if (!types().stream().map(DataSourceType::getType).collect(Collectors.toList()).contains(updataDsRequest.getType())) {
-            throw new Exception("Datasource type not supported.");
-        }
         checkName(updataDsRequest.getName(), updataDsRequest.getType(), updataDsRequest.getId());
         Datasource datasource = new Datasource();
         datasource.setName(updataDsRequest.getName());
@@ -250,15 +282,18 @@ public class DatasourceService {
         datasource.setCreateTime(null);
         datasource.setType(updataDsRequest.getType());
         datasource.setUpdateTime(System.currentTimeMillis());
-
         Provider datasourceProvider = ProviderFactory.getProvider(updataDsRequest.getType());
         datasourceProvider.checkConfiguration(datasource);
-
         checkAndUpdateDatasourceStatus(datasource);
+        updateDatasource(updataDsRequest.getId(), datasource);
+    }
+
+
+    public void updateDatasource(String id, Datasource datasource) {
         DatasourceExample example = new DatasourceExample();
-        example.createCriteria().andIdEqualTo(updataDsRequest.getId());
+        example.createCriteria().andIdEqualTo(id);
         datasourceMapper.updateByExampleSelective(datasource, example);
-        handleConnectionPool(updataDsRequest.getId());
+        handleConnectionPool(id);
     }
 
     private void handleConnectionPool(String datasourceId) {
@@ -272,7 +307,10 @@ public class DatasourceService {
         }
     }
 
-    public ResultHolder validate(Datasource datasource) throws Exception {
+    public ResultHolder validate(DatasourceDTO datasource) throws Exception {
+        if (datasource.isConfigurationEncryption()) {
+            datasource.setConfiguration(new String(java.util.Base64.getDecoder().decode(datasource.getConfiguration())));
+        }
         DatasourceDTO datasourceDTO = new DatasourceDTO();
         BeanUtils.copyBean(datasourceDTO, datasource);
         try {
@@ -360,7 +398,10 @@ public class DatasourceService {
         }
     }
 
-    public List<String> getSchema(Datasource datasource) throws Exception {
+    public List<String> getSchema(DatasourceDTO datasource) throws Exception {
+        if (datasource.isConfigurationEncryption()) {
+            datasource.setConfiguration(new String(java.util.Base64.getDecoder().decode(datasource.getConfiguration())));
+        }
         Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
         DatasourceRequest datasourceRequest = new DatasourceRequest();
         datasourceRequest.setDatasource(datasource);
@@ -482,7 +523,7 @@ public class DatasourceService {
         return datasourceMapper.selectByExampleWithBLOBs(example);
     }
 
-    private void checkAndUpdateDatasourceStatus(Datasource datasource) {
+    public void checkAndUpdateDatasourceStatus(Datasource datasource) {
         try {
             Provider datasourceProvider = ProviderFactory.getProvider(datasource.getType());
             DatasourceRequest datasourceRequest = new DatasourceRequest();
