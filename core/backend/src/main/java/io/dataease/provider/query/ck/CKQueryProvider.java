@@ -1003,11 +1003,7 @@ public class CKQueryProvider extends QueryProvider {
     }
 
     public String getTotalCount(boolean isTable, String sql, Datasource ds) {
-        if (isTable) {
-            return "SELECT COUNT(*) from " + String.format(CKConstants.KEYWORD_TABLE, sql);
-        } else {
-            return "SELECT COUNT(*) from ( " + sqlFix(sql) + " ) DE_COUNT_TEMP";
-        }
+        return  null;
     }
 
     @Override
