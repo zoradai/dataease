@@ -34,8 +34,8 @@
     <div
       :id="chartId"
       ref="chart"
-      style="width: 100%;overflow: hidden;"
-      :style="{height:chartHeight}"
+      style="overflow: hidden;"
+      :style="{height:chartHeight, width: chartWidth}"
     />
   </div>
 </template>
@@ -118,6 +118,7 @@ export default {
       dynamicAreaCode: null,
       borderRadius: '0px',
       chartHeight: '100%',
+      chartWidth: '100%',
       title_class: {
         margin: '0 0',
         width: '100%',
@@ -170,10 +171,11 @@ export default {
   },
   beforeDestroy() {
     if (this.myChart?.container) {
-      if (typeof this.myChart.container.getAttribute === 'function') {
+      if (this.myChart.container?.getAttribute?.('size-sensor-id')) {
         clear(this.myChart.container)
       }
     }
+    this.resizeObserver?.disconnect()
     this.myChart?.clear?.()
     this.myChart?.unbindSizeSensor?.()
     this.myChart?.unbind?.()
@@ -244,6 +246,7 @@ export default {
       this.initTitle()
       this.calcHeightRightNow(this.drawView)
       window.addEventListener('resize', this.chartResize)
+      this.initResizeObserver()
     },
     async drawView() {
       const chart = JSON.parse(JSON.stringify(this.chart))
@@ -304,7 +307,7 @@ export default {
         this.myChart = await baseFlowMapOption(this.chartId, chart, this.antVAction)
       } else if (chart.type === 'bidirectional-bar') {
         this.myChart = baseBidirectionalBarOptionAntV(this.chartId, chart, this.antVAction)
-      } else if (chart.type === 'stock-line'){
+      } else if (chart.type === 'stock-line') {
         this.myChart = stockLineOptionAntV(this.chartId, chart, this.antVAction)
       }
 
@@ -389,11 +392,11 @@ export default {
         }
       }
     },
-    chartResize() {
+    chartResize(callback) {
       this.resizeTimer && clearTimeout(this.resizeTimer)
       this.resizeTimer = setTimeout(() => {
-        this.calcHeightRightNow()
-      }, 100)
+        this.calcHeightRightNow(callback)
+      }, 300)
     },
     trackClick(trackAction) {
       const idTypeMap = this.chart.data.fields.reduce((pre, next) => {
@@ -503,18 +506,28 @@ export default {
     calcHeightRightNow(callback) {
       this.$nextTick(() => {
         if (this.$refs.chartContainer) {
-          const { offsetHeight } = this.$refs.chartContainer
+          const { offsetHeight, offsetWidth } = this.$refs.chartContainer
           let titleHeight = 0
           if (this.$refs.title) {
             titleHeight = this.$refs.title.offsetHeight
           }
           this.chartHeight = (offsetHeight - titleHeight) + 'px'
+          this.chartWidth = offsetWidth + 'px'
           this.$nextTick(() => callback?.())
         }
       })
     },
     initRemark() {
       this.remarkCfg = getRemark(this.chart)
+    },
+    initResizeObserver() {
+      const manualResizeCharts = ['pie', 'pie-donut']
+      if (manualResizeCharts.includes(this.chart.type)) {
+        this.resizeObserver = new ResizeObserver(() => {
+          this.chartResize(this.drawView)
+        })
+        this.resizeObserver.observe(this.$refs.chart)
+      }
     }
   }
 }
